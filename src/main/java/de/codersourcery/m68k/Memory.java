@@ -57,8 +57,8 @@ public class Memory {
 
     public static String hexdump(int startAddress, byte[] data, int offset, int count) {
 
-        StringBuffer result = new StringBuffer();
-        StringBuffer ascii = new StringBuffer();
+        final StringBuilder result = new StringBuilder();
+        final StringBuilder ascii = new StringBuilder();
         while ( count > 0 )
         {
             final String adr = Integer.toHexString(startAddress);
