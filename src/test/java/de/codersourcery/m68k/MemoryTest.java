@@ -24,8 +24,8 @@ public class MemoryTest extends TestCase
 
     public void testWords() {
 
-        memory.writeByte(0,0x34 );
-        memory.writeByte(1,0x12 );
+        memory.writeByte(0,0x12 );
+        memory.writeByte(1,0x34 );
 
         assertEquals(0x1234,memory.readWord(0 ) );
 
@@ -55,11 +55,10 @@ public class MemoryTest extends TestCase
         memory.writeLong(0, 0x12345678 );
         assertHexEquals(0x12345678,memory.readLong(0 ) );
 
-        memory.writeByte(1,0x78 );
-        memory.writeByte(2,0x56 );
-        memory.writeByte(3,0x34 );
-        memory.writeByte(4,0x12 );
-
+        memory.writeByte(1,0x12 );
+        memory.writeByte(2,0x34 );
+        memory.writeByte(3,0x56 );
+        memory.writeByte(4,0x78 );
         assertHexEquals(0x12345678, memory.readLong(1 ) );
 
         memory.writeLong(1, 0x12345678 );

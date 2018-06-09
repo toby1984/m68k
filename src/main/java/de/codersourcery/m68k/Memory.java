@@ -4,56 +4,46 @@ import org.apache.commons.lang3.StringUtils;
 
 public class Memory {
 
-    private final short[] data;
+    private final byte[] data;
 
     public Memory(int sizeInBytes)
     {
-        this.data = new short[ sizeInBytes/2 ];
+        this.data = new byte[ sizeInBytes ];
     }
     public int readWord(int address)
     {
-        return data[address>>1] & 0xffff;
+        int hi = data[address];
+        int lo = data[address+1];
+        return hi<<8|(lo & 0xff);
     }
 
     public void writeWord(int address,int value)
     {
-        data[address>>1] = (short) value;
+        data[address] = (byte) (value>>8);
+        data[address+1] = (byte) value;
     }
 
     public int readByte(int address)
     {
-        int value = data[ address >> 1];
-        if ( (address & 1) == 0 ) {
-            return value & 0xff;
-        }
-        return (value>>8) & 0xff;
+        return data[address];
     }
 
     public void writeByte(int address,int value)
     {
-        int trimmed = value & 0xff;
-        int mask = 0x00ff;
-        if ( (address & 1) == 0 )
-        {
-            trimmed <<= 8;
-            mask = 0xff00;
-        }
-        data[address>>1] = (short) ( (data[address>>1] & ~mask) | trimmed );
+        data[address] = (byte) value;
     }
 
     public int readLong(int address)
     {
-        final int shifted = address>>1;
-        int low   = data[ shifted+1 ] & 0xffff;
-        int hi  = data[ shifted ] & 0xffff;
-        return hi << 16 | low;
+        int hi = readWord(address);
+        int lo = readWord(address+2);
+        return hi << 16 | (lo & 0xffff);
     }
 
     public void writeLong(int address,int value)
     {
-        final int shifted = address>>1;
-        data[ shifted+1  ] = (short) value; // low
-        data[ shifted ] = (short) ((value>>16) & 0xffff); // high
+        writeWord(address,value>>16);
+        writeWord(address+2,value);
     }
 
     public String hexdump(int startAddress,int count)
