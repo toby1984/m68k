@@ -16,9 +16,16 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     }
 
     @Override
-    public void writeBytes(byte[] bytes) throws IOException
+    public void writeBytes(byte[] bytes)
     {
-        out.write(bytes);
+        try
+        {
+            out.write(bytes);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException(e);
+        }
         offset++;
     }
 

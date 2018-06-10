@@ -189,6 +189,15 @@ public class Assembler
         }
 
         @Override
+        public void error(String message, ASTNode node, Throwable t)
+        {
+            if ( t != null ) {
+                t.printStackTrace();
+            }
+            error(message,node);
+        }
+
+        @Override
         public void error(String message, Token token)
         {
             messages.error(message,token);
