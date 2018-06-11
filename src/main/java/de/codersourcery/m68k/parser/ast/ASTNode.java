@@ -13,7 +13,7 @@ public abstract class ASTNode
 {
     public final NodeType type;
     private ASTNode parent;
-    private final List<ASTNode> children = new ArrayList<>(4);
+    private final List<ASTNode> childs = new ArrayList<>(4);
     private TextRegion region;
 
     public ASTNode(NodeType type)
@@ -70,7 +70,7 @@ public abstract class ASTNode
 
     public final boolean hasChildren()
     {
-        return !children.isEmpty();
+        return ! children().isEmpty();
     }
 
     public final TextRegion getRegion()
@@ -89,7 +89,7 @@ public abstract class ASTNode
         if ( this.region != null ) {
             result = this.region.createCopy();
         }
-        for ( ASTNode child : children )
+        for ( ASTNode child : children() )
         {
             TextRegion merged = child.getMergedRegion();
             if ( merged != null ) {
@@ -105,27 +105,27 @@ public abstract class ASTNode
 
     public final Stream<ASTNode> stream()
     {
-        return children.stream();
+        return children().stream();
     }
 
     public final boolean hasNoChildren()
     {
-        return children.isEmpty();
+        return children().isEmpty();
     }
 
     public final int childCount()
     {
-        return children.size();
+        return children().size();
     }
 
-    public final List<ASTNode> children()
+    public List<ASTNode> children()
     {
-        return children;
+        return childs;
     }
 
     public final ASTNode child(int idx)
     {
-        return children.get(idx);
+        return children().get(idx);
     }
 
     public final boolean hasParent()
@@ -138,23 +138,23 @@ public abstract class ASTNode
         return parent == null;
     }
 
-    public final void add(ASTNode child)
+    public void add(ASTNode child)
     {
         if (child == null)
         {
             throw new IllegalArgumentException("Child must not be NULL");
         }
-        children.add(child);
+        children().add(child);
         child.parent = this;
     }
 
-    public final void remove(ASTNode child)
+    public void remove(ASTNode child)
     {
         if (child == null)
         {
             throw new IllegalArgumentException("Child must not be NULL");
         }
-        if ( children.remove(child) ) {
+        if ( children().remove(child) ) {
             child.parent = null;
         }
     }
@@ -206,7 +206,7 @@ public abstract class ASTNode
         visitor.accept(node,ctx );
         if ( ctx.isGoDeeper() )
         {
-            for ( ASTNode child : node.children )
+            for ( ASTNode child : node.children() )
             {
                 visitInOrder(child, ctx, visitor);
                 if (ctx.stop)
@@ -215,7 +215,6 @@ public abstract class ASTNode
                 }
             }
         }
-
     }
 
     public final String toString()
@@ -229,5 +228,53 @@ public abstract class ASTNode
 
     protected static String indent(int depth) {
         return StringUtils.repeat(" ", depth*4);
+    }
+
+    public static int signExtend8To16(int input)
+    {
+        final int result = input & 0xff;
+        return (input & 0x80) == 0 ? result : 0xff00 | result;
+    }
+
+    public static int signExtend8To32(int input)
+    {
+        final int result = input & 0xff;
+        return (input & 0x80) == 0 ? result : 0xffffff00 | result;
+    }
+
+    public static int signExtend16To32(int input)
+    {
+        final int result = input & 0xffff;
+        return (input & 1<<15) == 0 ? result : 0xffff0000 | result;
+    }
+
+    public static int signExtend(int input,int inputBits,int outputBits)
+    {
+        if ( outputBits < inputBits ) {
+            throw new IllegalArgumentException("outputBits < inputBits: "+outputBits+" vs. "+inputBits);
+        }
+        switch(inputBits) {
+            case 8:
+                switch (outputBits) {
+                    case 8:  return input;
+                    case 16: return signExtend8To16(input);
+                    case 32: return signExtend8To32(input);
+                }
+                break;
+            case 16:
+                switch (outputBits) {
+                    case 16: return input;
+                    case 32: return signExtend16To32(input);
+                }
+                break;
+            case 32:
+                if ( outputBits == 32 ) {
+                    return input;
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported input bit count "+inputBits);
+        }
+        throw new IllegalArgumentException("Unsupported output bit count "+outputBits);
     }
 }

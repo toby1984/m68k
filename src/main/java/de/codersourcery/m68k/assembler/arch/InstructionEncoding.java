@@ -1,5 +1,7 @@
-package de.codersourcery.m68k.assembler;
+package de.codersourcery.m68k.assembler.arch;
 
+import de.codersourcery.m68k.assembler.IntRange;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import java.io.ByteArrayOutputStream;
@@ -27,36 +29,6 @@ public class InstructionEncoding
 
     private final String[] patterns;
     private final Map<Field,List<IBitMapping>>[] bitMappings;
-
-    public static enum Field
-    {
-        SRC_REGISTER,
-        SRC_MODE,
-        DST_REGISTER,
-        DST_MODE,
-        SIZE,
-        /**
-         * Dummy field that indicates
-         * the {@link IBitMapping} requires no
-         * input value at all.
-         */
-        NONE;
-
-
-        public static Field getField(char c)
-        {
-            switch(c) {
-                case 's': return SRC_REGISTER;
-                case 'm': return SRC_MODE;
-                case 'D': return DST_REGISTER;
-                case 'M': return DST_MODE;
-                case 'S': return SIZE;
-                default:
-                    return null;
-            }
-        }
-    }
-
 
     public interface IBitMapping
     {
@@ -260,49 +232,6 @@ public class InstructionEncoding
         }
     }
 
-    private static final class IntRange implements Comparable<IntRange>
-    {
-        public final Field field;
-
-        /** Start index (inclusive) */
-        public int start;
-        public int end;
-
-        public IntRange(Field field,int start,int end)
-        {
-            Validate.notNull(field, "field must not be null");
-            if ( end <= start ) {
-                throw new IllegalArgumentException("End ("+end+") needs to be greater than start ("+start+")");
-            }
-            this.start = start;
-            this.end = end;
-            this.field = field;
-        }
-
-        @Override
-        public String toString()
-        {
-            return "IntRange{" +
-                    "field=" + field +
-                    ", start=" + start +
-                    ", end=" + end +
-                    '}';
-        }
-
-        public boolean contains(int i) {
-            return start <= i && i < end;
-        }
-
-        public int compareTo(IntRange other) {
-            return this.start - other.start;
-        }
-
-        public int length()
-        {
-            return end-start;
-        }
-    }
-
     private InstructionEncoding(String pattern1,String...additional)
     {
         Validate.notBlank( pattern1, "pattern1 must not be null or blank");
@@ -458,8 +387,16 @@ public class InstructionEncoding
                 final int inputValue = field == Field.NONE ? 0 : source.apply(field );
                 for ( var mapping : mappings )
                 {
-                    System.out.println("Applying "+mapping);
+                    System.out.println("=== Applying "+mapping+" with "+StringUtils.leftPad(Integer.toBinaryString(inputValue),16,'0')+" ===");
+                    final int oldValue = outputValue;
                     outputValue = mapping.apply(inputValue,outputValue);
+                    if ( oldValue != outputValue )
+                    {
+                        System.out.println("BEFORE: "+pattern);
+                        System.out.println("BEFORE: "+ StringUtils.leftPad(Integer.toBinaryString(oldValue),16,'0'));
+                        System.out.println("AFTER : " + pattern);
+                        System.out.println("AFTER : " + StringUtils.leftPad(Integer.toBinaryString(outputValue), 16, '0'));
+                    }
                 }
             }
             switch(pattern.length())

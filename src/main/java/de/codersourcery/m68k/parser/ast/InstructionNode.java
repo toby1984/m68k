@@ -1,30 +1,13 @@
 package de.codersourcery.m68k.parser.ast;
 
 import de.codersourcery.m68k.assembler.ICompilationContext;
-import de.codersourcery.m68k.parser.InstructionType;
+import de.codersourcery.m68k.assembler.arch.Field;
+import de.codersourcery.m68k.assembler.arch.OperandSize;
+import de.codersourcery.m68k.assembler.arch.InstructionType;
 import de.codersourcery.m68k.parser.TextRegion;
-import javafx.css.Size;
 
 public class InstructionNode extends ASTNode implements ICodeGeneratingNode
 {
-    public enum OperandSize {
-        BYTE(0b00),
-        WORD(0b01),
-        LONG(0b10),
-        DEFAULT(0b11);
-
-        private int bits;
-
-        private OperandSize(int bits) {
-            this.bits = bits;
-        }
-        public int bits() {
-            if ( this == DEFAULT ) {
-                throw new IllegalStateException("DEFAULT operand size has no encoding");
-            }
-            return bits;
-        }
-    }
 
     private final InstructionType type;
     private OperandSize operandSize;
@@ -47,9 +30,9 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         return (OperandNode) child(1);
     }
 
-    public OperandSize getOperandSize(OperandSize defaultValue)
+    public OperandSize getOperandSize()
     {
-        return operandSize == OperandSize.DEFAULT ? defaultValue : operandSize;
+        return operandSize;
     }
 
     public InstructionType getInstructionType()
@@ -77,6 +60,34 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         catch(Exception e)
         {
             ctx.error("Code generation failed: "+e.getMessage(), this,e);
+        }
+    }
+
+    @Override
+    public int getValueFor(Field field, ICompilationContext ctx)
+    {
+
+        switch(field)
+        {
+            case SRC_REGISTER:
+                final OperandNode src = source();
+                ASTNode value = src.getValue();
+
+                return register.register.bits;
+            case SRC_MODE:
+                return source().addressingMode.bits;
+            case DST_REGISTER:
+                final OperandNode dst = destination();
+                register = dst.child(0).asRegister();
+                return register.register.bits;
+            case DST_MODE:
+                return destination().addressingMode.bits;
+            case SIZE:
+                return operandSize.bits;
+            case NONE:
+                return 0;
+            default:
+                throw new RuntimeException("Internal error,unhandled field "+field);
         }
     }
 }

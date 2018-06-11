@@ -29,73 +29,73 @@ public class CompilationMessages implements ICompilationMessages
 
     // errors
     @Override
-    public void error(String message) {
-        error(message,(TextRegion) null);
+    public void error(CompilationUnit unit,String message) {
+        error(unit,message,(TextRegion) null);
     }
 
     @Override
-    public void error(String message, ASTNode node) {
-        error(message,node == null ? null : node.getMergedRegion());
+    public void error(CompilationUnit unit,String message, ASTNode node) {
+        error(unit,message,node == null ? null : node.getMergedRegion());
     }
 
     @Override
-    public void error(String message, ASTNode node, Throwable t)
+    public void error(CompilationUnit unit,String message, ASTNode node, Throwable t)
     {
         if ( t != null ) {
             t.printStackTrace();
         }
-        error(message,node);
+        error(unit,message,node);
     }
 
     @Override
-    public void error(String message, Token token) {
-        error(message,token == null ? null : token.getRegion());
+    public void error(CompilationUnit unit,String message, Token token) {
+        error(unit,message,token == null ? null : token.getRegion());
     }
 
     @Override
-    public void error(String message, TextRegion region) {
-        messages.add( Message.of(message,Level.ERROR,region) );
+    public void error(CompilationUnit unit,String message, TextRegion region) {
+        messages.add( Message.of(unit,message,Level.ERROR,region) );
     }
 
     // warnings
     @Override
-    public void warn(String message) {
-        warn(message,(TextRegion) null);
+    public void warn(CompilationUnit unit,String message) {
+        warn(unit,message,(TextRegion) null);
     }
 
     @Override
-    public void warn(String message, ASTNode node) {
-        warn(message,node == null ? null : node.getMergedRegion());
+    public void warn(CompilationUnit unit,String message, ASTNode node) {
+        warn(unit,message,node == null ? null : node.getMergedRegion());
     }
 
     @Override
-    public void warn(String message, Token token) {
-        warn(message,token == null ? null : token.getRegion());
+    public void warn(CompilationUnit unit,String message, Token token) {
+        warn(unit,message,token == null ? null : token.getRegion());
     }
 
     @Override
-    public void warn(String message, TextRegion region) {
-        messages.add( Message.of(message,Level.WARN,region) );
+    public void warn(CompilationUnit unit,String message, TextRegion region) {
+        messages.add( Message.of(unit,message,Level.WARN,region) );
     }
 
     // info
     @Override
-    public void info(String message) {
-        info(message,(TextRegion) null);
+    public void info(CompilationUnit unit,String message) {
+        info(unit,message,(TextRegion) null);
     }
 
     @Override
-    public void info(String message, ASTNode node) {
-        info(message,node == null ? null : node.getMergedRegion());
+    public void info(CompilationUnit unit,String message, ASTNode node) {
+        info(unit,message,node == null ? null : node.getMergedRegion());
     }
 
     @Override
-    public void info(String message, Token token) {
-        info(message,token == null ? null : token.getRegion());
+    public void info(CompilationUnit unit,String message, Token token) {
+        info(unit,message,token == null ? null : token.getRegion());
     }
 
     @Override
-    public void info(String message, TextRegion region) {
-        messages.add( Message.of(message,Level.INFO,region) );
+    public void info(CompilationUnit unit,String message, TextRegion region) {
+        messages.add( Message.of(unit,message,Level.INFO,region) );
     }
 }

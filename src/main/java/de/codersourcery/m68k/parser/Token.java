@@ -2,6 +2,7 @@ package de.codersourcery.m68k.parser;
 
 import org.apache.commons.lang3.Validate;
 
+import java.util.Collection;
 import java.util.Objects;
 
 public class Token
@@ -66,5 +67,41 @@ public class Token
     public int hashCode()
     {
         return Objects.hash(value, offset, type);
+    }
+
+    public static TextRegion getMergedRegion(Collection<Token> tokens)
+    {
+        TextRegion result = null;
+        if ( tokens != null )
+        {
+            for ( Token tok : tokens )
+            {
+                if ( tok != null ) {
+                    if ( result == null ) {
+                        result = tok.getRegion();
+                    } else {
+                        result.merge(tok.getRegion() );
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    public static TextRegion getMergedRegion(Token...tokens)
+    {
+        TextRegion result = null;
+        if ( tokens != null ) {
+            for ( Token tok : tokens ) {
+                if ( tok != null ) {
+                    if ( result == null ) {
+                        result = tok.getRegion();
+                    } else {
+                        result.merge(tok.getRegion() );
+                    }
+                }
+            }
+        }
+        return result;
     }
 }

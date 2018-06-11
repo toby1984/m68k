@@ -1,16 +1,15 @@
 package de.codersourcery.m68k.assembler;
 
+import de.codersourcery.m68k.assembler.phases.CodeGenerationPhase;
 import de.codersourcery.m68k.assembler.phases.ParsePhase;
-import de.codersourcery.m68k.parser.Lexer;
-import de.codersourcery.m68k.parser.Parser;
-import de.codersourcery.m68k.parser.StringScanner;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
-import de.codersourcery.m68k.parser.ast.AST;
 import de.codersourcery.m68k.parser.ast.ASTNode;
 import org.apache.commons.lang3.Validate;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,6 +24,7 @@ public class Assembler
     {
         var phases = new ArrayList<ICompilationPhase>();
         phases.add( new ParsePhase() );
+        phases.add( new CodeGenerationPhase() );
         return phases;
     }
 
@@ -45,7 +45,7 @@ public class Assembler
             catch (Exception e)
             {
                 e.printStackTrace();
-                messages.error("Phase "+phase+" failed unexpectedly ("+e.getMessage()+")");
+                messages.error(unit,"Phase "+phase+" failed unexpectedly ("+e.getMessage()+")");
             }
             if ( context.hasErrors() )
             {
@@ -113,7 +113,13 @@ public class Assembler
         public String getSource(CompilationUnit unit) throws IOException
         {
             Validate.notNull(unit, "unit must not be null");
-            return null;
+            final var buffer = new StringBuilder();
+            final var tmp = new char[1024*10];
+            try (var reader = new InputStreamReader( unit.getResource().createInputStream() ) ) {
+                final var len = reader.read(tmp);
+                buffer.append(tmp,0,len);
+            }
+            return buffer.toString();
         }
 
         @Override
@@ -165,27 +171,21 @@ public class Assembler
         }
 
         @Override
-        public void clearMessages()
+        public CompilationMessages getMessages()
         {
-            messages.clearMessages();
-        }
-
-        @Override
-        public List<ICompilationMessages.Message> getMessages()
-        {
-            return messages.getMessages();
+            return messages;
         }
 
         @Override
         public void error(String message)
         {
-            messages.error(message);
+            messages.error(getCompilationUnit(),message);
         }
 
         @Override
         public void error(String message, ASTNode node)
         {
-            messages.error(message,node);
+            messages.error(getCompilationUnit(),message,node);
         }
 
         @Override
@@ -200,61 +200,61 @@ public class Assembler
         @Override
         public void error(String message, Token token)
         {
-            messages.error(message,token);
+            messages.error(getCompilationUnit(),message,token);
         }
 
         @Override
         public void error(String message, TextRegion region)
         {
-            messages.error(message,region);
+            messages.error(getCompilationUnit(),message,region);
         }
 
         @Override
         public void warn(String message)
         {
-            messages.warn(message);
+            messages.warn(getCompilationUnit(),message);
         }
 
         @Override
         public void warn(String message, ASTNode node)
         {
-            messages.warn(message,node);
+            messages.warn(getCompilationUnit(),message,node);
         }
 
         @Override
         public void warn(String message, Token token)
         {
-            messages.warn(message,token);
+            messages.warn(getCompilationUnit(),message,token);
         }
 
         @Override
         public void warn(String message, TextRegion region)
         {
-            messages.warn(message,region);
+            messages.warn(getCompilationUnit(),message,region);
         }
 
         @Override
         public void info(String message)
         {
-            messages.info(message);
+            messages.info(getCompilationUnit(),message);
         }
 
         @Override
         public void info(String message, ASTNode node)
         {
-            messages.info(message,node);
+            messages.info(getCompilationUnit(),message,node);
         }
 
         @Override
         public void info(String message, Token token)
         {
-            messages.info(message,token);
+            messages.info(getCompilationUnit(),message,token);
         }
 
         @Override
         public void info(String message, TextRegion region)
         {
-            messages.info(message,region);
+            messages.info(getCompilationUnit(),message,region);
         }
     }
 }

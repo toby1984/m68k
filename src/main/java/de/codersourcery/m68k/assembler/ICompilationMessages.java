@@ -15,23 +15,25 @@ public interface ICompilationMessages
 
     public static final class Message
     {
+        public final CompilationUnit unit;
         public final String text;
         public final Level level;
         public final TextRegion location;
 
-        private Message(String text, Level level, TextRegion location)
+        private Message(CompilationUnit unit,String text, Level level, TextRegion location)
         {
+            this.unit = unit;
             this.text = text;
             this.level = level;
             this.location = location;
         }
 
-        public static Message of(String text, Level level) {
-            return new Message(text,level,null);
+        public static Message of(CompilationUnit unit,String text, Level level) {
+            return new Message(unit,text,level,null);
         }
 
-        public static Message of(String text, Level level, TextRegion location) {
-            return new Message(text,level,location);
+        public static Message of(CompilationUnit unit,String text, Level level, TextRegion location) {
+            return new Message(unit,text,level,location);
         }
     }
 
@@ -42,31 +44,31 @@ public interface ICompilationMessages
     List<Message> getMessages();
 
     // errors
-    void error(String message);
+    void error(CompilationUnit unit,String message);
 
-    void error(String message, ASTNode node);
+    void error(CompilationUnit unit,String message, ASTNode node);
 
-    void error(String message, ASTNode node,Throwable t);
+    void error(CompilationUnit unit,String message, ASTNode node,Throwable t);
 
-    void error(String message, Token token);
+    void error(CompilationUnit unit,String message, Token token);
 
-    void error(String message, TextRegion region);
+    void error(CompilationUnit unit,String message, TextRegion region);
 
     // warnings
-    void warn(String message);
+    void warn(CompilationUnit unit,String message);
 
-    void warn(String message, ASTNode node);
+    void warn(CompilationUnit unit,String message, ASTNode node);
 
-    void warn(String message, Token token);
+    void warn(CompilationUnit unit,String message, Token token);
 
-    void warn(String message, TextRegion region);
+    void warn(CompilationUnit unit,String message, TextRegion region);
 
     // info
-    void info(String message);
+    void info(CompilationUnit unit,String message);
 
-    void info(String message, ASTNode node);
+    void info(CompilationUnit unit,String message, ASTNode node);
 
-    void info(String message, Token token);
+    void info(CompilationUnit unit,String message, Token token);
 
-    void info(String message, TextRegion region);
+    void info(CompilationUnit unit,String message, TextRegion region);
 }

@@ -1,8 +1,15 @@
 package de.codersourcery.m68k.parser;
 
-import de.codersourcery.m68k.assembler.AddressingMode;
+import de.codersourcery.m68k.assembler.arch.AddressingMode;
+import de.codersourcery.m68k.assembler.arch.InstructionType;
+import de.codersourcery.m68k.assembler.arch.OperandSize;
+import de.codersourcery.m68k.assembler.arch.Register;
+import de.codersourcery.m68k.assembler.arch.Scaling;
 import de.codersourcery.m68k.parser.ast.*;
 import org.apache.commons.lang3.Validate;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class Parser
 {
@@ -11,6 +18,7 @@ public class Parser
     public AST parse(ILexer lexer) throws ParseException
     {
         Validate.notNull(lexer, "lexer must not be null");
+
         this.lexer = lexer;
         final AST result = new AST();
         while ( ! lexer.eof() )
@@ -97,10 +105,11 @@ public class Parser
             {
                 TextRegion region = tok.getRegion();
 
-                final Token token = lexer.next();
-                InstructionNode.OperandSize operandSize = InstructionNode.OperandSize.DEFAULT;
-                if ( token.is(TokenType.DOT ) ) {
-                    lexer.next();
+                lexer.next(); // consume instruction
+                OperandSize operandSize = t.defaultOperandSize;
+                if ( lexer.peek(TokenType.DOT ) )
+                {
+                    final Token token = lexer.next(); // consume dot
                     region.merge(token.getRegion() );
                     final Token token3 = lexer.peek();
                     if ( ! token3.is(TokenType.TEXT ) || token3.value.length() != 1 )
@@ -110,10 +119,13 @@ public class Parser
                     lexer.next();
                     switch( Character.toLowerCase(token3.value.charAt(0) ) ) {
                         case 'b':
-                            operandSize = InstructionNode.OperandSize.BYTE;
+                            operandSize = OperandSize.BYTE;
+                            break;
+                        case 'w':
+                            operandSize = OperandSize.WORD;
                             break;
                         case 'l':
-                            operandSize = InstructionNode.OperandSize.LONG;
+                            operandSize = OperandSize.LONG;
                             break;
                         default:
                             fail("Expected operand size (.b or .l) but got "+token3.value);
@@ -158,17 +170,282 @@ public class Parser
         return null;
     }
 
+    private static boolean evaluatesToNumber(ASTNode node)
+    {
+        // FIXME: Does not recognize expressions yet...
+        return node != null && node.is(NodeType.NUMBER);
+    }
+
+    private ASTNode parseExpression()
+    {
+        // FIXME: Implement parsing expressions here...
+        return parseAtom();
+    }
+
     private OperandNode parseOperand()
     {
-        final ASTNode child = parseAtom();
-        if ( child != null )
+        if ( lexer.peek(TokenType.HASH) ) // move #$0a,d0
         {
-            // TODO: Determine addressing mode
-            final OperandNode op = new OperandNode(AddressingMode.NO_MEMORY_INDIRECT_ACTION0);
-            op.add(child);
+            final Token hash = lexer.next();
+            ASTNode value = parseExpression();
+            if ( value == null ) {
+                fail("Failed to parse immediate mode operand");
+            }
+            final OperandNode op = new OperandNode(AddressingMode.IMMEDIATE_VALUE,Scaling.IDENTITY, hash.getRegion() );
+            op.setValue(value);
             return op;
         }
-        return null;
+
+        /*
+         * move d0,...     => NO_MEMORY_INDIRECT_ACTION0
+         * move a0,...     => NO_MEMORY_INDIRECT_ACTION0
+         *
+         * move $0a(a0),...   => MEMORY_INDIRECT_WITH_WORD_OUTER_DISPLACEMENT
+         * move $0a(a0,d5.w),...   => MEMORY_INDIRECT_WITH_WORD_OUTER_DISPLACEMENT
+         * move $0a(a0,d5.w*1),...   => MEMORY_INDIRECT_WITH_WORD_OUTER_DISPLACEMENT
+         *
+         * move ($0a,a0),...
+         * move ($0a,a0,d5.l),...
+         * move ($0a,a0,d5.l*2),...
+         *
+         * move (a0),   => MEMORY_INDIRECT_WITH_WORD_OUTER_DISPLACEMENT
+         * move (a0)+,  = AddressingMode.INDIRECT_POSTINDEXED_WITH_WORD_OUTER_DISPLACEMENT
+         * move -(a0)
+         *
+         * ([bd,An],An.W*scale,od)
+         */
+        final List<Token> tokens = new ArrayList<>();
+        Token indirectAddressing = null;
+        Token preDecrement = null;
+        ASTNode innerDisplacement = null;
+        RegisterNode register = null;
+        if ( lexer.peek(TokenType.MINUS ) )
+        {
+            preDecrement = lexer.next();
+            if (lexer.peek(TokenType.PARENS_OPEN)) // MOVE -(a0),...
+            {
+                tokens.add( preDecrement );
+                indirectAddressing = lexer.next();
+                tokens.add(indirectAddressing);
+
+                register = parseRegister();
+                if ( register == null ) {
+                    fail("Expected an address register");
+                }
+                if ( ! register.isAddressRegister() ) {
+                    fail("Expected an address register",register.getRegion());
+                }
+                if ( ! lexer.peek(TokenType.PARENS_CLOSE ) ) {
+                    fail("Expected closing parens");
+                }
+                tokens.add(lexer.next());
+                final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+                op.setValue(register);
+                return op;
+            }
+            fail("Misplaced unary minus");
+            return null; // never reached
+        }
+
+        // MOVE (....
+        // MOVE $123(
+        // MOVE Dx....
+
+        if ( ! lexer.peek(TokenType.PARENS_OPEN ) )
+        {
+            // expecting inner displacement value outside parens
+            innerDisplacement = parseExpression();
+            if ( innerDisplacement.is(NodeType.REGISTER) ) // MOVE D3,D4
+            {
+                Register r = innerDisplacement.asRegister().register;
+                AddressingMode mode = null;
+                if ( r.isAddress() ) {
+                    mode = AddressingMode.ADDRESS_REGISTER_DIRECT;
+                } else if ( r.isData() ) {
+                    mode = AddressingMode.DATA_REGISTER_DIRECT;
+                } else {
+                    fail("Expected a data or address register",innerDisplacement.getRegion());
+                }
+                final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+                op.setValue(innerDisplacement);
+                return op;
+            }
+            // MOVE $1234
+            if ( ! evaluatesToNumber(innerDisplacement ) ) {
+                fail("Expected a displacement value",innerDisplacement.getRegion());
+            }
+        }
+
+        if ( ! lexer.peek(TokenType.PARENS_OPEN ) ) { // LEA $1234,
+            final OperandNode op = new OperandNode(AddressingMode.IMMEDIATE_ADDRESS,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+            op.setValue(innerDisplacement);
+            return op;
+        }
+        tokens.add(lexer.next()); // consume opening parens
+
+        if ( innerDisplacement == null )
+        {
+            // MOVE (
+
+            // check for inner displacement (bd,...) syntax
+            ASTNode eaOrRegister = parseExpression();
+            if ( eaOrRegister == null ) {
+                fail("Expected an address register");
+            }
+            if ( evaluatesToNumber(eaOrRegister ) )
+            {
+                // MOVE ($0a,
+                innerDisplacement = eaOrRegister;
+            }
+            else if ( eaOrRegister.is(NodeType.REGISTER ) )
+            {
+                // move (A0
+                if ( ! eaOrRegister.asRegister().isAddressRegister() ) {
+                    fail("Expected an address register",eaOrRegister.getRegion());
+                }
+                register = eaOrRegister.asRegister();
+
+                if ( lexer.peek(TokenType.PARENS_CLOSE ) ) // MOVE (a0),...
+                {
+                    tokens.add(lexer.next());
+
+                    if ( lexer.peek(TokenType.PLUS) ) {
+                        tokens.add(lexer.next());
+                        final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+                        op.setValue(register);
+                        return op;
+                    }
+                    final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+                    op.setValue(register);
+                    return op;
+                }
+
+            } else {
+                fail("Expected a displacement value or address register",eaOrRegister.getRegion());
+            }
+
+            if ( lexer.peek(TokenType.PARENS_CLOSE) ) {
+                tokens.add(lexer.next());
+                final AddressingMode mode;
+                if ( register == null && innerDisplacement != null ) {
+                     mode = AddressingMode.MEMORY_INDIRECT;
+                } else if ( register != null && innerDisplacement == null ) {
+                     mode = AddressingMode.ADDRESS_REGISTER_INDIRECT;
+                } else if ( register != null && innerDisplacement != null ) {
+                     mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
+                } else {
+                    throw new RuntimeException("Unreachable code reached");
+                }
+                final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+                op.setValue(register);
+                op.setInnerDisplacement(innerDisplacement);
+                return op;
+            }
+
+            // MOVE (stuff,
+            if ( ! lexer.peek(TokenType.COMMA) ) {
+                fail("Expected a comma followed by an address register");
+            }
+            tokens.add(lexer.next());
+        }
+
+        if ( register == null )
+        {
+            ASTNode eaOrRegister = parseExpression();
+            if ( eaOrRegister == null ) {
+                fail("Expected an address register");
+            }
+            if ( ! eaOrRegister.is(NodeType.REGISTER ) || ! eaOrRegister.asRegister().isAddressRegister() ) {
+                fail("Expected an address register");
+            }
+            register = eaOrRegister.asRegister();
+        }
+
+        if ( lexer.peek(TokenType.PARENS_CLOSE ) ) {
+            tokens.add(lexer.next());
+            AddressingMode mode = innerDisplacement != null ? AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT :
+                    AddressingMode.ADDRESS_REGISTER_INDIRECT;
+            final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+            op.setInnerDisplacement(innerDisplacement);
+            op.setValue(register);
+            return op;
+        }
+
+        if ( ! lexer.peek(TokenType.COMMA) ) {
+            fail("Expected a comma followed by an address register");
+        }
+        tokens.add(lexer.next());
+
+        // parse index register
+        ASTNode eaOrRegister = parseAtom();
+        if ( eaOrRegister == null ) {
+            fail("Expected an index register");
+        }
+        if ( ! eaOrRegister.is(NodeType.REGISTER) || ! eaOrRegister.asRegister().isAddressRegister() ) {
+            fail("Expected an index register",eaOrRegister.getRegion());
+        }
+        final RegisterNode indexRegister = eaOrRegister.asRegister();
+
+        Scaling scaling = Scaling.IDENTITY;
+        if ( lexer.peek(TokenType.TIMES ) ) {
+            tokens.add(lexer.next());
+            final ASTNode tmp = parseNumber();
+            if ( tmp  == null ) {
+                fail("Expected a scaling value (1,2,4,8)");
+            }
+            final long value = tmp.asNumber().getValue();
+            if ( value == 1 ) {
+                scaling = Scaling.IDENTITY;
+            } else if ( value == 2 ) {
+                scaling = Scaling.TWO;
+            } else if ( value == 4 ) {
+                scaling = Scaling.FOUR;
+            } else if ( value == 8 ) {
+                scaling = Scaling.EIGHT;
+            } else {
+                fail("Invalid scaling value ,needs to be one of {1,2,4,8}");
+            }
+        }
+
+        // parse outer displacement (if any)
+        ASTNode outerDisplacement = null;
+        if ( lexer.peek(TokenType.COMMA) )
+        {
+            tokens.add(lexer.peek());
+            outerDisplacement = parseAtom();
+            if ( outerDisplacement == null ) {
+                fail("Expected outer displacement value");
+            }
+            if( ! evaluatesToNumber(outerDisplacement ) ) {
+                fail("Invalid outer displacement value",outerDisplacement.getRegion());
+            }
+        }
+
+        // parse closing parens
+        if ( ! lexer.peek(TokenType.PARENS_CLOSE ) ) {
+            fail("Missing closing parens");
+        }
+        tokens.add(lexer.next());
+
+        AddressingMode mode = null;
+        if ( scaling == Scaling.IDENTITY ) {
+            mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT_AND_SCALE_OPTIONAL;
+        } else {
+            mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT_AND_SCALE;
+        }
+
+        final OperandNode op = new OperandNode(mode, scaling,Token.getMergedRegion(tokens) );
+        op.setValue( register );
+        op.setIndexRegister(indexRegister);
+
+        if ( innerDisplacement != null )
+        {
+            op.setInnerDisplacement(innerDisplacement);
+        }
+        if ( outerDisplacement != null ) {
+            op.setOuterDisplacement( outerDisplacement );
+        }
+        return op;
     }
 
     private ASTNode parseAtom()
@@ -201,29 +478,57 @@ public class Parser
         return parseString();
     }
 
-    private ASTNode parseRegister()
+    private RegisterNode parseRegister()
     {
-        final Token tok = lexer.peek();
-        if ( tok.is(TokenType.TEXT) )
+        final Token prefix = lexer.peek();
+        if ( prefix.is(TokenType.TEXT) )
         {
-            Register r = Register.parseRegister(tok.value);
-            if ( r != null ) {
-                lexer.next();
-                return new RegisterNode(r,tok.getRegion());
-            }
-            lexer.next();
-            final Token tok2 = lexer.peek();
-            if ( tok2.is(TokenType.DIGITS ) )
+            lexer.next(); // consume prefix
+            Token registerNumber = null;
+            Register r = Register.parseRegister(prefix.value);
+            if ( r == null )
             {
-                r = Register.parseRegister(tok.value + tok2.value);
-                if (r != null)
+                if ( ! lexer.peek(TokenType.DIGITS ) ) // not Rx
                 {
-                    lexer.next();
-                    return new RegisterNode(r, tok.getRegion());
+                    lexer.push(prefix);
+                    return null;
+                }
+                registerNumber = lexer.peek();
+                r = Register.parseRegister(prefix.value + registerNumber.value);
+                if ( r == null )
+                {
+                    lexer.push(prefix);
+                    return null;
+                }
+                lexer.next(); // consume register number
+            }
+
+            OperandSize operandSize = null;
+            Token dot = null;
+            Token sizeSpec = null;
+            if( lexer.peek(TokenType.DOT) )
+            {
+                if ( ! r.supportsOperandSizeSpec )
+                {
+                    fail("Register "+r+" does not support size specification");
+                }
+                dot = lexer.next();
+                if ( ! lexer.peek().is(TokenType.TEXT ) ) {
+                    fail("Expected either .w or .l",dot.getRegion());
+                }
+                sizeSpec = lexer.next();
+                switch( sizeSpec.value.toLowerCase() ) {
+                    case "w":
+                        operandSize = OperandSize.WORD;
+                        break;
+                    case "l":
+                        operandSize = OperandSize.LONG;
+                        break;
+                    default:
+                        fail("Expected either .w or .l",sizeSpec.getRegion());
                 }
             }
-            lexer.push(tok);
-            return null;
+            return new RegisterNode(r,operandSize, Token.getMergedRegion(prefix,registerNumber,dot,sizeSpec ) );
         }
         return null;
     }

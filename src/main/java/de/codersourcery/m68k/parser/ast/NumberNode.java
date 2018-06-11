@@ -2,10 +2,40 @@ package de.codersourcery.m68k.parser.ast;
 
 import de.codersourcery.m68k.parser.TextRegion;
 
-public class NumberNode extends ASTNode
+public class NumberNode extends ASTNode implements IValueNode
 {
     private final long value;
     private final NumberType type;
+
+    @Override
+    public int getBits(int inputBits, int outputBits)
+    {
+        int input;
+        switch(inputBits)
+        {
+            case 8:
+                if ( value <-128 || value > 255 ) {
+                    throw new IllegalStateException("Value not inside 8-bit range: "+value);
+                }
+                input = (byte) value;
+                break;
+            case 16:
+                if ( value < -32768 || value > 65535) {
+                    throw new IllegalStateException("Value not inside 16-bit range: "+value);
+                }
+                input = (short) value;
+                break;
+            case 32:
+                if ( value < (1<<31) || value > 0x000000ffffffff ) {
+                    throw new IllegalStateException("Value not inside 32-bit range: "+value);
+                }
+                input = (int) value;
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported input bit count "+inputBits);
+        }
+        return signExtend(input,inputBits,outputBits);
+    }
 
     public enum NumberType
     {

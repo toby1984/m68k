@@ -15,6 +15,7 @@ public class ParsePhase implements ICompilationPhase
         final Parser p = new Parser();
         final String source = ctx.getSource(ctx.getCompilationUnit());
         final AST ast = p.parse(new Lexer(new StringScanner(source)));
+        System.out.println("AST: \n"+ast);
         ctx.getCompilationUnit().setAST(ast);
     }
 }

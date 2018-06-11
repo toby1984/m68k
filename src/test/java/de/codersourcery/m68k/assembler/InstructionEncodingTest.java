@@ -1,9 +1,10 @@
 package de.codersourcery.m68k.assembler;
 
+import de.codersourcery.m68k.assembler.arch.Field;
+import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.List;
 import java.util.function.Function;
 
 public class InstructionEncodingTest extends TestCase
@@ -48,7 +49,7 @@ public class InstructionEncodingTest extends TestCase
 
     public void testFixed16BitPattern()
     {
-        final Function<InstructionEncoding.Field,Integer> valueSource =
+        final Function<Field,Integer> valueSource =
                 field -> { throw new UnsupportedOperationException(); };
 
         final int expected = 0b1111000010010001;
@@ -79,7 +80,7 @@ public class InstructionEncodingTest extends TestCase
 
     public void testFixed32BitPattern()
     {
-        final Function<InstructionEncoding.Field,Integer> valueSource =
+        final Function<Field,Integer> valueSource =
                 field -> { throw new UnsupportedOperationException(); };
 
         final int expected = 0b1111000010010001_1111000010010101;
@@ -100,9 +101,9 @@ public class InstructionEncodingTest extends TestCase
 
     public void test16BitPattern()
     {
-        final Function<InstructionEncoding.Field,Integer> valueSource = field ->
+        final Function<Field,Integer> valueSource = field ->
                 {
-                    if ( field != InstructionEncoding.Field.SRC_REGISTER ) {
+                    if ( field != Field.SRC_REGISTER ) {
                         fail("Unexpected field: "+field);
                     }
                     return 0b101;

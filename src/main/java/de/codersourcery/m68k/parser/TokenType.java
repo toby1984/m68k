@@ -17,5 +17,5 @@ public enum TokenType
     PARENS_OPEN,
     PARENS_CLOSE,
     WHITESPACE,
-    EOF,EOL;
+    EOF,EOL, HASH;
 }
