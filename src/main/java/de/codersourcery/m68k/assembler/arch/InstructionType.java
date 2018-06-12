@@ -8,14 +8,44 @@ import java.util.function.Function;
 
 public enum InstructionType
 {
-    MOVE("move",2, OperandSize.WORD)
+    /*
+Bits 15 – 12 Operation
+0000 Bit Manipulation/MOVEP/Immed iate
+0001 Move Byte
+0010 Move Long
+0011 Move Word
+0100 Miscellaneous
+0101 ADDQ/SUBQ/Scc/DBcc/TRAPc c
+0110 Bcc/BSR/BRA
+0111 MOVEQ
+1000 OR/DIV/SBCD
+1001 SUB/SUBX
+1010 (Unassigned, Reserved)
+1011 CMP/EOR
+1100 AND/MUL/ABCD/EXG
+1101 ADD/ADDX
+1110 Shift/Rotate/Bit Field
+1111 Coprocessor Interface/MC68040 and CPU32 Extensions
+     */
+    MOVE("move",2, OperandSize.WORD,0b0000)
             {
-        @Override
+                @Override
+                public int getOperationCode(InstructionNode insn)
+                {
+                    switch( insn.getOperandSize() ) {
+                        case BYTE: return 0b0001;
+                        case WORD: return 0b0011;
+                        case LONG: return 0b0010;
+                    }
+                    throw new RuntimeException("Unhandled switch/case: "+ insn.getOperandSize());
+                }
+
+                @Override
         public void checkSupports(Operand kind, OperandNode node)
         {
         }
     },
-    LEA("lea",2, OperandSize.LONG)
+    LEA("lea",2, OperandSize.LONG,0b0100)
             {
         @Override
         public void checkSupports(Operand kind, OperandNode node)
@@ -39,15 +69,22 @@ public enum InstructionType
     public final OperandSize defaultOperandSize;
     private final String mnemonic;
     private final int operandCount;
+    private final int operationMode; // bits 15-12 of first instruction word
 
-    private InstructionType(String mnemonic, int operandCount, OperandSize defaultOperandSize)
+    private InstructionType(String mnemonic, int operandCount, OperandSize defaultOperandSize,int operationMode)
     {
         this.mnemonic = mnemonic.toLowerCase();
         this.operandCount = operandCount;
         this.defaultOperandSize = defaultOperandSize;
+        this.operationMode = operationMode;
     }
 
     public abstract void checkSupports(Operand kind, OperandNode node);
+
+    public int getOperationCode(InstructionNode insn)
+    {
+        return operationMode;
+    }
 
     public int getOperandCount()
     {
@@ -98,11 +135,7 @@ public enum InstructionType
                 case 'M': return DST_MODE;
                 case 'S': return SIZE;
      */
-    private static final InstructionEncoding MOVE_BYTE = InstructionEncoding.of("0001DDDMMMmmmsss");
-    private static final InstructionEncoding MOVE_LONG = InstructionEncoding.of("0010DDDMMMmmmsss");
-    private static final InstructionEncoding MOVE_WORD = InstructionEncoding.of("0011DDDMMMmmmsss");
-    private static final InstructionEncoding MOVE_SRC_MEM_INDIREC =
-            InstructionEncoding.of("0010DDDMMMmmmsss");
+    private static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
 
     private static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss");
 
@@ -119,21 +152,8 @@ public enum InstructionType
 
         switch(type)
         {
-            case LEA:
-                return LEA_ENCODING;
-            case MOVE:
-
-                final int sizeBits = node.getValueFor(Field.SIZE, context);
-                if ( sizeBits == OperandSize.BYTE.bits ) {
-                    return MOVE_BYTE;
-                }
-                if ( sizeBits == OperandSize.WORD.bits ) {
-                    return MOVE_WORD;
-                }
-                if ( sizeBits == OperandSize.LONG.bits ) {
-                    return MOVE_LONG;
-                }
-                throw new RuntimeException("Internal error, size "+sizeBits);
+            case LEA:  return LEA_ENCODING;
+            case MOVE: return MOVE_ENCODING;
             default:
                 throw new RuntimeException("Internal error,unhandled instruction type "+type);
         }

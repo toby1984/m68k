@@ -4,7 +4,7 @@ import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.parser.TextRegion;
 
-public class RegisterNode extends ASTNode
+public class RegisterNode extends ASTNode implements IValueNode
 {
     public final Register register;
 
@@ -47,5 +47,11 @@ public class RegisterNode extends ASTNode
     public void toString(StringBuilder buffer, int depth)
     {
         buffer.append(indent(depth)).append("Register [").append( register ).append("]\n");
+    }
+
+    @Override
+    public int getBits()
+    {
+        return register.bits;
     }
 }

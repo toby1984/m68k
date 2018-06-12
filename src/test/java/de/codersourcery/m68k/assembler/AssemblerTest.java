@@ -20,10 +20,17 @@ public class AssemblerTest extends TestCase
         //case 'm': return SRC_MODE;
         //case 'D': return DST_REGISTER;
         //case 'M': return DST_MODE;
+
         //case 'S': return SIZE;
 
-        // 0001DDDMMMmmmsss
-        // 0001001000010000
+        // 0001DDDM_MMmmmsss
+        // 00010010_00111000 0x1238
+        // 00010010_00110100 0x1234
+        // --
+        // 0001DDDM_MMmmmsss
+        // 00010010_00111100
+
+        // GNU AS >= 1238 1234
         assertArrayEquals(compile("move.b ($1234),d1"),0x12,0x38,0x12,0x34);
 
         assertArrayEquals(compile("move.b d0,d1"),0x12,0x00);
@@ -93,7 +100,8 @@ public class AssemblerTest extends TestCase
         if ( actual.length != len ) {
             fail = true;
         }
-        for ( int i = 0 ; i < len ; i++ )
+        final int minLen = Math.min(actual.length,expected.length);
+        for ( int i = 0 ; i < minLen ; i++ )
         {
             if ( expected[i] != actual[i] ) {
                 fail = true;

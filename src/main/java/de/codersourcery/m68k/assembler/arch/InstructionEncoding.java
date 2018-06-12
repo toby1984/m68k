@@ -30,6 +30,12 @@ public class InstructionEncoding
     private final String[] patterns;
     private final Map<Field,List<IBitMapping>>[] bitMappings;
 
+    private InstructionEncoding(String[] newPatterns, Map<Field,List<IBitMapping>>[] newMappings)
+    {
+        this.patterns = newPatterns;
+        this.bitMappings = newMappings;
+    }
+
     public interface IBitMapping
     {
         public Field getField();
@@ -302,39 +308,42 @@ public class InstructionEncoding
         for ( int i = 0, len = pattern.length(),bitNo=len-1 ; bitNo >= 0 ; i++,bitNo--)
         {
             final char c = pattern.charAt(i);
-            if ( c == '0' ) {
-                clearMask &= ~(1<<bitNo);
-            } else if ( c == '1' ) {
-                clearMask &= ~(1<<bitNo);
-                setMask |= (1<<bitNo);
-            }
-            else
-            {
-                final Field field = Field.getField(c );
-                if ( field == null ) {
-                    throw new IllegalArgumentException("Unknown field '"+c+"' at position "+i+" in pattern >"+pattern+"<");
-                }
-                List<IntRange> list = bitRanges.get(field);
-                if (list == null)
+            switch(c) {
+                case '0':
+                    clearMask &= ~(1<<bitNo);
+                    break;
+                case '1':
+                    clearMask &= ~(1<<bitNo);
+                    setMask |= (1<<bitNo);
+                    break;
+                default:
                 {
-                    list = new ArrayList<>();
-                    bitRanges.put(field,list);
-                }
-                boolean merged = false;
-                for ( IntRange r : list )
-                {
-                    if ( r.contains(bitNo) ) {
-                        merged = true;
-                        break;
-                    } else if ( r.start == bitNo+1) {
-                        r.start = bitNo;
-                        merged = true;
-                        break;
+                    final Field field = Field.getField(c);
+                    if ( field == null ) {
+                        throw new IllegalArgumentException("Unknown field '"+c+"' at position "+i+" in pattern >"+pattern+"<");
                     }
-                }
-                if ( ! merged )
-                {
-                    list.add(new IntRange(field,bitNo,bitNo+1));
+                    List<IntRange> list = bitRanges.get(field);
+                    if (list == null)
+                    {
+                        list = new ArrayList<>();
+                        bitRanges.put(field,list);
+                    }
+                    boolean merged = false;
+                    for ( IntRange r : list )
+                    {
+                        if ( r.contains(bitNo) ) {
+                            merged = true;
+                            break;
+                        } else if ( r.start == bitNo+1) {
+                            r.start = bitNo;
+                            merged = true;
+                            break;
+                        }
+                    }
+                    if ( ! merged )
+                    {
+                        list.add(new IntRange(field,bitNo,bitNo+1));
+                    }
                 }
             }
         }
@@ -343,8 +352,8 @@ public class InstructionEncoding
         {
             result.add( new FixedBitValue(Field.NONE,setMask,clearMask) );
         }
-        bitRanges.forEach((field,ranges) ->
-        {
+        for (Map.Entry<Field, List<IntRange>> entry : bitRanges.entrySet() ) {
+            final List<IntRange> ranges = entry.getValue();
             if ( ranges.size() == 1 )
             {
                 final IntRange range = ranges.get(0);
@@ -368,8 +377,18 @@ public class InstructionEncoding
                 }
                 result.add(mapping);
             }
-        });
-        return result.stream().collect(Collectors.groupingBy(map -> map.getField() ) );
+        }
+        final Map<Field, List<IBitMapping>> resultMap = new HashMap<>();
+        for (IBitMapping mapping : result)
+        {
+            List<IBitMapping> list = resultMap.get(mapping.getField());
+            if ( list == null ) {
+                list = new ArrayList<>();
+                resultMap.put(mapping.getField(),list);
+            }
+            list.add(mapping);
+        }
+        return resultMap;
     }
 
     public byte[] apply(Function<Field,Integer> source)
@@ -415,5 +434,23 @@ public class InstructionEncoding
             }
         }
         return out.toByteArray();
+    }
+
+    /**
+     * Returns a new instruction encoding from this one with one more pattern appended.
+     *
+     * @param pattern pattern to append
+     * @return new instruction encoding.
+     */
+    public InstructionEncoding append(String pattern)
+    {
+        final Map<Field,List<IBitMapping>>[] newMappings = new HashMap[ bitMappings.length +1 ];
+        System.arraycopy(bitMappings,0,newMappings,0,bitMappings.length);
+        newMappings[newMappings.length-1] = getMappings(pattern);
+
+        final String[] newPatterns = new String[ patterns.length+1 ];
+        System.arraycopy(patterns,0,newPatterns,0,patterns.length);
+        newPatterns[newPatterns.length-1] = pattern;
+        return new InstructionEncoding(newPatterns,newMappings);
     }
 }

@@ -63,23 +63,28 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         }
     }
 
+    private int getValue(OperandNode operand)
+    {
+        final ASTNode astNode = operand.getValue();
+        if ( astNode instanceof IValueNode) {
+            return  ((IValueNode) astNode).getBits();
+        }
+        throw new IllegalArgumentException("Don't know how to extract value from "+astNode);
+    }
+
     @Override
     public int getValueFor(Field field, ICompilationContext ctx)
     {
-
         switch(field)
         {
-            case SRC_REGISTER:
-                final OperandNode src = source();
-                ASTNode value = src.getValue();
-
-                return register.register.bits;
+            case OP_CODE:
+                return getInstructionType().getOperationCode(this);
+            case SRC_VALUE:
+                return getValue(source());
             case SRC_MODE:
                 return source().addressingMode.bits;
-            case DST_REGISTER:
-                final OperandNode dst = destination();
-                register = dst.child(0).asRegister();
-                return register.register.bits;
+            case DST_VALUE:
+                return getValue(destination());
             case DST_MODE:
                 return destination().addressingMode.bits;
             case SIZE:

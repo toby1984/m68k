@@ -9,7 +9,6 @@ import java.util.function.Function;
 
 public class InstructionEncodingTest extends TestCase
 {
-
     public void testNullPatternFails()
     {
         try
@@ -103,7 +102,7 @@ public class InstructionEncodingTest extends TestCase
     {
         final Function<Field,Integer> valueSource = field ->
                 {
-                    if ( field != Field.SRC_REGISTER ) {
+                    if ( field != Field.SRC_VALUE) {
                         fail("Unexpected field: "+field);
                     }
                     return 0b101;

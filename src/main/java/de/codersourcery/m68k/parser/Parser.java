@@ -218,7 +218,7 @@ public class Parser
         Token indirectAddressing = null;
         Token preDecrement = null;
         ASTNode innerDisplacement = null;
-        RegisterNode register = null;
+        RegisterNode baseRegister = null;
         if ( lexer.peek(TokenType.MINUS ) )
         {
             preDecrement = lexer.next();
@@ -228,19 +228,19 @@ public class Parser
                 indirectAddressing = lexer.next();
                 tokens.add(indirectAddressing);
 
-                register = parseRegister();
-                if ( register == null ) {
+                baseRegister = parseRegister();
+                if ( baseRegister == null ) {
                     fail("Expected an address register");
                 }
-                if ( ! register.isAddressRegister() ) {
-                    fail("Expected an address register",register.getRegion());
+                if ( ! baseRegister.isAddressRegister() ) {
+                    fail("Expected an address register",baseRegister.getRegion());
                 }
                 if ( ! lexer.peek(TokenType.PARENS_CLOSE ) ) {
                     fail("Expected closing parens");
                 }
                 tokens.add(lexer.next());
                 final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT,Scaling.IDENTITY, Token.getMergedRegion(tokens));
-                op.setValue(register);
+                op.setValue(baseRegister);
                 return op;
             }
             fail("Misplaced unary minus");
@@ -303,7 +303,7 @@ public class Parser
                 if ( ! eaOrRegister.asRegister().isAddressRegister() ) {
                     fail("Expected an address register",eaOrRegister.getRegion());
                 }
-                register = eaOrRegister.asRegister();
+                baseRegister = eaOrRegister.asRegister();
 
                 if ( lexer.peek(TokenType.PARENS_CLOSE ) ) // MOVE (a0),...
                 {
@@ -312,11 +312,11 @@ public class Parser
                     if ( lexer.peek(TokenType.PLUS) ) {
                         tokens.add(lexer.next());
                         final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,Scaling.IDENTITY, Token.getMergedRegion(tokens));
-                        op.setValue(register);
+                        op.setValue(baseRegister);
                         return op;
                     }
                     final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT,Scaling.IDENTITY, Token.getMergedRegion(tokens));
-                    op.setValue(register);
+                    op.setValue(baseRegister);
                     return op;
                 }
 
@@ -326,18 +326,23 @@ public class Parser
 
             if ( lexer.peek(TokenType.PARENS_CLOSE) ) {
                 tokens.add(lexer.next());
+                final ASTNode value;
                 final AddressingMode mode;
-                if ( register == null && innerDisplacement != null ) {
-                     mode = AddressingMode.MEMORY_INDIRECT;
-                } else if ( register != null && innerDisplacement == null ) {
-                     mode = AddressingMode.ADDRESS_REGISTER_INDIRECT;
-                } else if ( register != null && innerDisplacement != null ) {
-                     mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
+                if ( baseRegister == null && innerDisplacement != null ) {
+                    value = innerDisplacement;
+                    innerDisplacement = null;
+                    mode = AddressingMode.MEMORY_INDIRECT;
+                } else if ( baseRegister != null && innerDisplacement == null ) {
+                    mode = AddressingMode.ADDRESS_REGISTER_INDIRECT;
+                    value = baseRegister;
+                } else if ( baseRegister != null && innerDisplacement != null ) {
+                    mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
+                    value = baseRegister;
                 } else {
                     throw new RuntimeException("Unreachable code reached");
                 }
                 final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
-                op.setValue(register);
+                op.setValue(value);
                 op.setInnerDisplacement(innerDisplacement);
                 return op;
             }
@@ -349,7 +354,7 @@ public class Parser
             tokens.add(lexer.next());
         }
 
-        if ( register == null )
+        if ( baseRegister == null )
         {
             ASTNode eaOrRegister = parseExpression();
             if ( eaOrRegister == null ) {
@@ -358,7 +363,7 @@ public class Parser
             if ( ! eaOrRegister.is(NodeType.REGISTER ) || ! eaOrRegister.asRegister().isAddressRegister() ) {
                 fail("Expected an address register");
             }
-            register = eaOrRegister.asRegister();
+            baseRegister = eaOrRegister.asRegister();
         }
 
         if ( lexer.peek(TokenType.PARENS_CLOSE ) ) {
@@ -367,7 +372,7 @@ public class Parser
                     AddressingMode.ADDRESS_REGISTER_INDIRECT;
             final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
             op.setInnerDisplacement(innerDisplacement);
-            op.setValue(register);
+            op.setValue(baseRegister);
             return op;
         }
 
@@ -435,7 +440,7 @@ public class Parser
         }
 
         final OperandNode op = new OperandNode(mode, scaling,Token.getMergedRegion(tokens) );
-        op.setValue( register );
+        op.setValue( baseRegister );
         op.setIndexRegister(indexRegister);
 
         if ( innerDisplacement != null )

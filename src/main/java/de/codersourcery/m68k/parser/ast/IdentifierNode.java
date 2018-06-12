@@ -3,7 +3,7 @@ package de.codersourcery.m68k.parser.ast;
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.parser.TextRegion;
 
-public class IdentifierNode extends ASTNode
+public class IdentifierNode extends ASTNode implements IValueNode
 {
     private final Identifier value;
 
@@ -25,5 +25,11 @@ public class IdentifierNode extends ASTNode
     public void toString(StringBuilder buffer, int depth)
     {
         buffer.append(indent(depth)).append("Identifier [").append(value).append("]\n");
+    }
+
+    @Override
+    public int getBits()
+    {
+        throw new UnsupportedOperationException("Symbol tables/identifier lookup not implemented yet...");
     }
 }

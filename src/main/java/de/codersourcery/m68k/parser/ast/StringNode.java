@@ -27,30 +27,25 @@ public class StringNode extends ASTNode implements IValueNode
     }
 
     @Override
-    public int getBits(int inputBits, int outputBits)
+    public int getBits()
     {
         if ( value == null ) {
             throw new IllegalStateException("No value");
         }
-        int input;
-        switch( inputBits)
+        final int resultBits = Math.max(value.length()*8,32);
+        switch( resultBits)
         {
             case 32:
-                input = (value.charAt(0) & 0xff)<<24 |
-                        (value.charAt(0) & 0xff)<<16 |
-                        (value.charAt(0) & 0xff)<< 8 |
-                        (value.charAt(1) & 0xff);
-                break;
+                return (value.charAt(0) & 0xff)<<24 |
+                        (value.charAt(1) & 0xff)<<16 |
+                        (value.charAt(2) & 0xff)<< 8 |
+                        (value.charAt(3) & 0xff);
             case 16:
-                input = (value.charAt(0) & 0xff)<<8 |
+                return (value.charAt(0) & 0xff)<<8 |
                         (value.charAt(1) & 0xff);
-                break;
             case  8:
-                input = (value.charAt(0) & 0xff);
-                break;
-            default:
-                throw new IllegalArgumentException("bit count must be 8,16 or 32 but was "+inputBits);
+                return (value.charAt(0) & 0xff);
         }
-        return signExtend(input,inputBits,outputBits);
+        throw new IllegalArgumentException("bit count must be 8,16 or 32 but was "+resultBits);
     }
 }

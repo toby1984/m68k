@@ -19,11 +19,13 @@ public enum Register
     A5("a5",Type.ADDRESS,5,true),
     A6("a6",Type.ADDRESS,6,true),
     A7("a7",Type.ADDRESS,Type.STACKPTR,7,true),
-    PC("pc",Type.PC,0,false);
+    PC("pc",Type.PC,0,false),
+    SR("sr",Type.SR,0,false),
+    CCR("ccr",Type.CCR,0,false);
 
-    private final String name;
-    private final Type type1;
-    private final Type type2;
+    public final String name;
+    public final Type type1;
+    public final Type type2;
     public final int bits;
     public final boolean supportsOperandSizeSpec; // whether R.w / R.l syntax is allowed
 
@@ -79,7 +81,8 @@ public enum Register
         DATA,
         ADDRESS,
         STACKPTR,
-        PC
+        SR,
+        PC,CCR;
     }
 
     public static Register parseRegister(String s)
@@ -104,6 +107,8 @@ public enum Register
                 case "a5": case "A5": return Register.A5;
                 case "a6": case "A6": return Register.A6;
                 case "a7": case "A7": return Register.A7;
+                case "ccr": case "CCR": return Register.CCR;
+                case "sr": case "SR": return Register.SR;
                 case "sp": case "SP": case "sP": case "Sp": return Register.A7;
                 case "pc": case "PC": case "pC": case "Pc": return Register.PC;
             }
