@@ -63,7 +63,7 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         }
     }
 
-    private int getValue(OperandNode operand)
+    public int getValue(OperandNode operand)
     {
         final ASTNode astNode = operand.getValue();
         if ( astNode instanceof IValueNode) {

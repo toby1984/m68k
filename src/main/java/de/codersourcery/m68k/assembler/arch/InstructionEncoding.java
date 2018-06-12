@@ -12,7 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Instruction encoding.
@@ -48,10 +47,6 @@ public class InstructionEncoding
          * @return Updated outputValue
          */
         public int apply(int inputValue,int outputValue);
-    }
-
-    private static boolean isBitNoOutOfRange(int bitNo) {
-        return bitNo < 0 || bitNo > MAX_BITNO;
     }
 
     /**
@@ -123,17 +118,17 @@ public class InstructionEncoding
             if ( bitCount < 1 || bitCount > 32 ) {
                 throw new IllegalArgumentException("Bitcount must be 1 <= x <= 32 but was "+bitCount);
             }
-            if ( isBitNoOutOfRange(srcBitNo) ) {
+            if (srcBitNo < 0 || srcBitNo > MAX_BITNO) {
                 throw new IllegalArgumentException("srcBitNo must be 0 <= x <= 31 but was "+srcBitNo);
             }
-            if ( isBitNoOutOfRange(srcBitNo+bitCount) ) {
-                throw new IllegalArgumentException("srcBitNo+bitCount must be 0 <= x <= 31 but was "+(srcBitNo+bitCount));
+            if (srcBitNo + bitCount < 0 || srcBitNo + bitCount > MAX_BITNO + 1) {
+                throw new IllegalArgumentException("srcBitNo+bitCount must be 0 <= x <= 32 but was "+(srcBitNo+bitCount));
             }
-            if ( isBitNoOutOfRange( dstBitNo ) ) {
+            if (dstBitNo < 0 || dstBitNo > MAX_BITNO ) {
                 throw new IllegalArgumentException("dstBitNo must be 0 <= x <= 31 but was "+dstBitNo);
             }
-            if ( isBitNoOutOfRange(dstBitNo+bitCount) ) {
-                throw new IllegalArgumentException("dstBitNo+bitCount must be 0 <= x <= 31 but was "+(dstBitNo+bitCount));
+            if (dstBitNo + bitCount < 0 || dstBitNo + bitCount > MAX_BITNO + 1) {
+                throw new IllegalArgumentException("dstBitNo+bitCount must be 0 <= x <= 32 but was "+(dstBitNo+bitCount));
             }
 
             for ( int i = srcBitNo,len=bitCount ; len > 0 ; len--,i++ ) {
@@ -451,6 +446,30 @@ public class InstructionEncoding
         final String[] newPatterns = new String[ patterns.length+1 ];
         System.arraycopy(patterns,0,newPatterns,0,patterns.length);
         newPatterns[newPatterns.length-1] = pattern;
+        return new InstructionEncoding(newPatterns,newMappings);
+    }
+
+    public InstructionEncoding append(String pattern1,String... morePatterns)
+    {
+        final int oldLen = patterns.length;
+
+        final int additionalPatternCount = morePatterns == null ? 0 : morePatterns.length;
+        final int newParamCount = 1 + additionalPatternCount;
+        final int newLen = oldLen + newParamCount;
+
+        final Map<Field,List<IBitMapping>>[] newMappings = new HashMap[ newLen ];
+        final String[] newPatterns = new String[ newLen ];
+
+        System.arraycopy(bitMappings,0,newMappings,0,oldLen);
+        System.arraycopy(patterns,0,newPatterns,0,oldLen);
+
+        newPatterns[oldLen] = pattern1;
+        newMappings[oldLen] = getMappings(pattern1);
+        for ( int i = 0,newIdx = oldLen+1 ; i < additionalPatternCount ; i++,newIdx++ ) {
+            final String pattern = morePatterns[i];
+            newMappings[newIdx] = getMappings(pattern);
+            newPatterns[newIdx] = pattern;
+        }
         return new InstructionEncoding(newPatterns,newMappings);
     }
 }

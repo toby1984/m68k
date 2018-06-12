@@ -2,18 +2,24 @@ package de.codersourcery.m68k.assembler.arch;
 
 public enum Field
 {
-    SRC_VALUE,
-    SRC_MODE,
-    DST_VALUE,
-    DST_MODE,
-    SIZE,
-    OP_CODE,
+    SRC_VALUE('s'),
+    SRC_MODE('m'),
+    DST_VALUE('D'),
+    DST_MODE('M'),
+    SIZE('S'),
+    OP_CODE('o'),
     /**
      * Dummy field that indicates
      * the {@link InstructionEncoding.IBitMapping} requires no
      * input value at all.
      */
-    NONE;
+    NONE('x');
+
+    public final char c;
+
+    private Field(char c) {
+        this.c = c;
+    }
 
     public static Field getField(char c)
     {
