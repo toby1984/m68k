@@ -2,6 +2,7 @@ package de.codersourcery.m68k.assembler.arch;
 
 import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.parser.ast.InstructionNode;
+import de.codersourcery.m68k.parser.ast.NodeType;
 import de.codersourcery.m68k.parser.ast.OperandNode;
 import org.apache.commons.lang3.StringUtils;
 
@@ -57,16 +58,16 @@ Bits 15 – 12 Operation
                 {
                     if (kind == Operand.DESTINATION)
                     {
-                        if (node.addressingMode != AddressingMode.ADDRESS_REGISTER_DIRECT)
+                        if ( node.getValue().isNot(NodeType.REGISTER) || ! node.getValue().asRegister().isAddressRegister() )
                         {
                             throw new RuntimeException("LEA needs an address register as destination");
                         }
                     }
                     else if (kind == Operand.SOURCE)
                     {
-                        if (node.addressingMode != AddressingMode.IMMEDIATE_ADDRESS)
+                        if ( ! node.hasAbsoluteAddressing() )
                         {
-                            throw new RuntimeException("LEA requires an immediate address value as source");
+                            throw new RuntimeException("LEA requires an absolute address value as source");
                         }
                     }
                 }
@@ -144,9 +145,9 @@ Bits 15 – 12 Operation
                 case 'o': return OPERATION_CODE;
      */
     private static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
-    private static final InstructionEncoding MOVE_SRC_EXTRA_ENCODING = InstructionEncoding.of("ooooDDDMMM111000");
-    private static final InstructionEncoding MOVE_DST_EXTRA_ENCODING = InstructionEncoding.of("oooo000111mmmsss");
-    private static final InstructionEncoding MOVE_SRC_AND_DST_EXTRA_ENCODING = InstructionEncoding.of("oooo000111111000");
+    private static final InstructionEncoding MOVE_SRC_EXTRA_ENCODING = InstructionEncoding.of("ooooDDDMMMmmm000");
+    private static final InstructionEncoding MOVE_DST_EXTRA_ENCODING = InstructionEncoding.of("oooo000MMMmmmsss");
+    private static final InstructionEncoding MOVE_SRC_AND_DST_EXTRA_ENCODING = InstructionEncoding.of("oooo000MMMmmm000");
 
     private static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss");
 
@@ -168,36 +169,20 @@ Bits 15 – 12 Operation
             case LEA:
                 return LEA_ENCODING;
             case MOVE:
-                int extraSrcWords = getExtraWordCount(insn.source(), insn,context);
-                int extraDstWords = getExtraWordCount(insn.destination(), insn,context);
+                final String[] extraSrcWords = getExtraWordPatterns(insn.source(), true, insn,context);
+                final String[] extraDstWords = getExtraWordPatterns(insn.destination(), false, insn,context);
 
-                if (extraSrcWords > 2)
+                if (extraSrcWords != null && extraDstWords == null)
                 {
-                    throw new RuntimeException("Not implemented: Generating more than 2 extra src words");
+                    return MOVE_SRC_EXTRA_ENCODING.append(extraSrcWords);
                 }
-                if (extraDstWords > 2)
+                if (extraSrcWords == null && extraDstWords != null)
                 {
-                    throw new RuntimeException("Not implemented: Generating more than 2 extra dst words");
+                    return MOVE_DST_EXTRA_ENCODING.append(extraDstWords);
                 }
-
-                if (extraSrcWords != 0 && extraDstWords == 0)
+                if (extraSrcWords != null && extraDstWords != null)
                 {
-                    // TODO: Hack, will break if more than 2 extra words (>32 bits) are needed
-                    final String srcExtra = StringUtils.repeat(Field.SRC_VALUE.c, extraSrcWords * 16);
-                    return MOVE_SRC_EXTRA_ENCODING.append(srcExtra);
-                }
-                if (extraSrcWords == 0 && extraDstWords != 0)
-                {
-                    // TODO: Hack, will break if more than 2 extra words (>32 bits) are needed
-                    final String dstExtra = StringUtils.repeat(Field.DST_VALUE.c, extraSrcWords * 16);
-                    return MOVE_DST_EXTRA_ENCODING.append(dstExtra);
-                }
-                if (extraSrcWords != 0 && extraDstWords != 0)
-                {
-                    // TODO: Hack, will break if more than 2 extra words (>32 bits) are needed
-                    final String srcExtra = StringUtils.repeat(Field.SRC_VALUE.c, extraSrcWords * 16);
-                    final String dstExtra = StringUtils.repeat(Field.DST_VALUE.c, extraSrcWords * 16);
-                    return MOVE_SRC_AND_DST_EXTRA_ENCODING.append(srcExtra, dstExtra);
+                    return MOVE_SRC_AND_DST_EXTRA_ENCODING.append(extraSrcWords).append(extraDstWords);
                 }
                 return MOVE_ENCODING;
             default:
@@ -205,45 +190,95 @@ Bits 15 – 12 Operation
         }
     }
 
-    // returns how many extra words will need to be written
-    // to accomodate for the given operand and operand size
-    private int getExtraWordCount(OperandNode op, InstructionNode insn,ICompilationContext ctx)
+    // returns any InstructionEncoding patterns
+    // needed to accomodate all operand values
+    private String[] getExtraWordPatterns(OperandNode op, boolean isSourceOperand,InstructionNode insn,ICompilationContext ctx)
     {
+//            case DATA_REGISTER_DIRECT: // can be encoded in first instruction word
+//                return null;
+//            case ADDRESS_REGISTER_DIRECT: // can be encoded in first instruction word
+//                return null;
+//            case ADDRESS_REGISTER_INDIRECT: // can be encoded in first instruction word
+//                return null;
+//            case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT:
+//                return null; // TODO: Wrong, fix me
+//            case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT:
+//                return null; // TODO: Wrong, fix me
+//            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
+//                char c = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT.c : Field.DST_BASE_DISPLACEMENT.c;
+//                return new String[] { StringUtils.repeat(c,16) };
+//            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT_AND_SCALE:
+//                return null; // TODO: Wrong, fix me
+//            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT_AND_SCALE_OPTIONAL:
+//                return null; // TODO: Wrong, fix me
+//            case PROGRAM_COUNTER_INDIRECT_WITH_DISPLACEMENT:
+//                return null; // TODO: Wrong, fix me
+//            case IMMEDIATE_VALUE:
+//                return null; // TODO: Wrong, fix me
+//            case IMMEDIATE_ADDRESS: // LEA $1234,A0
+//                c = isSourceOperand ? Field.SRC_VALUE.c : Field.DST_VALUE.c;
+//                return new String[] { StringUtils.repeat(c,32) };
+//            case NO_OPERAND:
+//                return null;
+//            case MEMORY_INDIRECT: // MOVE ($1234).w,D0 / MOVE ($12345678).L,D1
+//                //  check whether the address fits in 15 bits
+//                // (16-bit instruction words get sign-extended by the
+//                // CPU)
+//                c = isSourceOperand ? Field.SRC_VALUE.c : Field.DST_VALUE.c;
+//                int value = insn.getValue(op.getValue());
+//                if ( (value & 1<<15) == 0 ) { // sign-expansion would not turn this into a negative 32-bit value
+//                    return new String[] { StringUtils.repeat(c,16) };
+//                }
+//                return new String[] { StringUtils.repeat(c,32) };
+//        }
+        final Field displacement = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT : Field.DST_BASE_DISPLACEMENT;
+        final Field value = isSourceOperand ? Field.SRC_VALUE: Field.DST_VALUE;
         switch (op.addressingMode)
         {
-            case DATA_REGISTER_DIRECT: // can be encoded in first instruction word
-                return 0;
-            case ADDRESS_REGISTER_DIRECT: // can be encoded in first instruction word
-                return 0;
-            case ADDRESS_REGISTER_INDIRECT: // can be encoded in first instruction word
-                return 0;
-            case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT:
-                return 0; // TODO: Wrong, fix me
-            case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT:
-                return 0; // TODO: Wrong, fix me
+            case DATA_REGISTER_DIRECT: return null; // handled
+            case ADDRESS_REGISTER_DIRECT: return null; // handled
+            case ADDRESS_REGISTER_INDIRECT: return null; // handled
+            case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT: return null; // handled
+            case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT: return null; // handled
             case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
-                return 0; // TODO: Wrong, fix me
-            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT_AND_SCALE:
-                return 0; // TODO: Wrong, fix me
-            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT_AND_SCALE_OPTIONAL:
-                return 0; // TODO: Wrong, fix me
-            case PROGRAM_COUNTER_INDIRECT_WITH_DISPLACEMENT:
-                return 0; // TODO: Wrong, fix me
-            case IMMEDIATE_VALUE:
+                return new String[] { StringUtils.repeat(displacement.c,16) };
+            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                // FIXME: 1 extra word
                 break;
-            case IMMEDIATE_ADDRESS: // LEA $1234,A0
-                return 2;
-            case NO_OPERAND:
-                return 0;
-            case MEMORY_INDIRECT: // MOVE ($1234).w,D0 / MOVE ($12345678).L,D1
-                //  check whether the address fits in 15 bits
-                // (16-bit instruction words get sign-extended by the
-                // CPU)
-                int value = insn.getValue(op);
-                if ( (value & 1<<15) == 0 ) { // sign-expansion would not turn this into a negative 32-bit value
-                    return 1;
-                }
-                return 2;
+            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                // FIXME: 1-3 extra words
+                break;
+            case MEMORY_INDIRECT_POSTINDEXED:
+                // FIXME: 1-5 extra words
+                break;
+            case MEMORY_INDIRECT_PREINDEXED:
+                // FIXME: 1-5 extra words
+                break;
+            case PC_INDIRECT_WITH_DISPLACEMENT:
+                // FIXME: 1 extra word
+                break;
+            case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                // FIXME: 1 extra word
+                break;
+            case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                // FIXME: 1-3 extra words
+                break;
+            case PC_MEMORY_INDIRECT_POSTINDEXED:
+                // FIXME: 1-5 extra words
+                break;
+            case PC_MEMORY_INDIRECT_PREINDEXED:
+                // FIXME: 1-5 extra words
+                break;
+            case ABSOLUTE_SHORT_ADDRESSING:
+                // FIXME: 1 extra word
+                break;
+            case ABSOLUTE_LONG_ADDRESSING:
+                // FIXME: 2 extra words
+                break;
+            case IMMEDIATE_VALUE:
+                // FIXME: 1-6 extra words
+                break;
+            case NO_OPERAND: return null; // handled
         }
         throw new RuntimeException("Unhandled addressing mode: "+op.addressingMode);
     }

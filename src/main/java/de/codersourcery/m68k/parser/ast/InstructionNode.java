@@ -63,9 +63,8 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         }
     }
 
-    public int getValue(OperandNode operand)
+    public int getValue(ASTNode astNode)
     {
-        final ASTNode astNode = operand.getValue();
         if ( astNode instanceof IValueNode) {
             return  ((IValueNode) astNode).getBits();
         }
@@ -80,13 +79,23 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
             case OP_CODE:
                 return getInstructionType().getOperationCode(this);
             case SRC_VALUE:
-                return getValue(source());
+                if ( source().addressingMode.eaRegisterField.isFixedValue() ) {
+                    return source().addressingMode.eaRegisterField.value();
+                }
+                return getValue(source().getValue());
+            case SRC_BASE_DISPLACEMENT:
+                return getValue( source().getBaseDisplacement() );
             case SRC_MODE:
-                return source().addressingMode.bits;
+                return source().addressingMode.eaModeField;
             case DST_VALUE:
-                return getValue(destination());
+                if ( destination().addressingMode.eaRegisterField.isFixedValue() ) {
+                    return destination().addressingMode.eaRegisterField.value();
+                }
+                return getValue(destination().getValue());
+            case DST_BASE_DISPLACEMENT:
+                return getValue( destination().getBaseDisplacement() );
             case DST_MODE:
-                return destination().addressingMode.bits;
+                return destination().addressingMode.eaModeField;
             case SIZE:
                 return operandSize.bits;
             case NONE:

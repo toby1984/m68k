@@ -45,6 +45,11 @@ public class TextRegion implements Serializable
     	}
     	return false;
     }
+
+    public void incLength(int length)
+    {
+        this.length+=length;
+    }
     
     public static int hashCode(TextRegion range) 
     {

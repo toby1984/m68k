@@ -472,4 +472,28 @@ public class InstructionEncoding
         }
         return new InstructionEncoding(newPatterns,newMappings);
     }
+
+    public InstructionEncoding append(String[] morePatterns)
+    {
+        if ( morePatterns == null || morePatterns.length == 0 ) {
+            return this;
+        }
+
+        final int oldLen = patterns.length;
+        final int newLen = oldLen + morePatterns.length;
+
+        final Map<Field,List<IBitMapping>>[] newMappings = new HashMap[ newLen ];
+        final String[] newPatterns = new String[ newLen ];
+
+        System.arraycopy(bitMappings,0,newMappings,0,oldLen);
+        System.arraycopy(patterns,0,newPatterns,0,oldLen);
+
+        for ( int i = 0,newIdx = oldLen,max = morePatterns.length ; i < max ; i++,newIdx++ )
+        {
+            final String pattern = morePatterns[i];
+            newMappings[newIdx] = getMappings(pattern);
+            newPatterns[newIdx] = pattern;
+        }
+        return new InstructionEncoding(newPatterns,newMappings);
+    }
 }

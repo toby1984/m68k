@@ -2,6 +2,8 @@ package de.codersourcery.m68k;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.function.Function;
+
 public class Memory {
 
     private final byte[] data;
@@ -55,7 +57,64 @@ public class Memory {
         return hexdump(startAddress, tmp, 0,count);
     }
 
+    private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
+
+    private static final HexConverter HEX_CONVERTER = new HexConverter();
+    private static final HexConverter BIN_CONVERTER = new BinConverter() {
+
+    };
+
+    public static class HexConverter
+    {
+        protected final char[] buffer;
+
+        public HexConverter() {
+            this(2);
+        }
+
+        protected HexConverter(int bufferSize)
+        {
+            this.buffer = new char[bufferSize];
+        }
+
+        public char[] convert(byte input)
+        {
+            buffer[0] = HEX_CHARS[ (input >> 4 ) & 0x0f ];
+            buffer[1] = HEX_CHARS[ input & 0x0f ];
+            return buffer;
+        }
+    }
+
+    public static class BinConverter extends HexConverter
+    {
+        public BinConverter() {
+            super(8);
+        }
+
+        public char[] convert(byte input)
+        {
+            buffer[0] = ( (input & ( 1<<7 )) != 0 ) ? '1' : '0';
+            buffer[1] = ( (input & ( 1<<6 )) != 0 ) ? '1' : '0';
+            buffer[2] = ( (input & ( 1<<5 )) != 0 ) ? '1' : '0';
+            buffer[3] = ( (input & ( 1<<4 )) != 0 ) ? '1' : '0';
+            buffer[4] = ( (input & ( 1<<3 )) != 0 ) ? '1' : '0';
+            buffer[5] = ( (input & ( 1<<2 )) != 0 ) ? '1' : '0';
+            buffer[6] = ( (input & ( 1<<1 )) != 0 ) ? '1' : '0';
+            buffer[7] = ( (input & ( 1<<0 )) != 0 ) ? '1' : '0';
+            return buffer;
+        }
+    }
+
     public static String hexdump(int startAddress, byte[] data, int offset, int count) {
+        return dump(startAddress,data,offset,count,HEX_CONVERTER);
+    }
+
+    public static String bindump(int startAddress, byte[] data, int offset, int count) {
+        return dump(startAddress,data,offset,count,BIN_CONVERTER);
+    }
+
+    private static String dump(int startAddress, byte[] data, int offset, int count, HexConverter converter)
+    {
 
         final StringBuilder result = new StringBuilder();
         final StringBuilder ascii = new StringBuilder();
@@ -74,8 +133,8 @@ public class Memory {
                 } else {
                     ascii.append(".");
                 }
-                final String value = Integer.toHexString( v );
-                result.append( StringUtils.leftPad(value,2,'0'));
+                final char[] value = converter.convert(v);
+                result.append(value,0,value.length);
                 if ( count-1 > 0 && (i+1) < 16) {
                   result.append(' ');
                 }

@@ -33,6 +33,21 @@ public class LexerTest extends TestCase
         assertEquals( expected,tokens);
     }
 
+    public void testLexImmediateMode()
+    {
+        var expected = Arrays.asList(
+            token(TokenType.TEXT,"move",0),
+            token(TokenType.WHITESPACE," ",4),
+            token(TokenType.HASH,"#", 5),
+            token(TokenType.TEXT,"$12", 6),
+            token(TokenType.COMMA,",",9),
+            token(TokenType.TEXT,"d0",10),
+            token(TokenType.EOF,null,12)
+        );
+        var tokens = lex("move #$12,d0" , false );
+        assertEquals( expected,tokens);
+    }
+
     public void testLexWhiteSpace()
     {
         var expected = Arrays.asList(

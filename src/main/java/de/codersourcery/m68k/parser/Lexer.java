@@ -119,6 +119,10 @@ outer:
             final char c = scanner.peek();
             switch(c)
             {
+                case '#':
+                    parseBuffer(start);
+                    charToken(TokenType.HASH);
+                    return;
                 case '+':
                     parseBuffer(start);
                     charToken(TokenType.PLUS);

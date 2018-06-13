@@ -23,15 +23,10 @@ public class AssemblerTest extends TestCase
 
         //case 'S': return SIZE;
 
-        // 0001DDDM_MMmmmsss
-        // 00010010_00111000 0x1238
-        // 00010010_00110100 0x1234
-        // --
-        // 0001DDDM_MMmmmsss
-        // 00010010_00111100
-
-        // GNU AS >= 1238 1234
-        assertArrayEquals(compile("move.b ($1234),d1"),0x12,0x38,0x12,0x34);
+        // Pattern: ooooDDDMMMmmmsss
+        // EXPECTED 0001001111111100 00000000 00010010 ....
+        // ACTUAL   0001001000000010 ..
+        assertArrayEquals(compile("move.b #$12,d1")      ,0x13,0xfc,0x00,0x12);
 
         assertArrayEquals(compile("move.b d0,d1"),0x12,0x00);
         assertArrayEquals(compile("move   d0,d1"),  0x32,0x00);
@@ -54,12 +49,13 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("move.l -(a0),d1"),0x22,0x20);
 
         assertArrayEquals(compile("move.b ($1234),d1"),0x12,0x38,0x12,0x34);
+        assertArrayEquals(compile("move.b ($1234),d1"),0x12,0x38,0x12,0x34);
         assertArrayEquals(compile("move   ($1234),d1"),0x32,0x38,0x12,0x34);
         assertArrayEquals(compile("move.w ($1234),d1"),0x32,0x38,0x12,0x34);
         assertArrayEquals(compile("move.l ($1234),d1"),0x22,0x38,0x12,0x34);
 
-        assertArrayEquals(compile("move.b $10(a0),d1"),0x12,0x28,0x00,0x10);
         assertArrayEquals(compile("move   $10(a0),d1"),0x32,0x28,0x00,0x10);
+        assertArrayEquals(compile("move.b $10(a0),d1"),0x12,0x28,0x00,0x10);
         assertArrayEquals(compile("move.w $10(a0),d1"),0x32,0x28,0x00,0x10);
         assertArrayEquals(compile("move.l $10(a0),d1"),0x22,0x28,0x00,0x10);
 
@@ -71,8 +67,6 @@ public class AssemblerTest extends TestCase
   50:   23fc 1234 5678  movel #305419896,0x0
   56:   0000 0000
          */
-
-        assertArrayEquals(compile("move.b #$12,d1")      ,0x13,0xfc,0x00,0x12,0x00,0x00);
         assertArrayEquals(compile("move   #$1234,d1")    ,0x33,0xfc,0x12,0x34,0x00,0x00);
         assertArrayEquals(compile("move.w #$1234,d1")    ,0x33,0xfc,0x12,0x34,0x00,0x00);
         assertArrayEquals(compile("move.l #$12345678,d1"),0x23,0xfc,0x12,0x34,0x56,0x78);
@@ -84,7 +78,11 @@ public class AssemblerTest extends TestCase
         final CompilationUnit root = new CompilationUnit(source);
 
         final CompilationMessages messages = asm.compile(root);
-        assertFalse(messages.hasErrors());
+        if ( messages.hasErrors() )
+        {
+            messages.getMessages().stream().forEach(System.out::println );
+            fail("Compilation failed with errors");
+        }
         //        System.out.println("RESULT: "+Memory.hexdump(0,data,0,data.length));
         return this.asm.getBytes();
     }
@@ -111,6 +109,9 @@ public class AssemblerTest extends TestCase
         {
             System.out.println("EXPECTED: "+Memory.hexdump(0,expected,0,expected.length));
             System.out.println("ACTUAL  : "+Memory.hexdump(0,actual,0,actual.length));
+            System.out.println();
+            System.out.println("EXPECTED: "+Memory.bindump(0,expected,0,expected.length));
+            System.out.println("ACTUAL  : "+Memory.bindump(0,actual,0,actual.length));
             fail("Arrays do not match");
         }
     }

@@ -22,8 +22,8 @@ public class OperandNode extends ASTNode
     private List<ASTNode> children = new ArrayList<>();
 
     private int childCount = 0;
-    private ASTNode innerDisplacement;
-    private ASTNode value;
+    private ASTNode baseDisplacement; // displacement relative to base register
+    private ASTNode value; // either an absolute address or a register
     private RegisterNode indexRegister;
     private ASTNode outerDisplacement;
 
@@ -50,6 +50,18 @@ public class OperandNode extends ASTNode
         refreshList();;
     }
 
+    public boolean hasAbsoluteAddressing() {
+        return hasAddressingMode( AddressingMode.ABSOLUTE_LONG_ADDRESSING) ||
+            hasAddressingMode( AddressingMode.ABSOLUTE_SHORT_ADDRESSING);
+    }
+
+    public boolean hasAddressingMode(AddressingMode mode) {
+        if ( mode == null ) {
+            throw new IllegalArgumentException("Mode must not be NULL");
+        }
+        return this.addressingMode == mode;
+    }
+
     public RegisterNode getIndexRegister()
     {
         return indexRegister;
@@ -65,14 +77,14 @@ public class OperandNode extends ASTNode
         refreshList();
     }
 
-    public ASTNode getInnerDisplacement()
+    public ASTNode getBaseDisplacement()
     {
-        return innerDisplacement;
+        return baseDisplacement;
     }
 
-    public void setInnerDisplacement(ASTNode value)
+    public void setBaseDisplacement(ASTNode value)
     {
-        this.innerDisplacement = value;
+        this.baseDisplacement = value;
         refreshList();
     }
 
@@ -102,8 +114,8 @@ public class OperandNode extends ASTNode
         if ( indexRegister != null ) {
             result.add(indexRegister);
         }
-        if ( innerDisplacement != null ) {
-            result.add(innerDisplacement);
+        if ( baseDisplacement != null ) {
+            result.add(baseDisplacement);
         }
         if ( outerDisplacement != null ) {
             result.add(outerDisplacement);
@@ -134,8 +146,8 @@ public class OperandNode extends ASTNode
         if ( child == indexRegister )
         {
             setIndexRegister(null);
-        } else if ( child == innerDisplacement ) {
-            setInnerDisplacement(null);
+        } else if ( child == baseDisplacement) {
+            setBaseDisplacement(null);
         } else if ( child == outerDisplacement ) {
             setOuterDisplacement(null);
         } else if( child == value) {

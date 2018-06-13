@@ -61,11 +61,34 @@ public abstract class ASTNode
         return (RegisterNode) this;
     }
 
+    public boolean isRegister() {
+        return is(NodeType.REGISTER);
+    }
+
+    public boolean isAddressRegister() {
+        return isRegister() && asRegister().isAddressRegister();
+    }
+
+    public boolean isPCRegister() {
+        return isRegister() && asRegister().isPC();
+    }
+
+    public boolean isDataRegister() {
+        return isRegister() && asRegister().isDataRegister();
+    }
+
     public final boolean is(NodeType t) {
         if ( t == null ) {
             throw new IllegalArgumentException("type must not be null");
         }
         return type == t;
+    }
+
+    public final boolean isNot(NodeType t) {
+        if ( t == null ) {
+            throw new IllegalArgumentException("type must not be null");
+        }
+        return type != t;
     }
 
     public final boolean hasChildren()
