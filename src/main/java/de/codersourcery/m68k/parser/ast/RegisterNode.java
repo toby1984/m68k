@@ -21,6 +21,9 @@ public class RegisterNode extends ASTNode implements IValueNode
         if ( register == null ) {
             throw new IllegalArgumentException("Register must not be NULL");
         }
+        if ( operandSize != null && (operandSize != OperandSize.WORD && operandSize != OperandSize.LONG) ) {
+            throw new IllegalArgumentException("Unsupported index register size "+operandSize);
+        }
         this.scaling = scaling;
         this.register = register;
         this.operandSize = operandSize;

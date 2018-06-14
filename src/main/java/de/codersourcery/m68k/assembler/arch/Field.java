@@ -9,6 +9,10 @@ public enum Field
     SRC_BASE_DISPLACEMENT('b'),
     SRC_OUTER_DISPLACEMENT('x'),
     SRC_MODE('m'),
+    SRC_REGISTER_KIND('r'),
+    SRC_INDEX_SIZE('q'),
+    SRC_SCALE('e'),
+    SRC_8_BIT_DISPLACEMENT('w'),
     // destination operand
     DST_VALUE('V'), // immediate/absolute mode value
     DST_BASE_REGISTER('D'),
@@ -16,6 +20,10 @@ public enum Field
     DST_BASE_DISPLACEMENT('B'),
     DST_OUTER_DISPLACEMENT('y'),
     DST_MODE('M'),
+    DST_REGISTER_KIND('R'), // (bd,br,{Rx},od)
+    DST_INDEX_SIZE('Q'), // (bd,br,Rx{.w|.l},od)
+    DST_SCALE('E'), // (bd,br,Rx.w{*4},od)
+    DST_8_BIT_DISPLACEMENT('W'), // (bd,br,Rx,{od}
     // misc
     SIZE('S'), // operation size: .b/.w/.l
     OP_CODE('o'), // bits 15-12
@@ -41,6 +49,10 @@ public enum Field
             case 'b': return SRC_BASE_DISPLACEMENT; // [bd,BR,Xn.SIZE*SCALE,od]
             case 'x': return SRC_OUTER_DISPLACEMENT;
             case 'm': return SRC_MODE;
+            case 'r': return SRC_REGISTER_KIND;
+            case 'q': return SRC_INDEX_SIZE;
+            case 'e': return SRC_SCALE;
+            case 'w': return SRC_8_BIT_DISPLACEMENT;
             // --
             case 'V': return DST_VALUE; // immediate/absolute mode value
             case 'D': return DST_BASE_REGISTER;
@@ -48,6 +60,10 @@ public enum Field
             case 'B': return DST_BASE_DISPLACEMENT;
             case 'y': return DST_OUTER_DISPLACEMENT;
             case 'M': return DST_MODE;
+            case 'R': return DST_REGISTER_KIND;
+            case 'Q': return DST_INDEX_SIZE;
+            case 'E': return DST_SCALE;
+            case 'W': return DST_8_BIT_DISPLACEMENT;
             // --
             case 'S': return SIZE;
             case 'o': return OP_CODE;

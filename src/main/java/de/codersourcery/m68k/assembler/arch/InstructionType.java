@@ -1,7 +1,6 @@
 package de.codersourcery.m68k.assembler.arch;
 
 import de.codersourcery.m68k.assembler.ICompilationContext;
-import de.codersourcery.m68k.parser.ast.ASTNode;
 import de.codersourcery.m68k.parser.ast.IValueNode;
 import de.codersourcery.m68k.parser.ast.InstructionNode;
 import de.codersourcery.m68k.parser.ast.NodeType;
@@ -158,6 +157,10 @@ Bits 15 – 12 Operation
                 case 'S': return SIZE;
                 case 'o': return OPERATION_CODE;
      */
+
+    private static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
+    private static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
+
     private static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
 
     private static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss");
@@ -232,11 +235,25 @@ Bits 15 – 12 Operation
                 // FIXME: 1-5 extra words
                 break;
             case PC_INDIRECT_WITH_DISPLACEMENT:
-                // FIXME: 1 extra word
-                break;
+                field = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT: Field.DST_BASE_DISPLACEMENT;
+                return new String[] { StringUtils.repeat(field.c,16) };
             case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
-                // FIXME: 1 extra word
-                break;
+
+                /*
+                    DST_REGISTER_KIND('R'), // (bd,br,{Rx},od) D or A
+    DST_INDEX_SIZE('Q'), // (bd,br,Rx{.w|.l},od)
+    DST_SCALE('E'), // (bd,br,Rx.w{*4},od)
+    DST_8_BIT_DISPLACEMENT('W'), // (bd,br,Rx,{od}
+
+BRIEF EXTENSION WORD FORMAT
+15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
+|   +-+--+  |  +--+ 0 +-------------+
+D/A   |     |   |           |
+    REGISTER|  SCALE      DISPLACEMENT
+            W/L
+                 */
+                field = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT: Field.DST_BASE_DISPLACEMENT;
+                return new String[] { isSourceOperand ? SRC_BRIEF_EXTENSION_WORD : DST_BRIEF_EXTENSION_WORD};
             case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
                 // FIXME: 1-3 extra words
                 break;

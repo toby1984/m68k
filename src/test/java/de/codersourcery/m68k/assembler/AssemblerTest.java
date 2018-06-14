@@ -20,7 +20,10 @@ public class AssemblerTest extends TestCase
         //          0010001000111100 00010010 00110100 01010110 01111000
         //          0010000001111100 00010010 00110100 01010110 01111000
 
+        assertArrayEquals(compile("move   $12(pc,a0.w*4),d1")    ,0x32,0x3b,0x84,0x12);
         assertArrayEquals(compile("move   $1234(pc),d1")    ,0x32,0x3a,0x12,0x34);
+        assertArrayEquals(compile("move   $8888(pc),d1")    ,0x32,0x3b,0x85,0x30,0x00,0x00,0x88,0x88 );
+
         assertArrayEquals(compile("move.l #$12345678,a0"),0x20,0x7c,0x12,0x34,0x56,0x78);
 
         /*
@@ -30,7 +33,6 @@ public class AssemblerTest extends TestCase
          * (bd,An,Xn.SIZE*SCALE)         => ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT
          * ([bd,An],Xn.SIZE*SCALE,od)    => MEMORY_INDIRECT_POSTINDEXED
          * ([bd, An, Xn.SIZE*SCALE], od) => MEMORY_INDIRECT_PREINDEXED
-         * (d16 ,PC)                     => PC_INDIRECT_WITH_DISPLACEMENT
          * (d8,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
          * (bd, PC, Xn. SIZE*SCALE)      => PC_INDIRECT_WITH_INDEX_DISPLACEMENT
          * ([bd,PC],Xn.SIZE*SCALE,od)    => PC_MEMORY_INDIRECT_POSTINDEXED

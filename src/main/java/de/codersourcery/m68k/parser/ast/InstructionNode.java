@@ -63,11 +63,41 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         }
     }
 
+    private int getIndexRegisterSizeBit(RegisterNode register)
+    {
+        OperandSize size = register.operandSize;
+        if ( size == null )  {
+            size = OperandSize.WORD;
+        }
+        switch(size) {
+            case WORD:
+                return 0;
+            case LONG:
+                return 1;
+        }
+        throw new RuntimeException("Invalid index register operand size "+size);
+    }
     @Override
     public int getValueFor(Field field, ICompilationContext ctx)
     {
         switch(field)
         {
+            case SRC_REGISTER_KIND:
+                return source().getIndexRegister().isDataRegister() ? 0 : 1;
+            case SRC_INDEX_SIZE:
+                return getIndexRegisterSizeBit( source().getIndexRegister() );
+            case SRC_SCALE:
+                return source().getIndexRegister().scaling.bits;
+            case SRC_8_BIT_DISPLACEMENT:
+                return source().getBaseDisplacement().getBits();
+            case DST_REGISTER_KIND:
+                return destination().getIndexRegister().isDataRegister() ? 0 : 1;
+            case DST_INDEX_SIZE:
+                return getIndexRegisterSizeBit( destination().getIndexRegister() );
+            case DST_SCALE:
+                return destination().getIndexRegister().scaling.bits;
+            case DST_8_BIT_DISPLACEMENT:
+                return destination().getBaseDisplacement().getBits();
             case OP_CODE:
                 return getInstructionType().getOperationCode(this);
             case SRC_VALUE:

@@ -2,14 +2,14 @@ package de.codersourcery.m68k.assembler.arch;
 
 public enum Scaling
 {
-    IDENTITY(1),
-    TWO(2),
-    FOUR(4),
-    EIGHT(8);
+    IDENTITY(0b00),
+    TWO(0b01),
+    FOUR(0b10),
+    EIGHT(0b11);
 
-    public final int value;
+    public final int bits;
 
-    private Scaling(int value) {
-        this.value = value;
+    private Scaling(int bits) {
+        this.bits = bits;
     }
 }
