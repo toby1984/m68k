@@ -16,17 +16,31 @@ public class AssemblerTest extends TestCase
 
     public void testMove()
     {
-        //case 's': return SRC_REGISTER;
-        //case 'm': return SRC_MODE;
-        //case 'D': return DST_REGISTER;
-        //case 'M': return DST_MODE;
-
-        //case 'S': return SIZE;
-
         // Pattern: ooooDDDMMMmmmsss
-        // EXPECTED 0001001111111100 00000000 00010010 ....
-        // ACTUAL   0001001000000010 ..
-        assertArrayEquals(compile("move.b #$12,d1")      ,0x13,0xfc,0x00,0x12);
+        //          0010001000111100 00010010 00110100 01010110 01111000
+        //          0010000001111100 00010010 00110100 01010110 01111000
+
+        assertArrayEquals(compile("move   $1234(pc),d1")    ,0x32,0x3a,0x12,0x34);
+        assertArrayEquals(compile("move.l #$12345678,a0"),0x20,0x7c,0x12,0x34,0x56,0x78);
+
+        /*
+         *  An                           => ADDRESS_REGISTER_DIRECT
+         *  d16(An)                      => ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT
+         * (d8,An, Xn.SIZE*SCALE)        => ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
+         * (bd,An,Xn.SIZE*SCALE)         => ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT
+         * ([bd,An],Xn.SIZE*SCALE,od)    => MEMORY_INDIRECT_POSTINDEXED
+         * ([bd, An, Xn.SIZE*SCALE], od) => MEMORY_INDIRECT_PREINDEXED
+         * (d16 ,PC)                     => PC_INDIRECT_WITH_DISPLACEMENT
+         * (d8,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
+         * (bd, PC, Xn. SIZE*SCALE)      => PC_INDIRECT_WITH_INDEX_DISPLACEMENT
+         * ([bd,PC],Xn.SIZE*SCALE,od)    => PC_MEMORY_INDIRECT_POSTINDEXED
+         * ([bd,PC,Xn.SIZE*SCALE],od)    => PC_MEMORY_INDIRECT_PREINDEXED
+         * ($1234).w                     => ABSOLUTE_SHORT_ADDRESSING
+         * ($1234).L                     => ABSOLUTE_LONG_ADDRESSING
+         * #$1234                        => IMMEDIATE_VALUE
+         */
+
+        assertArrayEquals(compile("move   #$1234,d1")    ,0x32,0x3c,0x12,0x34);
 
         assertArrayEquals(compile("move.b d0,d1"),0x12,0x00);
         assertArrayEquals(compile("move   d0,d1"),  0x32,0x00);
@@ -59,17 +73,10 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("move.w $10(a0),d1"),0x32,0x28,0x00,0x10);
         assertArrayEquals(compile("move.l $10(a0),d1"),0x22,0x28,0x00,0x10);
 
-        /*
-  40:   13fc 0012 0000  moveb #18,0x0
-  46:   0000
-  48:   33fc 1234 0000  movew #4660,0x0
-  4e:   0000
-  50:   23fc 1234 5678  movel #305419896,0x0
-  56:   0000 0000
-         */
-        assertArrayEquals(compile("move   #$1234,d1")    ,0x33,0xfc,0x12,0x34,0x00,0x00);
-        assertArrayEquals(compile("move.w #$1234,d1")    ,0x33,0xfc,0x12,0x34,0x00,0x00);
-        assertArrayEquals(compile("move.l #$12345678,d1"),0x23,0xfc,0x12,0x34,0x56,0x78);
+        assertArrayEquals(compile("move.b #$12,d1")      ,0x12,0x3c,0x00,0x12);
+
+        assertArrayEquals(compile("move.w #$1234,d1")    ,0x32,0x3c,0x12,0x34);
+        assertArrayEquals(compile("move.l #$12345678,d1"),0x22,0x3c,0x12,0x34,0x56,0x78);
     }
 
     private byte[] compile(String s)

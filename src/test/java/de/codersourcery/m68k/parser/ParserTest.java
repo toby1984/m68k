@@ -2,14 +2,10 @@ package de.codersourcery.m68k.parser;
 
 import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.InstructionType;
+import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.Register;
-import de.codersourcery.m68k.parser.ast.AST;
-import de.codersourcery.m68k.parser.ast.CommentNode;
-import de.codersourcery.m68k.parser.ast.InstructionNode;
-import de.codersourcery.m68k.parser.ast.LabelNode;
-import de.codersourcery.m68k.parser.ast.OperandNode;
-import de.codersourcery.m68k.parser.ast.RegisterNode;
-import de.codersourcery.m68k.parser.ast.StatementNode;
+import de.codersourcery.m68k.assembler.arch.Scaling;
+import de.codersourcery.m68k.parser.ast.*;
 import junit.framework.TestCase;
 
 public class ParserTest extends TestCase
@@ -30,6 +26,336 @@ public class ParserTest extends TestCase
         assertNotNull(ast);
         assertTrue(ast.hasNoChildren());
         assertTrue(ast.hasNoParent());
+    }
+
+    // IMMEDIATE_VALUE
+    public void testImmediateMode()
+    {
+        final OperandNode src = parseSourceOperand("MOVE #$1234,D0");
+        assertEquals(AddressingMode.IMMEDIATE_VALUE,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.NUMBER) );
+        assertEquals( 0x1234 , src.getValue().asNumber().getValue() );
+        assertNull( src.getBaseDisplacement() );
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // DATA_REGISTER_DIRECT
+    public void testDataRegisterDirect()
+    {
+        final OperandNode src = parseSourceOperand("MOVE D0,D1");
+        assertEquals(AddressingMode.DATA_REGISTER_DIRECT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        final RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.D0, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+        assertNull( src.getBaseDisplacement() );
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // ADDRESS_REGISTER_DIRECT
+    public void testAdddressRegisterDirect()
+    {
+        final OperandNode src = parseSourceOperand("MOVE A0,D1");
+        assertEquals(AddressingMode.ADDRESS_REGISTER_DIRECT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        final RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.A0, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+        assertNull( src.getBaseDisplacement() );
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // ADDRESS_REGISTER_INDIRECT
+    public void testAdddressRegisterIndirect()
+    {
+        final OperandNode src = parseSourceOperand("MOVE (A0),D1");
+        assertEquals(AddressingMode.ADDRESS_REGISTER_INDIRECT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.A0, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+        assertNull( src.getBaseDisplacement() );
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // ADDRESS_REGISTER_INDIRECT_POST_INCREMENT
+    public void testAdddressRegisterIndirectPostIncrement()
+    {
+        final OperandNode src = parseSourceOperand("MOVE (A0)+,D1");
+        assertEquals(AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        final RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.A0, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+        assertNull( src.getBaseDisplacement() );
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT
+    public void testAddressRegisterIndirectPreDecrement() {
+        // ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT
+        final OperandNode src = parseSourceOperand("MOVE -(A0),D1");
+        assertEquals(AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        final RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.A0, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+        assertNull( src.getBaseDisplacement() );
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT
+    public void testAddressRegisterIndirectWithDisplacement() {
+
+        OperandNode src = parseSourceOperand("MOVE $1234(A0),D1");
+        assertEquals(AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.A0, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+
+        assertNotNull( src.getBaseDisplacement() );
+        assertTrue( src.getBaseDisplacement().is(NodeType.NUMBER));
+        long baseDisplacement = src.getBaseDisplacement().asNumber().getValue();
+        assertEquals(0x1234,baseDisplacement);
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // PC_INDIRECT_WITH_DISPLACEMENT
+    public void testPCRegisterIndirectWithDisplacement() {
+
+        OperandNode src = parseSourceOperand("MOVE $1234(PC),D1");
+        assertEquals(AddressingMode.PC_INDIRECT_WITH_DISPLACEMENT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.PC, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+
+        assertNotNull( src.getBaseDisplacement() );
+        assertTrue( src.getBaseDisplacement().is(NodeType.NUMBER));
+        long baseDisplacement = src.getBaseDisplacement().asNumber().getValue();
+        assertEquals(0x1234,baseDisplacement);
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    public void testTooLargeDisplacement() {
+        try
+        {
+            parseSourceOperand("MOVE $123467(PC),D1");
+            fail("Should've failed to parse");
+        } catch(Exception e) {
+            // ok
+        }
+    }
+
+    // ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
+    public void testAddressRegisterIndirectWithIndex8BitDisplacement() {
+
+        OperandNode src = parseSourceOperand("MOVE $12(A1,A2.l*2),D1");
+        assertEquals(AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.A1, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+
+        assertNotNull( src.getIndexRegister() );
+        RegisterNode indexRegister = src.getIndexRegister();
+        assertEquals( Register.A2, indexRegister.register );
+        assertEquals(OperandSize.LONG, indexRegister.operandSize );
+        assertEquals(Scaling.TWO, indexRegister.scaling );
+
+        assertNotNull( src.getBaseDisplacement() );
+        assertTrue( src.getBaseDisplacement().is(NodeType.NUMBER));
+        long baseDisplacement = src.getBaseDisplacement().asNumber().getValue();
+        assertEquals(0x12,baseDisplacement);
+        assertNull( src.getOuterDisplacement() );
+    }
+
+        // ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT
+    public void testAddressRegisterIndirectWihIndex16BitDisplacement() {
+
+        OperandNode src = parseSourceOperand("MOVE $1234(A1,A2.l*2),D1");
+        assertEquals(AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.A1, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+
+        assertNotNull( src.getIndexRegister() );
+        RegisterNode indexRegister = src.getIndexRegister();
+        assertEquals( Register.A2, indexRegister.register );
+        assertEquals(OperandSize.LONG, indexRegister.operandSize );
+        assertEquals(Scaling.TWO, indexRegister.scaling );
+
+        assertNotNull( src.getBaseDisplacement() );
+        assertTrue( src.getBaseDisplacement().is(NodeType.NUMBER));
+        long baseDisplacement = src.getBaseDisplacement().asNumber().getValue();
+        assertEquals(0x1234,baseDisplacement);
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // MEMORY_INDIRECT_POSTINDEXED
+    public void testMemoryIndirectPostIndexed() {
+
+        OperandNode src = parseSourceOperand("MOVE $1234(A1,A2.l*2,$ab),D1");
+        assertEquals(AddressingMode.MEMORY_INDIRECT_POSTINDEXED,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.A1, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+
+        assertNotNull( src.getIndexRegister() );
+        RegisterNode indexRegister = src.getIndexRegister();
+        assertEquals( Register.A2, indexRegister.register );
+        assertEquals(OperandSize.LONG, indexRegister.operandSize );
+        assertEquals(Scaling.TWO, indexRegister.scaling );
+
+        assertNotNull( src.getBaseDisplacement() );
+
+        assertTrue( src.getBaseDisplacement().is(NodeType.NUMBER));
+        long baseDisplacement = src.getBaseDisplacement().asNumber().getValue();
+        assertEquals(0x1234,baseDisplacement);
+
+        assertTrue( src.getOuterDisplacement().is(NodeType.NUMBER));
+        long outerDisplacement = src.getOuterDisplacement().asNumber().getValue();
+        assertEquals(0xab,outerDisplacement);
+    }
+
+    // PC_MEMORY_INDIRECT_POSTINDEXED
+    public void testPCMemoryIndirectPostIndexed() {
+
+        OperandNode src = parseSourceOperand("MOVE $1234(PC,A2.l*2,$ab),D1");
+        assertEquals(AddressingMode.MEMORY_INDIRECT_POSTINDEXED,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.A1, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+
+        assertNotNull( src.getIndexRegister() );
+        RegisterNode indexRegister = src.getIndexRegister();
+        assertEquals( Register.A2, baseRegister.register );
+        assertEquals(OperandSize.LONG, indexRegister.operandSize );
+        assertEquals(Scaling.TWO, indexRegister.scaling );
+
+        assertNotNull( src.getBaseDisplacement() );
+
+        assertTrue( src.getBaseDisplacement().is(NodeType.NUMBER));
+        long baseDisplacement = src.getBaseDisplacement().asNumber().getValue();
+        assertEquals(0x1245,baseDisplacement);
+
+        assertTrue( src.getOuterDisplacement().is(NodeType.NUMBER));
+        long outerDisplacement = src.getOuterDisplacement().asNumber().getValue();
+        assertEquals(0xab,outerDisplacement);
+    }
+
+    // PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
+    public void testPCIndirectWithIndex8BitDisplacement() {
+
+        OperandNode src = parseSourceOperand("MOVE $12(PC,A2.l*2),D1");
+        assertEquals(AddressingMode.PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.PC, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+
+        assertNotNull( src.getIndexRegister() );
+        RegisterNode indexRegister = src.getIndexRegister();
+        assertEquals( Register.PC, baseRegister.register );
+        assertEquals(OperandSize.LONG, indexRegister.operandSize );
+        assertEquals(Scaling.TWO, indexRegister.scaling );
+
+        assertNotNull( src.getBaseDisplacement() );
+
+        assertTrue( src.getBaseDisplacement().is(NodeType.NUMBER));
+        long baseDisplacement = src.getBaseDisplacement().asNumber().getValue();
+        assertEquals(0x12,baseDisplacement);
+
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // PC_INDIRECT_WITH_INDEX_DISPLACEMENT
+    public void testPCIndirectWithIndex16BitDisplacement() {
+
+        OperandNode src = parseSourceOperand("MOVE $1245(PC,A2.l*2),D1");
+        assertEquals(AddressingMode.PC_INDIRECT_WITH_INDEX_DISPLACEMENT,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.REGISTER) );
+        RegisterNode baseRegister = src.getValue().asRegister();
+        assertEquals( Register.PC, baseRegister.register );
+        assertNull( baseRegister.operandSize );
+        assertNull( baseRegister.scaling );
+
+        assertNotNull( src.getIndexRegister() );
+        RegisterNode indexRegister = src.getIndexRegister();
+        assertEquals( Register.A2, indexRegister.register );
+        assertEquals(OperandSize.LONG, indexRegister.operandSize );
+        assertEquals(Scaling.TWO, indexRegister.scaling );
+
+        assertNotNull( src.getBaseDisplacement() );
+
+        assertTrue( src.getBaseDisplacement().is(NodeType.NUMBER));
+        long baseDisplacement = src.getBaseDisplacement().asNumber().getValue();
+        assertEquals(0x1245,baseDisplacement);
+
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // ABSOLUTE_SHORT_ADDRESSING
+    public void testAbsoluteShortAddressing() {
+
+        OperandNode src = parseSourceOperand("LEA $1234,A0");
+        assertEquals(AddressingMode.ABSOLUTE_SHORT_ADDRESSING,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.NUMBER) );
+        assertEquals( 0x1234 , src.getValue().asNumber().getValue() );
+        assertNull( src.getBaseDisplacement() );
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // ABSOLUTE_LONG_ADDRESSING
+    public void testAbsoluteLongAddressing()
+    {
+        OperandNode src = parseSourceOperand("LEA $12345678,D0");
+        assertEquals(AddressingMode.ABSOLUTE_LONG_ADDRESSING,src.addressingMode);
+        assertTrue( src.getValue().is(NodeType.NUMBER) );
+        assertEquals( 0x12345678 , src.getValue().asNumber().getValue() );
+        assertNull( src.getBaseDisplacement() );
+        assertNull( src.getIndexRegister() );
+        assertNull( src.getOuterDisplacement() );
+    }
+
+    // TODO: MEMORY_INDIRECT_PREINDEXED
+    // TODO: PC_MEMORY_INDIRECT_PREINDEXED
+
+    private OperandNode parseSourceOperand(String expression)
+    {
+        AST ast = parse(expression);
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.getInstruction();
+        assertNotNull("Instruction not found",insn);
+        final OperandNode source = insn.source();
+        assertNotNull("Instruction has no source operand ?",insn);
+        return source;
     }
 
     public void testParseLabel()
@@ -145,7 +471,7 @@ public class ParserTest extends TestCase
         assertEquals(InstructionType.LEA, insn.getInstructionType() );
 
         final OperandNode source = insn.source();
-        assertEquals(AddressingMode.IMMEDIATE_ADDRESS,source.addressingMode);
+        assertEquals(AddressingMode.ABSOLUTE_SHORT_ADDRESSING,source.addressingMode);
         assertEquals(0x1234,source.getValue().asNumber().getValue());
 
         final OperandNode dest = insn.destination();

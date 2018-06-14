@@ -9,7 +9,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-public abstract class ASTNode
+public abstract class ASTNode implements IASTNode
 {
     public final NodeType type;
     private ASTNode parent;
@@ -187,36 +187,6 @@ public abstract class ASTNode
         return parent;
     }
 
-    public static final class IterationCtx<T>
-    {
-        public T value = null;
-        public boolean stop = false;
-        public boolean dontGoDeeper = false;
-
-        public void stop(T value) {
-            this.value = value;
-            stop = true;
-        }
-        public void stop() {
-            stop = true;
-        }
-        public void dontGoDeeper() {
-            dontGoDeeper = true;
-        }
-
-        public boolean isGoDeeper()
-        {
-            if ( stop ) {
-                return false;
-            }
-            if ( dontGoDeeper ) {
-                dontGoDeeper = false;
-                return false;
-            }
-            return true;
-        }
-    }
-
     public final <T> T visitInOrder(BiConsumer<ASTNode,IterationCtx<T>> visitor)
     {
         final IterationCtx<T> ctx = new IterationCtx<T>();
@@ -253,51 +223,14 @@ public abstract class ASTNode
         return StringUtils.repeat(" ", depth*4);
     }
 
-    public static int signExtend8To16(int input)
+    protected final ASTNode findFirstChild(NodeType t)
     {
-        final int result = input & 0xff;
-        return (input & 0x80) == 0 ? result : 0xff00 | result;
-    }
-
-    public static int signExtend8To32(int input)
-    {
-        final int result = input & 0xff;
-        return (input & 0x80) == 0 ? result : 0xffffff00 | result;
-    }
-
-    public static int signExtend16To32(int input)
-    {
-        final int result = input & 0xffff;
-        return (input & 1<<15) == 0 ? result : 0xffff0000 | result;
-    }
-
-    public static int signExtend(int input,int inputBits,int outputBits)
-    {
-        if ( outputBits < inputBits ) {
-            throw new IllegalArgumentException("outputBits < inputBits: "+outputBits+" vs. "+inputBits);
+        for ( ASTNode child : children() )
+        {
+            if ( child.is(t) ) {
+                return child.asInstruction();
+            }
         }
-        switch(inputBits) {
-            case 8:
-                switch (outputBits) {
-                    case 8:  return input;
-                    case 16: return signExtend8To16(input);
-                    case 32: return signExtend8To32(input);
-                }
-                break;
-            case 16:
-                switch (outputBits) {
-                    case 16: return input;
-                    case 32: return signExtend16To32(input);
-                }
-                break;
-            case 32:
-                if ( outputBits == 32 ) {
-                    return input;
-                }
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported input bit count "+inputBits);
-        }
-        throw new IllegalArgumentException("Unsupported output bit count "+outputBits);
+        return null;
     }
 }

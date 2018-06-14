@@ -1,6 +1,8 @@
 package de.codersourcery.m68k.assembler.arch;
 
 import de.codersourcery.m68k.assembler.ICompilationContext;
+import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.parser.ast.IValueNode;
 import de.codersourcery.m68k.parser.ast.InstructionNode;
 import de.codersourcery.m68k.parser.ast.NodeType;
 import de.codersourcery.m68k.parser.ast.OperandNode;
@@ -47,6 +49,12 @@ Bits 15 – 12 Operation
                 }
 
                 @Override
+                protected int getMaxOperandSize(InstructionNode insn, OperandNode operand)
+                {
+                    return 32;
+                }
+
+                @Override
                 public void checkSupports(Operand kind, OperandNode node)
                 {
                 }
@@ -70,6 +78,12 @@ Bits 15 – 12 Operation
                             throw new RuntimeException("LEA requires an absolute address value as source");
                         }
                     }
+                }
+
+                @Override
+                protected int getMaxOperandSize(InstructionNode insn, OperandNode operand)
+                {
+                    return 32;
                 }
             };
 
@@ -145,9 +159,6 @@ Bits 15 – 12 Operation
                 case 'o': return OPERATION_CODE;
      */
     private static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
-    private static final InstructionEncoding MOVE_SRC_EXTRA_ENCODING = InstructionEncoding.of("ooooDDDMMMmmm000");
-    private static final InstructionEncoding MOVE_DST_EXTRA_ENCODING = InstructionEncoding.of("oooo000MMMmmmsss");
-    private static final InstructionEncoding MOVE_SRC_AND_DST_EXTRA_ENCODING = InstructionEncoding.of("oooo000MMMmmm000");
 
     private static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss");
 
@@ -174,15 +185,15 @@ Bits 15 – 12 Operation
 
                 if (extraSrcWords != null && extraDstWords == null)
                 {
-                    return MOVE_SRC_EXTRA_ENCODING.append(extraSrcWords);
+                    return MOVE_ENCODING.append(extraSrcWords);
                 }
                 if (extraSrcWords == null && extraDstWords != null)
                 {
-                    return MOVE_DST_EXTRA_ENCODING.append(extraDstWords);
+                    return MOVE_ENCODING.append(extraDstWords);
                 }
                 if (extraSrcWords != null && extraDstWords != null)
                 {
-                    return MOVE_SRC_AND_DST_EXTRA_ENCODING.append(extraSrcWords).append(extraDstWords);
+                    return MOVE_ENCODING.append(extraSrcWords).append(extraDstWords);
                 }
                 return MOVE_ENCODING;
             default:
@@ -194,45 +205,10 @@ Bits 15 – 12 Operation
     // needed to accomodate all operand values
     private String[] getExtraWordPatterns(OperandNode op, boolean isSourceOperand,InstructionNode insn,ICompilationContext ctx)
     {
-//            case DATA_REGISTER_DIRECT: // can be encoded in first instruction word
-//                return null;
-//            case ADDRESS_REGISTER_DIRECT: // can be encoded in first instruction word
-//                return null;
-//            case ADDRESS_REGISTER_INDIRECT: // can be encoded in first instruction word
-//                return null;
-//            case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT:
-//                return null; // TODO: Wrong, fix me
-//            case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT:
-//                return null; // TODO: Wrong, fix me
-//            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
-//                char c = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT.c : Field.DST_BASE_DISPLACEMENT.c;
-//                return new String[] { StringUtils.repeat(c,16) };
-//            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT_AND_SCALE:
-//                return null; // TODO: Wrong, fix me
-//            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT_AND_SCALE_OPTIONAL:
-//                return null; // TODO: Wrong, fix me
-//            case PROGRAM_COUNTER_INDIRECT_WITH_DISPLACEMENT:
-//                return null; // TODO: Wrong, fix me
-//            case IMMEDIATE_VALUE:
-//                return null; // TODO: Wrong, fix me
-//            case IMMEDIATE_ADDRESS: // LEA $1234,A0
-//                c = isSourceOperand ? Field.SRC_VALUE.c : Field.DST_VALUE.c;
-//                return new String[] { StringUtils.repeat(c,32) };
-//            case NO_OPERAND:
-//                return null;
-//            case MEMORY_INDIRECT: // MOVE ($1234).w,D0 / MOVE ($12345678).L,D1
-//                //  check whether the address fits in 15 bits
-//                // (16-bit instruction words get sign-extended by the
-//                // CPU)
-//                c = isSourceOperand ? Field.SRC_VALUE.c : Field.DST_VALUE.c;
-//                int value = insn.getValue(op.getValue());
-//                if ( (value & 1<<15) == 0 ) { // sign-expansion would not turn this into a negative 32-bit value
-//                    return new String[] { StringUtils.repeat(c,16) };
-//                }
-//                return new String[] { StringUtils.repeat(c,32) };
-//        }
-        final Field displacement = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT : Field.DST_BASE_DISPLACEMENT;
-        final Field value = isSourceOperand ? Field.SRC_VALUE: Field.DST_VALUE;
+        if ( op.addressingMode.maxExtensionWords == 0 ) {
+            return null;
+        }
+
         switch (op.addressingMode)
         {
             case DATA_REGISTER_DIRECT: return null; // handled
@@ -241,7 +217,8 @@ Bits 15 – 12 Operation
             case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT: return null; // handled
             case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT: return null; // handled
             case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
-                return new String[] { StringUtils.repeat(displacement.c,16) };
+                Field field = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT : Field.DST_BASE_DISPLACEMENT;
+                return new String[] { StringUtils.repeat(field.c,16) };
             case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
                 // FIXME: 1 extra word
                 break;
@@ -270,16 +247,52 @@ Bits 15 – 12 Operation
                 // FIXME: 1-5 extra words
                 break;
             case ABSOLUTE_SHORT_ADDRESSING:
-                // FIXME: 1 extra word
-                break;
+                field = isSourceOperand ? Field.SRC_VALUE : Field.DST_VALUE;
+                return new String[] { StringUtils.repeat(field.c,16) };
             case ABSOLUTE_LONG_ADDRESSING:
-                // FIXME: 2 extra words
-                break;
+                field = isSourceOperand ? Field.SRC_VALUE : Field.DST_VALUE;
+                return new String[] { StringUtils.repeat(field.c,32) };
             case IMMEDIATE_VALUE:
-                // FIXME: 1-6 extra words
-                break;
+                field = isSourceOperand ? Field.SRC_VALUE : Field.DST_VALUE;
+
+                final int actualSizeInBits = checkOperandSize(insn,op,op.getValue());
+
+                final int words;
+                switch( actualSizeInBits )
+                {
+                    case 8:  words = 1; break;
+                    case 16: words = 1; break;
+                    case 32: words = 2; break;
+                    default:
+                        throw new RuntimeException("Unhandled operand size: "+actualSizeInBits);
+                }
+                return new String[] { StringUtils.repeat(field.c,words*16) };
             case NO_OPERAND: return null; // handled
         }
         throw new RuntimeException("Unhandled addressing mode: "+op.addressingMode);
     }
+
+    private int checkOperandSize(InstructionNode insn, OperandNode op, IValueNode value)
+    {
+        int max = getMaxOperandSize(insn,op);
+        int actualSize = getOperandSizeInBits(value);
+        if ( actualSize > max ) {
+            throw new RuntimeException("Operand out of range, expected at most "+max+" bits but was "+actualSize);
+        }
+        return actualSize;
+    }
+
+    private static int getOperandSizeInBits(IValueNode node)
+    {
+        int bits = node.getBits();
+        if ( (bits & 0xffffff00) == 0 || ( (bits & 0xffffff00) == 0xffffff00 && ( (bits & 0x00ff) !=  0 ) ) ) {
+            return 8;
+        }
+        if ( (bits & 0xffff0000) == 0 || ( (bits & 0xffff0000) == 0xffff0000 && ( (bits & 0xffff) !=  0 ) ) ) {
+            return 16;
+        }
+        return 32;
+    }
+
+    protected abstract int getMaxOperandSize(InstructionNode insn,OperandNode operand);
 }

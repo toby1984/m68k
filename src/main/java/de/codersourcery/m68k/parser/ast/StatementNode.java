@@ -23,4 +23,9 @@ public class StatementNode extends ASTNode
             child.toString(buffer,depth+1);
         }
     }
+
+    public InstructionNode getInstruction() {
+        final ASTNode n = findFirstChild(NodeType.MNEMONIC);
+        return n == null ? null : n.asInstruction();
+    }
 }

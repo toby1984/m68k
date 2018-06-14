@@ -2,6 +2,7 @@ package de.codersourcery.m68k.parser.ast;
 
 import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.Register;
+import de.codersourcery.m68k.assembler.arch.Scaling;
 import de.codersourcery.m68k.parser.TextRegion;
 
 public class RegisterNode extends ASTNode implements IValueNode
@@ -12,16 +13,15 @@ public class RegisterNode extends ASTNode implements IValueNode
      * Always NULL unless "Rx.w" or "Rx.l" was parsed
      */
     public final OperandSize operandSize;
+    public final Scaling scaling;
 
-    public RegisterNode(Register register, OperandSize operandSize,TextRegion region)
+    public RegisterNode(Register register, OperandSize operandSize,Scaling scaling,TextRegion region)
     {
         super(NodeType.REGISTER, region);
         if ( register == null ) {
             throw new IllegalArgumentException("Register must not be NULL");
         }
-        if ( ! register.supportsOperandSizeSpec && operandSize != null ) {
-            throw new IllegalArgumentException("Register "+register+" does not support operand size specification");
-        }
+        this.scaling = scaling;
         this.register = register;
         this.operandSize = operandSize;
     }
@@ -36,6 +36,10 @@ public class RegisterNode extends ASTNode implements IValueNode
 
     public boolean isDataRegister() {
         return register.isData();
+    }
+
+    public boolean hasScaling() {
+        return scaling != null;
     }
 
     /**

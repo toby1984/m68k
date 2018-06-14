@@ -2,43 +2,41 @@ package de.codersourcery.m68k.assembler.arch;
 
 public enum Register
 {
-    D0("d0",Type.DATA,0,true),
-    D1("d1",Type.DATA,1,true),
-    D2("d2",Type.DATA,2,true),
-    D3("d3",Type.DATA,3,true),
-    D4("d4",Type.DATA,4,true),
-    D5("d5",Type.DATA,5,true),
-    D6("d6",Type.DATA,6,true),
-    D7("d7",Type.DATA,7,true),
+    D0("d0",Type.DATA,0),
+    D1("d1",Type.DATA,1),
+    D2("d2",Type.DATA,2),
+    D3("d3",Type.DATA,3),
+    D4("d4",Type.DATA,4),
+    D5("d5",Type.DATA,5),
+    D6("d6",Type.DATA,6),
+    D7("d7",Type.DATA,7),
     //
-    A0("a0",Type.ADDRESS,0,true),
-    A1("a1",Type.ADDRESS,1,true),
-    A2("a2",Type.ADDRESS,2,true),
-    A3("a3",Type.ADDRESS,3,true),
-    A4("a4",Type.ADDRESS,4,true),
-    A5("a5",Type.ADDRESS,5,true),
-    A6("a6",Type.ADDRESS,6,true),
-    A7("a7",Type.ADDRESS,Type.STACKPTR,7,true),
-    PC("pc",Type.PC,0,false),
-    SR("sr",Type.SR,0,false),
-    CCR("ccr",Type.CCR,0,false);
+    A0("a0",Type.ADDRESS,0),
+    A1("a1",Type.ADDRESS,1),
+    A2("a2",Type.ADDRESS,2),
+    A3("a3",Type.ADDRESS,3),
+    A4("a4",Type.ADDRESS,4),
+    A5("a5",Type.ADDRESS,5),
+    A6("a6",Type.ADDRESS,6),
+    A7("a7",Type.ADDRESS,Type.STACKPTR,7),
+    PC("pc",Type.PC,0),
+    SR("sr",Type.SR,0),
+    CCR("ccr",Type.CCR,0);
 
     public final String name;
     public final Type type1;
     public final Type type2;
     public final int bits;
-    public final boolean supportsOperandSizeSpec; // whether R.w / R.l syntax is allowed
 
-    private Register(String name,Type type1,int index,boolean supportsOperandSizeSpec) {
-        this(name,type1,null,index,supportsOperandSizeSpec);
+    private Register(String name, Type type1, int index) {
+        this(name,type1,null,index);
     }
 
-    private Register(String name,Type type1,Type type2,int index,boolean supportsOperandSizeSpec) {
+    private Register(String name,Type type1,Type type2,int index) {
         this.name = name;
         this.type1 = type1;
         this.type2 = type2;
         this.bits = index;
-        this.supportsOperandSizeSpec = supportsOperandSizeSpec;
     }
 
     public boolean isData()

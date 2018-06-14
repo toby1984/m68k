@@ -35,6 +35,18 @@ public class InstructionEncoding
         this.bitMappings = newMappings;
     }
 
+    public String toString()
+    {
+        StringBuffer buffer = new StringBuffer();
+        for ( int i = 0,len = patterns.length;i<len;i++) {
+            buffer.append('"').append(patterns[i]).append("'");
+            if ( (i+1) < len ) {
+                buffer.append(" , ");
+            }
+        }
+        return buffer.toString();
+    }
+
     public interface IBitMapping
     {
         public Field getField();

@@ -17,26 +17,21 @@ import java.util.List;
 public class OperandNode extends ASTNode
 {
     public final AddressingMode addressingMode;
-    public final Scaling scaling;
 
     private List<ASTNode> children = new ArrayList<>();
 
     private int childCount = 0;
-    private ASTNode baseDisplacement; // displacement relative to base register
-    private ASTNode value; // either an absolute address or a register
+    private IValueNode baseDisplacement; // displacement relative to base register
+    private IValueNode value; // either an absolute address or a register
     private RegisterNode indexRegister;
-    private ASTNode outerDisplacement;
+    private IValueNode outerDisplacement;
 
-    public OperandNode(AddressingMode mode, Scaling scaling,TextRegion region)
+    public OperandNode(AddressingMode mode, TextRegion region)
     {
         super(NodeType.OPERAND,region);
         if ( mode == null ) {
             throw new IllegalArgumentException("mode must not be NULL");
         }
-        if ( scaling == null ) {
-            throw new IllegalArgumentException("scaling must not be NULL");
-        }
-        this.scaling = scaling;
         this.addressingMode = mode;
     }
 
@@ -67,33 +62,33 @@ public class OperandNode extends ASTNode
         return indexRegister;
     }
 
-    public ASTNode getValue() {
+    public IValueNode getValue() {
         return value;
     }
 
-    public void setValue(ASTNode value)
+    public void setValue(IValueNode value)
     {
         this.value = value;
         refreshList();
     }
 
-    public ASTNode getBaseDisplacement()
+    public IValueNode getBaseDisplacement()
     {
         return baseDisplacement;
     }
 
-    public void setBaseDisplacement(ASTNode value)
+    public void setBaseDisplacement(IValueNode value)
     {
         this.baseDisplacement = value;
         refreshList();
     }
 
-    public ASTNode getOuterDisplacement()
+    public IValueNode getOuterDisplacement()
     {
         return outerDisplacement;
     }
 
-    public void setOuterDisplacement(ASTNode value)
+    public void setOuterDisplacement(IValueNode value)
     {
         this.outerDisplacement = value;
         refreshList();

@@ -1,6 +1,6 @@
 package de.codersourcery.m68k.parser.ast;
 
-public interface IValueNode
+public interface IValueNode extends IASTNode
 {
     /**
      * Returns a bit representation of this node's value suitabe for inclusion in an instruction word.

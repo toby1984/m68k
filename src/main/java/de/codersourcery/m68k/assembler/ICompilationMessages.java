@@ -35,6 +35,8 @@ public interface ICompilationMessages
         public static Message of(CompilationUnit unit,String text, Level level, TextRegion location) {
             return new Message(unit,text,level,location);
         }
+
+        
     }
 
     boolean hasErrors();

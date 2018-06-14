@@ -63,14 +63,6 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         }
     }
 
-    public int getValue(ASTNode astNode)
-    {
-        if ( astNode instanceof IValueNode) {
-            return  ((IValueNode) astNode).getBits();
-        }
-        throw new IllegalArgumentException("Don't know how to extract value from "+astNode);
-    }
-
     @Override
     public int getValueFor(Field field, ICompilationContext ctx)
     {
@@ -79,21 +71,33 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
             case OP_CODE:
                 return getInstructionType().getOperationCode(this);
             case SRC_VALUE:
+                return source().getValue().getBits();
+            case SRC_BASE_REGISTER:
                 if ( source().addressingMode.eaRegisterField.isFixedValue() ) {
                     return source().addressingMode.eaRegisterField.value();
                 }
-                return getValue(source().getValue());
+                return source().getValue().asRegister().getBits();
+            case SRC_INDEX_REGISTER:
+                return source().getIndexRegister().getBits();
             case SRC_BASE_DISPLACEMENT:
-                return getValue( source().getBaseDisplacement() );
+                return source().getBaseDisplacement().getBits();
+            case SRC_OUTER_DISPLACEMENT:
+                return source().getOuterDisplacement().getBits();
             case SRC_MODE:
                 return source().addressingMode.eaModeField;
             case DST_VALUE:
+                return destination().getValue().getBits();
+            case DST_BASE_REGISTER:
                 if ( destination().addressingMode.eaRegisterField.isFixedValue() ) {
                     return destination().addressingMode.eaRegisterField.value();
                 }
-                return getValue(destination().getValue());
+                return destination().getValue().asRegister().getBits();
+            case DST_INDEX_REGISTER:
+                return destination().getIndexRegister().getBits();
             case DST_BASE_DISPLACEMENT:
-                return getValue( destination().getBaseDisplacement() );
+                return destination().getBaseDisplacement().getBits();
+            case DST_OUTER_DISPLACEMENT:
+                return destination().getOuterDisplacement().getBits();
             case DST_MODE:
                 return destination().addressingMode.eaModeField;
             case SIZE:

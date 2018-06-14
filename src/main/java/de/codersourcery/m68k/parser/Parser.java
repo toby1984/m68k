@@ -170,21 +170,53 @@ public class Parser
         return null;
     }
 
-    private static boolean evaluatesToNumber(ASTNode node)
+    private static boolean evaluatesToNumber(IValueNode node)
     {
+        // Method MUST be NULL safe
         // FIXME: Does not recognize expressions yet...
         return node != null && node.is(NodeType.NUMBER);
     }
 
-    private ASTNode parseExpression()
+    private IValueNode parseExpression(boolean operandSizeSupported,boolean registerScalingSupported,boolean registerSupported)
     {
         // FIXME: Implement parsing expressions here...
-        return parseAtom();
+        return parseAtom(operandSizeSupported,registerScalingSupported,registerSupported);
     }
 
-    private boolean fitsIn16Bits(ASTNode node) {
+    private boolean fitsIn16Bits(IValueNode node)
+    {
+        if ( node == null ) {
+            return true;
+        }
+        if ( !  evaluatesToNumber(node) ) {
+            fail("Expected a 16-bit number");
+        }
         int bits = ((IValueNode) node).getBits();
-        return ( ( bits & ~0b111_1111_1111_1111) == 0 );
+
+        return (bits & 0xffff0000) == 0 || (bits & 0xffffff00) == 0xffff0000;
+    }
+
+    private boolean fitsIn8Bits(IValueNode node)
+    {
+        if ( node == null ) {
+            return true;
+        }
+        int bits = node.getBits();
+        return (bits & 0xffffff00) == 0 || (bits & 0xffffff00) == 0xffffff00;
+    }
+
+    private Token consumeComma() {
+        if ( ! lexer.peek(TokenType.COMMA ) ) {
+            fail("Expected a comma");
+        }
+        return lexer.next();
+    }
+
+    private Token consumeClosingParens() {
+        if ( ! lexer.peek(TokenType.PARENS_CLOSE) ) {
+            fail("Expected closing parens");
+        }
+        return lexer.next();
     }
 
     private OperandNode parseOperand()
@@ -203,14 +235,14 @@ public class Parser
          * (d8,An, Xn.SIZE*SCALE)        => ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
          * (bd,An,Xn.SIZE*SCALE)         => ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT
          *
-         * ([bd,An],Xn.SIZE*SCALE,od)    => MEMORY_INDIRECT_POSTINDEXED
-         * ([bd,PC],Xn.SIZE*SCALE,od)    => PC_MEMORY_INDIRECT_POSTINDEXED
+         * ([bd,An],Xn.SIZE*SCALE,od)    => MEMORY_INDIRECT_POSTINDEXED (ok)
+         * ([bd,PC],Xn.SIZE*SCALE,od)    => PC_MEMORY_INDIRECT_POSTINDEXED (ok)
          *
          * ([bd,An,Xn.SIZE*SCALE],od)    => MEMORY_INDIRECT_PREINDEXED
          * ([bd,PC,Xn.SIZE*SCALE],od)    => PC_MEMORY_INDIRECT_PREINDEXED
          *
-         * (d8,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
-         * (bd,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_DISPLACEMENT
+         * (d8,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT (ok)
+         * (bd,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_DISPLACEMENT (ok)
          *
          * ($1234).w                     => ABSOLUTE_SHORT_ADDRESSING (ok)
          * ($1234).L                     => ABSOLUTE_LONG_ADDRESSING (ok)
@@ -222,41 +254,38 @@ public class Parser
         if ( lexer.peek(TokenType.HASH) ) // move #$0a,d0
         {
             final Token hash = lexer.next();
-            ASTNode value = parseExpression();
+            IValueNode value = parseExpression(false,false,false);
             if ( value == null ) {
                 fail("Failed to parse immediate mode operand");
             }
-            final OperandNode op = new OperandNode(AddressingMode.IMMEDIATE_VALUE,Scaling.IDENTITY, hash.getRegion() );
+            final OperandNode op = new OperandNode(AddressingMode.IMMEDIATE_VALUE,hash.getRegion() );
             op.setValue(value);
             return op;
         }
 
         final List<Token> tokens = new ArrayList<>();
-        Token indirectAddressing = null;
-        Token preDecrement = null;
-        ASTNode baseDisplacement = null;
+
+        IValueNode baseDisplacement = null;
+        IValueNode outerDisplacement = null;
         RegisterNode baseRegister = null;
+        RegisterNode indexRegister = null;
+
         if ( lexer.peek(TokenType.MINUS ) )
         {
-            preDecrement = lexer.next();
+            tokens.add( lexer.next() );
             if (lexer.peek(TokenType.PARENS_OPEN)) // MOVE -(a0),...
             {
-                tokens.add( preDecrement );
-                indirectAddressing = lexer.next();
-                tokens.add(indirectAddressing);
+                tokens.add( lexer.next() );
 
-                baseRegister = parseRegister(false);
+                baseRegister = parseRegister(false,false);
                 if ( baseRegister == null ) {
                     fail("Expected an address register");
                 }
                 if ( ! baseRegister.isAddressRegister() ) {
-                    fail("Expected an address register",baseRegister.getRegion());
+                    fail("Expected an address register",baseRegister);
                 }
-                if ( ! lexer.peek(TokenType.PARENS_CLOSE ) ) {
-                    fail("Expected closing parens");
-                }
-                tokens.add(lexer.next());
-                final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+                tokens.add( consumeClosingParens() );
+                final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT,Token.getMergedRegion(tokens));
                 op.setValue(baseRegister);
                 return op;
             }
@@ -271,7 +300,7 @@ public class Parser
         if ( ! lexer.peek(TokenType.PARENS_OPEN ) )
         {
             // expecting inner displacement value outside parens
-            baseDisplacement = parseExpression();
+            baseDisplacement = parseExpression(false,false,true);
             if ( baseDisplacement.isRegister() ) // MOVE D3,D4
             {
                 final Register r = baseDisplacement.asRegister().register;
@@ -281,165 +310,279 @@ public class Parser
                 } else if ( r.isData() ) {
                     mode = AddressingMode.DATA_REGISTER_DIRECT;
                 } else {
-                    fail("Expected a data or address register",baseDisplacement.getRegion());
+                    fail("Expected a data or address register",baseDisplacement);
                 }
-                final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+                final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
                 op.setValue(baseDisplacement);
                 return op;
             }
             // MOVE $1234
             if ( ! evaluatesToNumber(baseDisplacement ) ) {
-                fail("Expected an address value",baseDisplacement.getRegion());
+                fail("Expected an address value",baseDisplacement);
             }
         }
 
+        // // MOVE $1234
         if ( ! lexer.peek(TokenType.PARENS_OPEN ) )
         {
-            // LEA $1234,...
             final int bits = ((IValueNode) baseDisplacement).getBits();
             final AddressingMode mode = ( ( bits & ~0b111_1111_1111_1111) == 0 ) ?
                     AddressingMode.ABSOLUTE_SHORT_ADDRESSING : AddressingMode.ABSOLUTE_LONG_ADDRESSING;
-            final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
+            final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
             op.setValue(baseDisplacement);
             return op;
         }
-        tokens.add(lexer.next()); // consume opening parens
 
-        if ( baseDisplacement != null ) {
-            // MOVE $10(
-            baseRegister = parseRegister(false );
-            if ( baseRegister == null ) {
-                fail("Expected a register");
-            }
-            if ( ! ( baseRegister.isAddressRegister() || baseRegister.isPC() ) ) {
-                fail("Expected PC or an address register");
-            }
-            if ( lexer.peek(TokenType.PARENS_CLOSE) )
+        tokens.add( lexer.next() ); // consume opening parens
+
+        final List<IValueNode> arguments;
+        if ( baseDisplacement == null ) {
+            // MOVE
+            arguments = parseCommaSeparatedList(4,true);
+            if ( evaluatesToNumber((IValueNode) arguments.get(0) ) )
             {
-                // MOVE $10(A0)
-                tokens.add(lexer.next());
-                if ( ! fitsIn16Bits(baseDisplacement ) ) {
-                    fail("Displacement out-of-range, must fit in 16 bits");
+                baseRegister = null;
+                baseDisplacement = (IValueNode) arguments.get(0);
+                arguments.remove(0);
+
+                if ( arguments.isEmpty() )
+                {
+                    tokens.add( consumeClosingParens() );
+                    final AddressingMode mode = fitsIn16Bits(baseDisplacement ) ?
+                            AddressingMode.ABSOLUTE_SHORT_ADDRESSING : AddressingMode.ABSOLUTE_LONG_ADDRESSING;
+                    final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
+                    op.setValue(baseDisplacement);
+                    return op;
                 }
-                final AddressingMode mode;
-                if ( baseRegister.isPC() ) {
-                    mode = AddressingMode.PC_INDIRECT_WITH_DISPLACEMENT;
-                } else {
-                    mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
-                }
-                final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
-                op.setBaseDisplacement(baseDisplacement);
+            }
+        } else {
+            arguments = parseCommaSeparatedList(3,true);
+        }
+        tokens.add( consumeClosingParens() );
+
+        if ( lexer.peek(TokenType.PLUS ) )
+        {
+            tokens.add(lexer.next());
+
+            if ( arguments.size() != 1 ) {
+                fail("Expected one address register for post-increment");
+            }
+            baseRegister = arguments.get(0).asRegister();
+            if ( ! baseRegister.isAddressRegister() ) {
+                fail("Expected one address register for post-increment");
+            }
+            if ( baseRegister.hasScaling() || baseRegister.hasOperandSize() ) {
+                fail("Cannot use scaling and/or operand size spec with post increment");
+            }
+            if ( baseDisplacement != null ) {
+                fail("Cannot use post-increment with displacement");
+            }
+
+            final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,Token.getMergedRegion(tokens));
+            op.setValue(baseRegister);
+            return op;
+        }
+
+        if ( ! fitsIn16Bits(baseDisplacement)) {
+            fail("Displacement does not fit in 16 bits",baseDisplacement);
+        }
+
+        // base register displacement parsed,
+        // we now have at most three more arguments
+
+        /*
+         * (d8,An, Xn.SIZE*SCALE)        => ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
+         * (bd,An,Xn.SIZE*SCALE)         => ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT
+         *
+         * ([bd,An],Xn.SIZE*SCALE,od)    => MEMORY_INDIRECT_POSTINDEXED (ok)
+         * ([bd,PC],Xn.SIZE*SCALE,od)    => PC_MEMORY_INDIRECT_POSTINDEXED (ok)
+         *
+         * ([bd,An,Xn.SIZE*SCALE],od)    => MEMORY_INDIRECT_PREINDEXED
+         * ([bd,PC,Xn.SIZE*SCALE],od)    => PC_MEMORY_INDIRECT_PREINDEXED
+         *
+         * (d8,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
+         * (bd,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_DISPLACEMENT
+         */
+
+        // (baseRegister,indexRegister.SIZE*SCALE,outerDisplacement)
+        if ( ! arguments.get(0).isRegister() ) {
+            fail("Expected a register");
+        }
+        baseRegister = arguments.get(0).asRegister();
+        if ( baseRegister.isPC() )
+        {
+            // MOVE $0d(PC
+            // MOVE (PC
+            // MOVE ($0d,PC
+            if ( arguments.size() == 1 )
+            {
+                final OperandNode op = new OperandNode(AddressingMode.PC_INDIRECT_WITH_DISPLACEMENT,Token.getMergedRegion(tokens));
                 op.setValue(baseRegister);
+                op.setBaseDisplacement(baseDisplacement);
                 return op;
             }
-            if ( ! lexer.peek(TokenType.COMMA ) ) {
-                fail("Expected a comma");
+
+            if ( ! arguments.get(1).isAddressRegister() ) {
+                fail("Expected an address register",arguments.get(1));
             }
-            tokens.add(lexer.next());
-            // MOVE (A0,
+            indexRegister = arguments.get(1).asRegister();
+
+            if ( arguments.size() == 2 )
+            {
+                /*
+                 * (d8,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
+                 * (bd,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_DISPLACEMENT
+                 */
+                AddressingMode mode = AddressingMode.PC_INDIRECT_WITH_INDEX_DISPLACEMENT;
+                if ( fitsIn8Bits( baseDisplacement ) ) {
+                    mode = AddressingMode.PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT;
+                }
+                final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
+                op.setValue(baseRegister);
+                op.setBaseDisplacement(baseDisplacement);
+                op.setIndexRegister(indexRegister);
+                return op;
+            }
+            outerDisplacement = (IValueNode) arguments.get(2);
+            if ( ! fitsIn16Bits(outerDisplacement ) ) {
+                fail("Outer displacement out of 16-bit range",outerDisplacement);
+            }
+            // * ([bd,PC],Xn.SIZE*SCALE,od)    => PC_MEMORY_INDIRECT_POSTINDEXED (ok)
+            final OperandNode op = new OperandNode(AddressingMode.PC_MEMORY_INDIRECT_POSTINDEXED,Token.getMergedRegion(tokens));
+            op.setValue(baseRegister);
+            op.setBaseDisplacement(baseDisplacement);
+            op.setIndexRegister(indexRegister);
+            op.setOuterDisplacement(outerDisplacement);
+            return op;
         }
-        else
+        if ( ! baseRegister.isAddressRegister() ) {
+            fail("Unsupported register: "+baseRegister);
+        }
+
+        baseRegister = arguments.get(0).asRegister();
+        if ( baseRegister.hasOperandSize() || baseRegister.hasScaling() ) {
+            fail("No scaling or operand size allowed on base register",baseRegister);
+        }
+
+        if ( arguments.size() == 1 )
         {
-            // baseDisplacement == NULL   here
-
-            // check for inner displacement (bd,...) syntax
-            ASTNode eaOrRegister = parseExpression();
-            if ( eaOrRegister == null ) {
-                fail("Expected an address register or displacement value");
+            AddressingMode mode;
+            if ( baseDisplacement == null ) {
+                mode = AddressingMode.ADDRESS_REGISTER_INDIRECT;
             }
-            if ( evaluatesToNumber(eaOrRegister) )
+            else
             {
-                // MOVE ($0a
-                baseDisplacement = eaOrRegister;
-                if ( lexer.peek(TokenType.PARENS_CLOSE) )
-                {
-                    tokens.add(lexer.next());
-                    final AddressingMode mode = fitsIn16Bits(baseDisplacement) ?
-                        AddressingMode.ABSOLUTE_SHORT_ADDRESSING : AddressingMode.ABSOLUTE_LONG_ADDRESSING;
-                    final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
-                    op.setBaseDisplacement(baseDisplacement);
-                    return op;
-                }
-                if ( ! lexer.peek(TokenType.COMMA ) ) {
-                    fail("Expected a comma");
-                }
-                tokens.add(lexer.next());
-
-                // MOVE ($0a,
-                eaOrRegister = parseExpression();
-                if ( eaOrRegister == null ) {
-                    fail("Expected an address register or PC");
-                }
-                if ( ! ( eaOrRegister.isAddressRegister() || eaOrRegister.isPCRegister() ) ) {
-                    fail("Expected an address register or PC");
-                }
-                baseRegister = eaOrRegister.asRegister();
-                if ( lexer.peek(TokenType.PARENS_CLOSE) ) // TODO: Duplicate code (1)
-                {
-                    tokens.add(lexer.next());
-                    final AddressingMode mode;
-                    if ( baseRegister.isPC() ) {
-                        mode = AddressingMode.PC_INDIRECT_WITH_DISPLACEMENT;
-                    } else {
-                        mode = AddressingMode.ADDRESS_REGISTER_INDIRECT;
-                    }
-                    final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
-                    op.setValue(baseRegister);
-                    // fake zero displacement value
-                    op.setBaseDisplacement(new NumberNode(0,NumberNode.NumberType.DECIMAL,new TextRegion(0,0) ) );
-                    return op;
-                }
-                if ( ! lexer.peek(TokenType.COMMA ) ) {
-                    fail("Expected a comma");
-                }
-                tokens.add(lexer.next());
-                // MOVE ($0a,Ax|PC,
+                mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
             }
-            else if ( eaOrRegister.isRegister() )
-            {
-                // MOVE (A0
-                if ( ! (eaOrRegister.isAddressRegister() || eaOrRegister.isPCRegister() ) )
-                {
-                    fail("Expected PC or an address register");
-                }
-                baseRegister = eaOrRegister.asRegister();
-
-                if ( lexer.peek(TokenType.PARENS_CLOSE) ) // TODO: Duplicate code (1)
-                {
-                    tokens.add(lexer.next());
-                    final AddressingMode mode;
-                    if ( baseRegister.isPC() ) {
-                        mode = AddressingMode.PC_INDIRECT_WITH_DISPLACEMENT;
-                    } else {
-                        mode = AddressingMode.ADDRESS_REGISTER_INDIRECT;
-                    }
-                    final OperandNode op = new OperandNode(mode,Scaling.IDENTITY, Token.getMergedRegion(tokens));
-                    op.setValue(baseRegister);
-                    // fake zero displacement value
-                    op.setBaseDisplacement(new NumberNode(0,NumberNode.NumberType.DECIMAL,new TextRegion(0,0) ) );
-                    return op;
-                }
-                if ( ! lexer.peek(TokenType.COMMA ) ) {
-                    fail("Expected a comma");
-                }
-                tokens.add(lexer.next());
-                // MOVE (A0,
-            } else {
-                fail("Syntax error");
-            }
+            final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
+            op.setValue(baseRegister);
+            op.setBaseDisplacement(baseDisplacement);
+            op.setIndexRegister(null);
+            op.setOuterDisplacement(null);
+            return op;
         }
-        // state here:
-        // MOVE ($0a,Ax|PC,
-        // MOVE (Ax|PC,
 
+        indexRegister = arguments.get(1).asRegister();
 
-        // ======================== TODO: Parse missing address modes
+        if ( arguments.size() == 2 )
+        {
+            AddressingMode mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT;
+            if ( ! fitsIn8Bits(baseDisplacement ) ) {
+                mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT;
+            }
+            final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
+            op.setValue(baseRegister);
+            op.setBaseDisplacement(baseDisplacement);
+            op.setIndexRegister(indexRegister);
+            op.setOuterDisplacement(outerDisplacement);
+            return op;
+        }
+
+        outerDisplacement = (IValueNode) arguments.get(2);
+        if ( ! fitsIn16Bits(outerDisplacement ) ) {
+            fail("Outer displacement out of 16-bit range",outerDisplacement);
+        }
+
+        final OperandNode op = new OperandNode(AddressingMode.MEMORY_INDIRECT_POSTINDEXED,Token.getMergedRegion(tokens));
+        op.setValue(baseRegister);
+        op.setBaseDisplacement(baseDisplacement);
+        op.setIndexRegister(indexRegister);
+        op.setOuterDisplacement(outerDisplacement);
+        return op;
     }
 
-    private ASTNode parseAtom()
+    private List<IValueNode> parseCommaSeparatedList(int maxElementCount,boolean operandSizeSupported)
+    {
+        final var result = new ArrayList<IValueNode>(maxElementCount);
+
+        boolean valueExpected = false;
+        do  {
+            final IValueNode node = parseExpression(operandSizeSupported,true,true);
+            if ( node == null )
+            {
+                if ( valueExpected ) {
+                    fail("Value expected after comma");
+                }
+                break;
+            }
+            result.add( node );
+            if ( lexer.peek(TokenType.COMMA ) )
+            {
+                if ( result.size()+1 > maxElementCount ) {
+                    fail("Too many arguments, expected at most "+maxElementCount);
+                }
+                lexer.next();
+                valueExpected = true;
+            } else {
+                valueExpected = false;
+            }
+        }
+        while ( result.size() < maxElementCount );
+
+        if ( valueExpected ) {
+            fail("Value expected after comma");
+        }
+        if ( result.isEmpty() ) {
+            fail("Expected at least one argument after opening parens");
+        }
+        return result;
+    }
+
+    private Scaling parseScaling(List<Token> tokens)
+    {
+        Scaling scaling = null;
+        if ( lexer.peek(TokenType.TIMES ) )
+        {
+            tokens.add(lexer.next()); // consume '*'
+            if (! lexer.peek(TokenType.DIGITS))
+            {
+                fail("Expected scaling factor for 1,2,4 or 8");
+            }
+            final Token numberToken = lexer.next();
+            tokens.add(numberToken);
+            try
+            {
+                switch (Integer.parseInt(numberToken.value))
+                {
+                    case 1: return Scaling.IDENTITY;
+                    case 2: return Scaling.TWO;
+                    case 4: return Scaling.FOUR;
+                    case 8: return Scaling.EIGHT;
+                }
+                fail("Expected scaling factor for 1,2,4 or 8");
+            }
+            catch (Exception e)
+            {
+            }
+            fail("Not a valid number", numberToken.getRegion());
+        }
+        return scaling;
+    }
+
+    private IValueNode parseAtom(boolean operandSizeSupported,boolean registerScalingSupported,boolean registerNameSupported)
     {
         Token token = lexer.peek();
-        ASTNode result = null;
+        IValueNode result = null;
         if ( token.is(TokenType.DIGITS) )
         {
             return parseNumber();
@@ -452,9 +595,13 @@ public class Parser
                 return result;
             }
 
-            result = parseRegister(false);
-            if ( result != null) {
-                return result;
+            if ( registerNameSupported )
+            {
+                result = parseRegister(operandSizeSupported, registerScalingSupported);
+                if (result != null)
+                {
+                    return result;
+                }
             }
 
             if ( Identifier.isValid( token.value ) )
@@ -466,7 +613,7 @@ public class Parser
         return parseString();
     }
 
-    private RegisterNode parseRegister(boolean operandSizeSuffixSupported)
+    private RegisterNode parseRegister(boolean operandSizeSuffixSupported,boolean scalingSupported)
     {
         final Token prefix = lexer.peek();
         if ( prefix.is(TokenType.TEXT) )
@@ -496,15 +643,29 @@ public class Parser
                 if ( ! operandSizeSuffixSupported ) {
                     fail("Size specification not supported here");
                 }
-                if ( ! r.supportsOperandSizeSpec ) {
-                    fail("Register "+r+" does not support a size specification (.w/.l)");
+                if ( ! r.isAddress() ) {
+                    fail("Operand size can only be specified on address registers",prefix);
                 }
             }
             final TextRegion region = Token.getMergedRegion(prefix,registerNumber);
             if ( operandSize != null ) {
                 region.incLength(2); // +2 characters ('.w' or '.l')
             }
-            return new RegisterNode(r,operandSize, region);
+            final List<Token> tokens = new ArrayList<>();
+            Scaling scaling = null;
+            if ( scalingSupported )
+            {
+                scaling = parseScaling(tokens);
+                if (scaling != null)
+                {
+                    if (!r.isAddress())
+                    {
+                        fail("Scaling non-address registers is not possible", prefix);
+                    }
+                    region.merge(Token.getMergedRegion(tokens));
+                }
+            }
+            return new RegisterNode(r,operandSize, scaling, region);
         }
         return null;
     }
@@ -621,6 +782,25 @@ public class Parser
 
     private void fail(String message,Token token) {
         fail(message,token.getRegion());
+    }
+
+    private void fail(String message,IASTNode node)
+    {
+        TextRegion r;
+        if ( node == null ) {
+            r = lexer.peek().getRegion();
+        }
+        else
+        {
+            r = node.getRegion();
+            if ( r == null ) {
+                r = node.getMergedRegion();
+                if (r == null ) {
+                    r = lexer.peek().getRegion();
+                }
+            }
+        }
+        fail(message,r.getStartingOffset());
     }
 
     private void fail(String message,TextRegion region) {
