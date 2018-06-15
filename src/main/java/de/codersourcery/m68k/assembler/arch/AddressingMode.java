@@ -61,6 +61,11 @@ public enum AddressingMode
      * EA = (An) + d16
      */
     ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT(0b101,registerNumber(),1),
+
+    /*
+     * ==============================================
+     */
+
     /**
      * MOVE (d8,An, Xn.SIZE*SCALE),... (1 extra word).
      *
@@ -72,7 +77,7 @@ public enum AddressingMode
      *
      * EA = (An) + (Xn) + bd
      */
-    // 1,2 or 3 extra words TODO: Why 3 extra words ? 32 bit for displacement (=2 words) + X ???
+    // 1,2 or 3 extra words
     ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT(0b110,registerNumber(),3),
     /**
      * MOVE ([bd,An],Xn.SIZE*SCALE,od),... (1-5 extra words).
@@ -88,6 +93,11 @@ public enum AddressingMode
      */
     // 1,2,3,4 or 5 extra words
     MEMORY_INDIRECT_PREINDEXED(0b110,registerNumber(),5),
+
+    /*
+     * ==============================================
+     */
+
     /**
      * MOVE (d16 ,PC),... (1 extra word).
      *

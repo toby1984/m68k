@@ -12,11 +12,11 @@ public class Memory {
     {
         this.data = new byte[ sizeInBytes ];
     }
-    public int readWord(int address)
+    public short readWord(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits
     {
         int hi = data[address];
         int lo = data[address+1];
-        return hi<<8|(lo & 0xff);
+        return (short) (hi<<8|(lo & 0xff));
     }
 
     public void writeWord(int address,int value)
@@ -25,7 +25,7 @@ public class Memory {
         data[address+1] = (byte) value;
     }
 
-    public int readByte(int address)
+    public byte readByte(int address) // return type NEEDS to be byte, used for implicit sign extension 8 bits -> 32 bits
     {
         return data[address];
     }
