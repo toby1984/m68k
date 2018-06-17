@@ -11,7 +11,22 @@ public enum OperandSize
     private OperandSize(int bits) {
         this.bits = bits;
     }
+
     public int bits() {
         return bits;
+    }
+
+    public int sizeInBits()
+    {
+        switch(this)
+        {
+            case BYTE:
+                return 8;
+            case WORD:
+                return 16;
+            case LONG:
+                return 32;
+        }
+        throw new RuntimeException("Unreachable code reached");
     }
 }

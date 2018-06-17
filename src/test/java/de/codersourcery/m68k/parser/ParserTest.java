@@ -28,6 +28,12 @@ public class ParserTest extends TestCase
         assertTrue(ast.hasNoParent());
     }
 
+    public void testMoveQOperandSizesFail() {
+        assertFails( () -> parse("moveq.b #$70,d0") );
+        assertFails( () -> parse("moveq.w #$70,d0") );
+        assertFails( () -> parse("moveq.l #$70,d0") );
+    }
+
     // IMMEDIATE_VALUE
     public void testImmediateMode()
     {
@@ -243,16 +249,16 @@ public class ParserTest extends TestCase
     public void testPCMemoryIndirectPostIndexed() {
 
         OperandNode src = parseSourceOperand("MOVE $1234(PC,A2.l*2,$ab),D1");
-        assertEquals(AddressingMode.MEMORY_INDIRECT_POSTINDEXED,src.addressingMode);
+        assertEquals(AddressingMode.PC_MEMORY_INDIRECT_POSTINDEXED,src.addressingMode);
         assertTrue( src.getValue().is(NodeType.REGISTER) );
         RegisterNode baseRegister = src.getValue().asRegister();
-        assertEquals( Register.A1, baseRegister.register );
+        assertEquals( Register.PC, baseRegister.register );
         assertNull( baseRegister.operandSize );
         assertNull( baseRegister.scaling );
 
         assertNotNull( src.getIndexRegister() );
         RegisterNode indexRegister = src.getIndexRegister();
-        assertEquals( Register.A2, baseRegister.register );
+        assertEquals( Register.A2, indexRegister.register );
         assertEquals(OperandSize.LONG, indexRegister.operandSize );
         assertEquals(Scaling.TWO, indexRegister.scaling );
 
@@ -260,7 +266,7 @@ public class ParserTest extends TestCase
 
         assertTrue( src.getBaseDisplacement().is(NodeType.NUMBER));
         long baseDisplacement = src.getBaseDisplacement().asNumber().getValue();
-        assertEquals(0x1245,baseDisplacement);
+        assertEquals(0x1234,baseDisplacement);
 
         assertTrue( src.getOuterDisplacement().is(NodeType.NUMBER));
         long outerDisplacement = src.getOuterDisplacement().asNumber().getValue();
@@ -563,5 +569,16 @@ public class ParserTest extends TestCase
 
         final ILexer lexer = new Lexer(new StringScanner(source ) );
         return new Parser().parse(lexer);
+    }
+
+    private void assertFails(Runnable r)
+    {
+        try {
+            r.run();
+            fail("Should've failed");
+        }
+        catch(Exception e) {
+            // ok
+        }
     }
 }

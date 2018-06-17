@@ -18,7 +18,7 @@ public class CPU
     private static final int FLAG_I0        = 1<<8; // IRQ priority mask bit 0
 
     // usermode byte (condition codes)
-    private static final int FLAG_X        = 1<<4;
+    private static final int FLAG_EXTENDED = 1<<4;
     private static final int FLAG_NEGATIVE = 1<<3;
     private static final int FLAG_ZERO     = 1<<2;
     private static final int FLAG_OVERFLOW = 1<<1;
@@ -34,6 +34,21 @@ public class CPU
 
     private int ea;
     private int value;
+
+    public boolean isExtended() { return (sr & FLAG_EXTENDED) != 0; }
+    public boolean isNotExtended() { return (sr & FLAG_EXTENDED) == 0; }
+
+    public boolean isNegative() { return (sr & FLAG_NEGATIVE) != 0; }
+    public boolean isNotNegative() { return (sr & FLAG_NEGATIVE) == 0; }
+
+    public boolean isZero() { return (sr & FLAG_ZERO) != 0; }
+    public boolean isNotZero() { return (sr & FLAG_ZERO) == 0; }
+
+    public boolean isOverflow() { return (sr & FLAG_OVERFLOW) != 0; }
+    public boolean isNotOverflow() { return (sr & FLAG_OVERFLOW) == 0; }
+
+    public boolean isCarry() { return (sr & FLAG_CARRY) != 0; }
+    public boolean isNotCarry() { return (sr & FLAG_CARRY) == 0; }
 
     /*
 
@@ -177,7 +192,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 // ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
                 int offset = memLoadWord(pc);
                 pc += 2; // skip displacement
-                offset = (offset<<16)>>16;
                 ea = addressRegisters[ eaRegister ] + offset; // hint: memLoad() performs sign-extension to 32 bits
                 return;
             case 0b110:
@@ -220,7 +234,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             return;
                         case 0b0010: // Indirect Preindexed with Word Outer Displacement
                             outerDisplacement = memLoadWord(pc);
-                            outerDisplacement = (outerDisplacement<<16)>>16;
                             pc += 2;
                             int intermediateAddress = baseRegisterValue + baseDisplacement + decodeIndexRegisterValue(extensionWord );
                             ea = memLoadLong(intermediateAddress)+outerDisplacement;
@@ -239,7 +252,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             return;
                         case 0b0110: // Indirect Postindexed with Word Outer Displacement
                             outerDisplacement = memLoadWord(pc);
-                            outerDisplacement = (outerDisplacement<<16)>>16;
                             pc += 2;
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLong(intermediateAddress) + decodeIndexRegisterValue(extensionWord ) + outerDisplacement;
@@ -259,7 +271,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             return;
                         case 0b1010: // Memory Indirect with Word Outer Displacement, Index suppressed
                             outerDisplacement = memLoadWord(pc);
-                            outerDisplacement = (outerDisplacement<<16)>>16;
                             pc += 2;
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLong(intermediateAddress) + outerDisplacement;
@@ -291,7 +302,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     case 0b010:
                         // PC_INDIRECT_WITH_DISPLACEMENT(0b111,fixedValue(0b010),1),
                         baseDisplacement = memory.readWord(pc);
-                        baseDisplacement = (baseDisplacement<<16) >> 16; // sign-extend
                         ea = baseDisplacement + pc;
                         pc += 2;
                         return;
@@ -334,7 +344,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          */
                         ea = memLoadWord(pc);
                         pc += 2;
-                        ea = (ea << 16 ) >> 16; // sign-extend
                         return;
                     case 0b001:
                         /*
@@ -424,21 +433,31 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 operandSize = 1;
                 break;
             case 0b0001_0000_0000_0000: // Move Byte
-                loadValue(instruction,1);
+                loadValue(instruction,2); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
+                value = (value<<24)>>24; // sign-extend
+                updateFlags();
                 storeValue(instruction,1 );
                 return;
             case 0b0010_0000_0000_0000: // Move Long
                 loadValue(instruction,4);
+                updateFlags();
                 storeValue(instruction,4 );
                 return;
             case 0b0011_0000_0000_0000: // Move Word
                 loadValue(instruction,2);
+                updateFlags();
                 storeValue(instruction,2 );
                 return;
             case 0b0100_0000_0000_0000: // Miscellaneous
             case 0b0101_0000_0000_0000: // ADDQ/SUBQ/Scc/DBcc/TRAPc c
             case 0b0110_0000_0000_0000: // Bcc/BSR/BRA
             case 0b0111_0000_0000_0000: // MOVEQ
+                value = instruction & 0xff;
+                value = (value<<24)>>24; // sign-extend
+                int register = (instruction & 0b0111_0000_0000) >> 8;
+                dataRegisters[register] = value;
+                updateFlags();
+                break;
             case 0b1000_0000_0000_0000: // OR/DIV/SBCD
             case 0b1001_0000_0000_0000: // SUB/SUBX
             case 0b1010_0000_0000_0000: // (Unassigned, Reserved)
@@ -454,6 +473,23 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         // perform operation
 
         // storeValue(instruction,operandSize);
+    }
+
+    private void updateFlags()
+    {
+        int clearMask = 0xffffffff;
+        int setMask = 0;
+        if ( value == 0 ) {
+            setMask |= FLAG_ZERO;
+        } else {
+            clearMask &= ~FLAG_ZERO;
+        }
+        if ( ( value & 1<<31 ) != 0 ) {
+            setMask |= FLAG_NEGATIVE;
+        } else {
+            clearMask &= ~FLAG_NEGATIVE;
+        }
+        this.sr = (this.sr & clearMask ) | setMask;
     }
 
     private void loadValue(int instruction,int operandSize)
@@ -488,10 +524,23 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         {
             case 0b000:
                 // DATA_REGISTER_DIRECT;
-                dataRegisters[eaRegister] = value;
-                break;
+                switch( operandSize ) {
+                    case 1:
+                        dataRegisters[eaRegister] = value & 0x00ff;
+                        return;
+                    case 2:
+                        dataRegisters[eaRegister] = value & 0xffff;
+                        return;
+                    case 4:
+                        dataRegisters[eaRegister] = value;
+                        return;
+                }
+                throw new RuntimeException("Unreachable code reached");
             case 0b001:
                 // ADDRESS_REGISTER_DIRECT;
+                if ( operandSize != 4 ) {
+                    throw new IllegalArgumentException("Unexpected operand size "+operandSize+" for address register");
+                }
                 addressRegisters[eaRegister] = value;
                 break;
             default:
@@ -518,5 +567,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
     {
         addressRegisters[7] = memLoadLong(0 );
         pc = memLoadLong(4 );
+        sr = FLAG_SUPERVISOR_MODE;
     }
 }

@@ -109,6 +109,10 @@ public class Parser
                 OperandSize operandSize = t.defaultOperandSize;
                 if ( lexer.peek(TokenType.DOT ) )
                 {
+                    if ( ! t.supportsExplicitOperandSize() ) {
+                        fail("Instruction does not support explicit operand sizes",tok);
+                    }
+
                     final Token token = lexer.next(); // consume dot
                     region.merge(token.getRegion() );
                     final Token token3 = lexer.peek();

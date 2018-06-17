@@ -108,6 +108,20 @@ public class NumberNode extends ASTNode implements IValueNode
     @Override
     public void toString(StringBuilder buffer, int depth)
     {
-        buffer.append(indent(depth)).append(type.toString()).append(" number [").append(value).append("]\n");
+        String num;
+        switch(type) {
+            case DECIMAL:
+                num = Long.toString(value);
+                break;
+            case BINARY:
+                num = "%"+Long.toBinaryString(value);
+                break;
+            case HEXADECIMAL:
+                num = "$"+Long.toHexString(value);
+                break;
+            default:
+                throw new RuntimeException("Unhandled switch/case: "+type);
+        }
+        buffer.append(indent(depth)).append(type.toString()).append(" number [ ").append(num).append(" ]\n");
     }
 }

@@ -30,61 +30,82 @@ Bits 15 – 12 Operation
 1110 Shift/Rotate/Bit Field
 1111 Coprocessor Interface/MC68040 and CPU32 Extensions
      */
+    MOVEQ("moveq", 2, OperandSize.BYTE, 0b0111)
+        {
+
+            @Override
+            public void checkSupports(Operand kind, OperandNode node)
+            {
+                switch(kind)
+                {
+                    case SOURCE:
+                        if ( ! node.hasAddressingMode(AddressingMode.IMMEDIATE_VALUE) )
+                        {
+                            throw new RuntimeException("MOVEQ requires an immediate value as source operand");
+                        }
+                        break;
+                    case DESTINATION:
+                        if ( ! node.hasAddressingMode(AddressingMode.DATA_REGISTER_DIRECT) )
+                        {
+                            throw new RuntimeException("MOVEQ requires a data register as destination operand");
+                        }
+                        break;
+                }
+            }
+
+            @Override public boolean supportsExplicitOperandSize() { return false; }
+            @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
+            @Override protected int getMaxSourceOperandSizeInBits() { return 8; }
+
+        },
     MOVE("move", 2, OperandSize.WORD, 0b0000)
+        {
+            @Override
+            public int getOperationCode(InstructionNode insn)
             {
-                @Override
-                public int getOperationCode(InstructionNode insn)
+                switch (insn.getOperandSize())
                 {
-                    switch (insn.getOperandSize())
-                    {
-                        case BYTE:
-                            return 0b0001;
-                        case WORD:
-                            return 0b0011;
-                        case LONG:
-                            return 0b0010;
-                    }
-                    throw new RuntimeException("Unhandled switch/case: " + insn.getOperandSize());
+                    case BYTE:
+                        return 0b0001;
+                    case WORD:
+                        return 0b0011;
+                    case LONG:
+                        return 0b0010;
                 }
+                throw new RuntimeException("Unhandled switch/case: " + insn.getOperandSize());
+            }
 
-                @Override
-                protected int getMaxOperandSize(InstructionNode insn, OperandNode operand)
-                {
-                    return 32;
-                }
+            @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
+            @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
 
-                @Override
-                public void checkSupports(Operand kind, OperandNode node)
-                {
-                }
-            },
+            @Override
+            public void checkSupports(Operand kind, OperandNode node)
+            {
+            }
+        },
     LEA("lea", 2, OperandSize.LONG, 0b0100)
+        {
+            @Override
+            public void checkSupports(Operand kind, OperandNode node)
             {
-                @Override
-                public void checkSupports(Operand kind, OperandNode node)
+                if (kind == Operand.DESTINATION)
                 {
-                    if (kind == Operand.DESTINATION)
+                    if ( node.getValue().isNot(NodeType.REGISTER) || ! node.getValue().asRegister().isAddressRegister() )
                     {
-                        if ( node.getValue().isNot(NodeType.REGISTER) || ! node.getValue().asRegister().isAddressRegister() )
-                        {
-                            throw new RuntimeException("LEA needs an address register as destination");
-                        }
-                    }
-                    else if (kind == Operand.SOURCE)
-                    {
-                        if ( ! node.hasAbsoluteAddressing() )
-                        {
-                            throw new RuntimeException("LEA requires an absolute address value as source");
-                        }
+                        throw new RuntimeException("LEA needs an address register as destination");
                     }
                 }
-
-                @Override
-                protected int getMaxOperandSize(InstructionNode insn, OperandNode operand)
+                else if (kind == Operand.SOURCE)
                 {
-                    return 32;
+                    if ( ! node.hasAbsoluteAddressing() )
+                    {
+                        throw new RuntimeException("LEA requires an absolute address value as source");
+                    }
                 }
-            };
+            }
+            @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
+            @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
+        };
 
     public final OperandSize defaultOperandSize;
     private final String mnemonic;
@@ -163,6 +184,8 @@ Bits 15 – 12 Operation
 
     private static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
 
+    private static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
+
     private static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss");
 
     protected InstructionEncoding getEncoding(InstructionType type, InstructionNode insn, ICompilationContext context)
@@ -180,11 +203,14 @@ Bits 15 – 12 Operation
 
         switch (type)
         {
+            case MOVEQ:
+                checkOperandSize(insn.source().getValue(), Operand.SOURCE);
+                return MOVEQ_ENCODING;
             case LEA:
                 return LEA_ENCODING;
             case MOVE:
-                final String[] extraSrcWords = getExtraWordPatterns(insn.source(), true, insn,context);
-                final String[] extraDstWords = getExtraWordPatterns(insn.destination(), false, insn,context);
+                final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                final String[] extraDstWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
 
                 if (extraSrcWords != null && extraDstWords == null)
                 {
@@ -206,7 +232,7 @@ Bits 15 – 12 Operation
 
     // returns any InstructionEncoding patterns
     // needed to accomodate all operand values
-    private String[] getExtraWordPatterns(OperandNode op, boolean isSourceOperand,InstructionNode insn,ICompilationContext ctx)
+    private String[] getExtraWordPatterns(OperandNode op, Operand operandKind,InstructionNode insn,ICompilationContext ctx)
     {
         if ( op.addressingMode.maxExtensionWords == 0 ) {
             return null;
@@ -220,7 +246,7 @@ Bits 15 – 12 Operation
             case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT: return null; // handled
             case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT: return null; // handled
             case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
-                Field field = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT : Field.DST_BASE_DISPLACEMENT;
+                Field field = operandKind == Operand.SOURCE ? Field.SRC_BASE_DISPLACEMENT : Field.DST_BASE_DISPLACEMENT;
                 return new String[] { StringUtils.repeat(field.c,16) };
             case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
                 // FIXME: 1 extra word
@@ -235,7 +261,7 @@ Bits 15 – 12 Operation
                 // FIXME: 1-5 extra words
                 break;
             case PC_INDIRECT_WITH_DISPLACEMENT:
-                field = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT: Field.DST_BASE_DISPLACEMENT;
+                field = operandKind == Operand.SOURCE ? Field.SRC_BASE_DISPLACEMENT: Field.DST_BASE_DISPLACEMENT;
                 return new String[] { StringUtils.repeat(field.c,16) };
             case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
 
@@ -252,8 +278,8 @@ D/A   |     |   |           |
     REGISTER|  SCALE      DISPLACEMENT
             W/L
                  */
-                field = isSourceOperand ? Field.SRC_BASE_DISPLACEMENT: Field.DST_BASE_DISPLACEMENT;
-                return new String[] { isSourceOperand ? SRC_BRIEF_EXTENSION_WORD : DST_BRIEF_EXTENSION_WORD};
+                field = operandKind == Operand.SOURCE ? Field.SRC_BASE_DISPLACEMENT: Field.DST_BASE_DISPLACEMENT;
+                return new String[] { operandKind == Operand.SOURCE ? SRC_BRIEF_EXTENSION_WORD : DST_BRIEF_EXTENSION_WORD};
             case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
                 // FIXME: 1-3 extra words
                 break;
@@ -264,34 +290,32 @@ D/A   |     |   |           |
                 // FIXME: 1-5 extra words
                 break;
             case ABSOLUTE_SHORT_ADDRESSING:
-                field = isSourceOperand ? Field.SRC_VALUE : Field.DST_VALUE;
+                field = operandKind == Operand.SOURCE ? Field.SRC_VALUE : Field.DST_VALUE;
                 return new String[] { StringUtils.repeat(field.c,16) };
             case ABSOLUTE_LONG_ADDRESSING:
-                field = isSourceOperand ? Field.SRC_VALUE : Field.DST_VALUE;
+                field = operandKind == Operand.SOURCE ? Field.SRC_VALUE : Field.DST_VALUE;
                 return new String[] { StringUtils.repeat(field.c,32) };
             case IMMEDIATE_VALUE:
-                field = isSourceOperand ? Field.SRC_VALUE : Field.DST_VALUE;
+                field = operandKind == Operand.SOURCE ? Field.SRC_VALUE : Field.DST_VALUE;
 
-                final int actualSizeInBits = checkOperandSize(insn,op,op.getValue());
+                int actualSizeInBits = checkOperandSize(op.getValue(),operandKind);
 
-                final int words;
-                switch( actualSizeInBits )
-                {
-                    case 8:  words = 1; break;
-                    case 16: words = 1; break;
-                    case 32: words = 2; break;
-                    default:
-                        throw new RuntimeException("Unhandled operand size: "+actualSizeInBits);
+                if ( actualSizeInBits > insn.getOperandSize().sizeInBits() ) {
+                    throw new RuntimeException("Operand has "+actualSizeInBits+" bits but instruction specifies to use only "+
+                        insn.getOperandSize().sizeInBits());
                 }
+                // TODO: 8-bit immediate values could actually be stored in-line (MOVEQ) instead of wasting a byte here
+                // TODO: Maybe add optimization pass that turns regular MOVE into MOVEQ when possible?
+                final int words = insn.getOperandSize() == OperandSize.LONG ? 2 : 1;
                 return new String[] { StringUtils.repeat(field.c,words*16) };
             case NO_OPERAND: return null; // handled
         }
         throw new RuntimeException("Unhandled addressing mode: "+op.addressingMode);
     }
 
-    private int checkOperandSize(InstructionNode insn, OperandNode op, IValueNode value)
+    private int checkOperandSize(IValueNode value,Operand opKind)
     {
-        int max = getMaxOperandSize(insn,op);
+        final int max = opKind == Operand.SOURCE ? getMaxSourceOperandSizeInBits() : getMaxDestinationOperandSizeInBits();
         int actualSize = getOperandSizeInBits(value);
         if ( actualSize > max ) {
             throw new RuntimeException("Operand out of range, expected at most "+max+" bits but was "+actualSize);
@@ -311,5 +335,24 @@ D/A   |     |   |           |
         return 32;
     }
 
-    protected abstract int getMaxOperandSize(InstructionNode insn,OperandNode operand);
+    /**
+     * Returns the maximum size (in bits) this instruction supports for the source operand.
+     * @return
+     */
+    protected abstract int getMaxSourceOperandSizeInBits();
+
+    /**
+     * Returns the maximum size (in bits) this instruction supports for the source operand.
+     * @return
+     */
+    protected abstract int getMaxDestinationOperandSizeInBits();
+
+    /**
+     * Whether this instruction supports explicit .b/.w/.l suffixes or not.
+     *
+     * @return
+     */
+    public boolean supportsExplicitOperandSize() {
+        return true;
+    }
 }

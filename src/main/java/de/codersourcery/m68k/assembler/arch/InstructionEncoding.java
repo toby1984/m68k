@@ -247,6 +247,7 @@ public class InstructionEncoding
 
     private InstructionEncoding(String pattern1,String...additional)
     {
+        pattern1 = stripUnderscores(pattern1);
         Validate.notBlank( pattern1, "pattern1 must not be null or blank");
         final int len = 1 + ( additional != null ? additional.length : 0 );
         this.bitMappings = new Map[len];
@@ -257,11 +258,16 @@ public class InstructionEncoding
         {
             for (int i = 0; i < additional.length; i++)
             {
-                Validate.notBlank( additional[i], "additional patterns must not be null or blank");
-                this.patterns[i+1] = additional[i];
-                this.bitMappings[i+1] = getMappings(additional[i]);
+                final String stripped = stripUnderscores( additional[i] );
+                Validate.notBlank(stripped, "additional patterns must not be null or blank");
+                this.patterns[i+1] = stripped;
+                this.bitMappings[i+1] = getMappings(stripped);
             }
         }
+    }
+
+    private static String stripUnderscores(String s) {
+        return s.replace("_", "");
     }
 
     /**
