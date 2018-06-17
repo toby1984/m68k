@@ -35,6 +35,13 @@ public class Memory {
         data[address] = (byte) value;
     }
 
+    public void writeBytes(int address,byte[] data)
+    {
+        for ( int i = 0,len=data.length,ptr = address ; i < len ; i++,ptr++ ) {
+            this.data[ptr] = data[i];
+        }
+    }
+
     public int readLong(int address)
     {
         int hi = readWord(address);

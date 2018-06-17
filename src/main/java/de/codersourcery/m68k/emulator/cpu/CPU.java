@@ -4,6 +4,26 @@ import de.codersourcery.m68k.Memory;
 
 public class CPU
 {
+    /*
+    X N Z V C
+     */
+    // supervisor mode byte
+    private static final int FLAG_T1        = 1<<15; // TRACE
+    private static final int FLAG_T0        = 1<<14;
+    private static final int FLAG_SUPERVISOR_MODE        = 1<<13;
+    private static final int FLAG_MASTER_INTERRUPT       = 1<<12;
+
+    private static final int FLAG_I2        = 1<<10; // IRQ priority mask bit 2
+    private static final int FLAG_I1        = 1<<9; // IRQ priority mask bit 1
+    private static final int FLAG_I0        = 1<<8; // IRQ priority mask bit 0
+
+    // usermode byte (condition codes)
+    private static final int FLAG_X        = 1<<4;
+    private static final int FLAG_NEGATIVE = 1<<3;
+    private static final int FLAG_ZERO     = 1<<2;
+    private static final int FLAG_OVERFLOW = 1<<1;
+    private static final int FLAG_CARRY    = 1<<0;
+
     public final Memory memory;
 
     public final int[] dataRegisters = new int[8];
@@ -14,6 +34,51 @@ public class CPU
 
     private int ea;
     private int value;
+
+    /*
+
+TODO: Not all of them apply to m68k (for example FPU/MMU ones)
+
+0 000 Reset Initial Interrupt Stack Pointer
+1 004 Reset Initial Program Counter
+2 008 Access Fault
+3 00C Address Error
+4 010 Illegal Instruction
+5 014 Integer Divide by Zero
+6 018 CHK, CHK2 Instruction
+7 01C FTRAPcc, TRAPcc, TRAPV Instructions
+8 020 Privilege Violation
+9 024 Trace
+10 028 Line 1010 Emulator (Unimplemented A- Line Opcode)
+11 02C Line 1111 Emulator (Unimplemented F-Line Opcode)
+12 030 (Unassigned, Reserved)
+13 034 Coprocessor Protocol Violation
+14 038 Format Error
+15 03C Uninitialized Interrupt
+16–23 040–05C (Unassigned, Reserved)
+24 060 Spurious Interrupt
+25 064 Level 1 Interrupt Autovector
+26 068 Level 2 Interrupt Autovector
+27 06C Level 3 Interrupt Autovector
+28 070 Level 4 Interrupt Autovector
+29 074 Level 5 Interrupt Autovector
+30 078 Level 6 Interrupt Autovector
+31 07C Level 7 Interrupt Autovector
+32–47 080–0BC TRAP #0 D 15 Instruction Vectors
+48 0C0 FP Branch or Set on Unordered Condition
+49 0C4 FP Inexact Result
+50 0C8 FP Divide by Zero
+51 0CC FP Underflow
+52 0D0 FP Operand Error
+53 0D4 FP Overflow
+54 0D8 FP Signaling NAN
+55 0DC FP Unimplemented Data Type (Defined for MC68040)
+56 0E0 MMU Configuration Error
+57 0E4 MMU Illegal Operation Error
+58 0E8 MMU Access Level Violation Error
+59–63 0ECD0FC (Unassigned, Reserved)
+64–255 100D3FC User Defined Vectors (192)
+     */
 
     public CPU(Memory memory) {
         this.memory = memory;
@@ -346,10 +411,6 @@ public class CPU
         return idxRegisterValue * scale;
     }
 
-    private void decodeDestination(int instruction) {
-
-    }
-
     public void executeOneInstruction()
     {
         int instruction= memory.readWord(pc);
@@ -363,14 +424,17 @@ public class CPU
                 operandSize = 1;
                 break;
             case 0b0001_0000_0000_0000: // Move Byte
-                operandSize = 1;
-                break;
+                loadValue(instruction,1);
+                storeValue(instruction,1 );
+                return;
             case 0b0010_0000_0000_0000: // Move Long
-                operandSize = 4;
-                break;
+                loadValue(instruction,4);
+                storeValue(instruction,4 );
+                return;
             case 0b0011_0000_0000_0000: // Move Word
-                operandSize = 2;
-                break;
+                loadValue(instruction,2);
+                storeValue(instruction,2 );
+                return;
             case 0b0100_0000_0000_0000: // Miscellaneous
             case 0b0101_0000_0000_0000: // ADDQ/SUBQ/Scc/DBcc/TRAPc c
             case 0b0110_0000_0000_0000: // Bcc/BSR/BRA
@@ -448,5 +512,11 @@ public class CPU
                 }
         }
 
+    }
+
+    public void reset()
+    {
+        addressRegisters[7] = memLoadLong(0 );
+        pc = memLoadLong(4 );
     }
 }
