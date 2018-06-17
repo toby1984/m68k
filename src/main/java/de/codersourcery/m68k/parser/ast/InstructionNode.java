@@ -4,6 +4,7 @@ import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.arch.Field;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.InstructionType;
+import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.parser.TextRegion;
 
 public class InstructionNode extends ASTNode implements ICodeGeneratingNode
@@ -132,6 +133,26 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
                 return destination().addressingMode.eaModeField;
             case SIZE:
                 return operandSize.bits;
+            case EXG_DATA_REGISTER:
+            case EXG_ADDRESS_REGISTER:
+                final Register srcReg = source().getValue().asRegister().register;
+                final Register dstReg = destination().getValue().asRegister().register;
+                // data register if EXG used with registers of different types, otherwise either the src data or src address register
+                if ( field == Field.EXG_DATA_REGISTER )
+                {
+                    if ( srcReg.isData() != dstReg.isData() )
+                    {
+                        return srcReg.isData() ? srcReg.bits : dstReg.bits;
+                    }
+                    return srcReg.bits;
+                }
+                // field == Field.EXG_ADDRESS_REGISTER;
+                // address register if EXG used with registers of different types, otherwise either the dst data or dst address register
+                if ( srcReg.isAddress() != dstReg.isAddress() )
+                {
+                    return dstReg.isAddress() ? dstReg.bits : srcReg.bits;
+                }
+                return dstReg.bits;
             case NONE:
                 return 0;
             default:

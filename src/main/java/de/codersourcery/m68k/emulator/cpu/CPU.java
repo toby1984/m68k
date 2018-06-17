@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 
 public class CPU
 {
@@ -8,21 +9,21 @@ public class CPU
     X N Z V C
      */
     // supervisor mode byte
-    private static final int FLAG_T1        = 1<<15; // TRACE
-    private static final int FLAG_T0        = 1<<14;
-    private static final int FLAG_SUPERVISOR_MODE        = 1<<13;
-    private static final int FLAG_MASTER_INTERRUPT       = 1<<12;
+    public static final int FLAG_T1        = 1<<15; // TRACE
+    public static final int FLAG_T0        = 1<<14;
+    public static final int FLAG_SUPERVISOR_MODE        = 1<<13;
+    public static final int FLAG_MASTER_INTERRUPT       = 1<<12;
 
-    private static final int FLAG_I2        = 1<<10; // IRQ priority mask bit 2
-    private static final int FLAG_I1        = 1<<9; // IRQ priority mask bit 1
-    private static final int FLAG_I0        = 1<<8; // IRQ priority mask bit 0
+    public static final int FLAG_I2        = 1<<10; // IRQ priority mask bit 2
+    public static final int FLAG_I1        = 1<<9; // IRQ priority mask bit 1
+    public static final int FLAG_I0        = 1<<8; // IRQ priority mask bit 0
 
     // usermode byte (condition codes)
-    private static final int FLAG_EXTENDED = 1<<4;
-    private static final int FLAG_NEGATIVE = 1<<3;
-    private static final int FLAG_ZERO     = 1<<2;
-    private static final int FLAG_OVERFLOW = 1<<1;
-    private static final int FLAG_CARRY    = 1<<0;
+    public static final int FLAG_EXTENDED = 1<<4;
+    public static final int FLAG_NEGATIVE = 1<<3;
+    public static final int FLAG_ZERO     = 1<<2;
+    public static final int FLAG_OVERFLOW = 1<<1;
+    public static final int FLAG_CARRY    = 1<<0;
 
     public final Memory memory;
 
@@ -422,6 +423,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
     public void executeOneInstruction()
     {
+        System.out.println(">>>> Executing instruction at 0x"+Integer.toHexString(pc));
         int instruction= memory.readWord(pc);
         pc += 2;
 
@@ -436,19 +438,32 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 loadValue(instruction,2); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
                 value = (value<<24)>>24; // sign-extend
                 updateFlags();
+                clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 storeValue(instruction,1 );
                 return;
             case 0b0010_0000_0000_0000: // Move Long
                 loadValue(instruction,4);
                 updateFlags();
+                clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 storeValue(instruction,4 );
                 return;
             case 0b0011_0000_0000_0000: // Move Word
                 loadValue(instruction,2);
                 updateFlags();
+                clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 storeValue(instruction,2 );
                 return;
             case 0b0100_0000_0000_0000: // Miscellaneous
+                if ( (instruction & 0b0100_0001_1100_0000) == 0b0100_0001_1100_0000 )
+                {
+                    // LEA
+                    loadValue(instruction,4);
+                    final int dstAdrReg = (instruction & 0b1110_0000_0000) >> 9;
+
+                    addressRegisters[dstAdrReg] = value;
+                    return;
+                }
+                break;
             case 0b0101_0000_0000_0000: // ADDQ/SUBQ/Scc/DBcc/TRAPc c
             case 0b0110_0000_0000_0000: // Bcc/BSR/BRA
             case 0b0111_0000_0000_0000: // MOVEQ
@@ -457,12 +472,41 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 int register = (instruction & 0b0111_0000_0000) >> 8;
                 dataRegisters[register] = value;
                 updateFlags();
+                clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 break;
             case 0b1000_0000_0000_0000: // OR/DIV/SBCD
             case 0b1001_0000_0000_0000: // SUB/SUBX
             case 0b1010_0000_0000_0000: // (Unassigned, Reserved)
             case 0b1011_0000_0000_0000: // CMP/EOR
             case 0b1100_0000_0000_0000: // AND/MUL/ABCD/EXG
+                // 1100000100000000
+                if ( (instruction & 0b1100_0001_0000_0000) == 0b1100_0001_0000_0000 )
+                {
+                    // EXG
+                    // hint: variable names are a bit misleading, only apply if EXG between different register types
+                    final int dataReg = (instruction & 0b111_000000000) >> 9;
+                    final int addressReg = instruction & 0b111;
+                    switch( instruction & 0b1111_1000 )
+                    {
+                        case 0b01000000: // swap Data registers
+                            int tmp = dataRegisters[ addressReg ];
+                            dataRegisters[ addressReg ] = dataRegisters[ dataReg ];
+                            dataRegisters[ dataReg ] = tmp;
+                            return;
+                        case 0b01001000: // swap Address registers
+                            tmp = addressRegisters[ addressReg ];
+                            addressRegisters[ addressReg ] = addressRegisters[ dataReg ];
+                            addressRegisters[ dataReg ] = tmp;
+                            return;
+                        case 0b10001000: // swap Data register and address register
+                            tmp = addressRegisters[ addressReg ];
+                            addressRegisters[ addressReg ] = dataRegisters[ dataReg ];
+                            dataRegisters[ dataReg ] = tmp;
+                            return;
+                    }
+                    illegalInstruction(instruction);
+                }
+                break;
             case 0b1101_0000_0000_0000: // ADD/ADDX
             case 0b1110_0000_0000_0000: // Shift/Rotate/Bit Field
             case 0b1111_0000_0000_0000: // Coprocessor Interface/MC68040 and CPU32 Extensions
@@ -473,6 +517,29 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         // perform operation
 
         // storeValue(instruction,operandSize);
+    }
+
+    private void illegalInstruction(int instruction) {
+        throw new RuntimeException("Illegal instruction word: "+instruction);
+    }
+
+    /**
+     * Sets all bits in the status register where the bit bitMask has a '1' bit.
+     *
+     * @param bitMask
+     */
+    public void setFlags(int bitMask) {
+        this.sr |= bitMask;
+    }
+
+    /**
+     * Clears the all bits in the status register where the bit mask has a '1' bit.
+     *
+     * @param bitMask
+     */
+    public void clearFlags(int bitMask)
+    {
+        this.sr &= ~bitMask;
     }
 
     private void updateFlags()
@@ -508,6 +575,26 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 // ADDRESS_REGISTER_DIRECT;
                 value = addressRegisters[eaRegister];
                 break;
+            case 0b111:
+                switch(eaRegister)
+                {
+                    case 0b000:
+                        /*
+                         * MOVE (xxx).W,... (1 extra word).
+                         * ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1 ),
+                         */
+                        value = memLoadWord(pc);
+                        pc += 2;
+                        return;
+                    case 0b001:
+                        /*
+                         * MOVE (xxx).L,.... (2 extra words).
+                        ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2 ),
+                         */
+                        value = memLoadLong(pc);
+                        pc += 4;
+                        return;
+                }
             default:
                 decodeOperand(instruction, operandSize, eaMode, eaRegister);
                 value = memLoad(ea, operandSize);
@@ -543,6 +630,24 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 }
                 addressRegisters[eaRegister] = value;
                 break;
+            case 0b111:
+                switch(eaRegister)
+                {
+                    case 0b000:
+                        /*
+                         * MOVE (xxx).W,... (1 extra word).
+                         * ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1 ),
+                         */
+                        addressRegisters[eaRegister] = value;
+                        return;
+                    case 0b001:
+                        /*
+                         * MOVE (xxx).L,.... (2 extra words).
+                        ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2 ),
+                         */
+                        addressRegisters[eaRegister] = value;
+                        return;
+                }
             default:
                 decodeOperand(instruction, operandSize, eaMode, eaRegister);
                 switch(operandSize)

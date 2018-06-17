@@ -18,7 +18,7 @@ public enum Field
     DST_BASE_REGISTER('D'),
     DST_INDEX_REGISTER('I'),
     DST_BASE_DISPLACEMENT('B'),
-    DST_OUTER_DISPLACEMENT('y'),
+    DST_OUTER_DISPLACEMENT('Y'),
     DST_MODE('M'),
     DST_REGISTER_KIND('R'), // (bd,br,{Rx},od)
     DST_INDEX_SIZE('Q'), // (bd,br,Rx{.w|.l},od)
@@ -27,6 +27,8 @@ public enum Field
     // misc
     SIZE('S'), // operation size: .b/.w/.l
     OP_CODE('o'), // bits 15-12
+    EXG_DATA_REGISTER('k'), // data register if EXG used with registers of different types, otherwise either the src data or src address register
+    EXG_ADDRESS_REGISTER('l'), // address register if EXG used with registers of different types, otherwise either the dst data or dst address register
     /**
      * Dummy field that indicates
      * the {@link InstructionEncoding.IBitMapping} requires no
@@ -58,15 +60,18 @@ public enum Field
             case 'D': return DST_BASE_REGISTER;
             case 'I': return DST_INDEX_REGISTER;
             case 'B': return DST_BASE_DISPLACEMENT;
-            case 'y': return DST_OUTER_DISPLACEMENT;
+            case 'Y': return DST_OUTER_DISPLACEMENT;
             case 'M': return DST_MODE;
             case 'R': return DST_REGISTER_KIND;
             case 'Q': return DST_INDEX_SIZE;
             case 'E': return DST_SCALE;
             case 'W': return DST_8_BIT_DISPLACEMENT;
             // --
+            case 'k': return EXG_DATA_REGISTER;
+            case 'l': return EXG_ADDRESS_REGISTER;
             case 'S': return SIZE;
             case 'o': return OP_CODE;
+
             default:
                 return null;
         }

@@ -7,6 +7,7 @@ import de.codersourcery.m68k.parser.ast.NodeType;
 import de.codersourcery.m68k.parser.ast.OperandNode;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.xml.crypto.Data;
 import java.util.function.Function;
 
 public enum InstructionType
@@ -30,6 +31,53 @@ Bits 15 – 12 Operation
 1110 Shift/Rotate/Bit Field
 1111 Coprocessor Interface/MC68040 and CPU32 Extensions
      */
+    EXG("exg",2,OperandSize.LONG,0b1100)
+        {
+            @Override
+            public int getOperationCode(InstructionNode insn)
+            {
+                /*
+01000—Data registers
+01001—Address registers
+10001—Data register and address register
+                 */
+                boolean isData1 = insn.source().getValue().isDataRegister();
+                boolean isData2 = insn.destination().getValue().asRegister().isDataRegister();
+                if ( isData1 != isData2 ) {
+                    return 0b10001;
+                }
+                return isData1 ? 0b01000 : 0b01001;
+            }
+
+            @Override
+            public void checkSupports(Operand kind, OperandNode node)
+            {
+                if ( ! node.getValue().isRegister() ) {
+                    throw new RuntimeException("Bad operand type, EXG needs a address or data register");
+                }
+                if ( ! ( node.getValue().isDataRegister() || node.getValue().isAddressRegister() ) ) {
+                    throw new RuntimeException("Unsupported register, EXG supports address or data registers");
+                }
+            }
+
+            @Override
+            protected int getMaxSourceOperandSizeInBits()
+            {
+                return 32;
+            }
+
+            @Override
+            protected int getMaxDestinationOperandSizeInBits()
+            {
+                return 32;
+            }
+
+            @Override
+            public boolean supportsExplicitOperandSize()
+            {
+                return false;
+            }
+        },
     MOVEQ("moveq", 2, OperandSize.BYTE, 0b0111)
         {
 
@@ -170,24 +218,6 @@ Bits 15 – 12 Operation
         context.getCodeWriter().writeBytes(data);
     }
 
-    /*
-                case 's': return SRC_REGISTER;
-                case 'm': return SRC_MODE;
-                case 'D': return DST_REGISTER;
-                case 'M': return DST_MODE;
-                case 'S': return SIZE;
-                case 'o': return OPERATION_CODE;
-     */
-
-    private static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
-    private static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
-
-    private static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
-
-    private static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
-
-    private static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss");
-
     protected InstructionEncoding getEncoding(InstructionType type, InstructionNode insn, ICompilationContext context)
     {
         OperandNode operand = insn.source();
@@ -203,10 +233,15 @@ Bits 15 – 12 Operation
 
         switch (type)
         {
+            case EXG:
+                return EXG_ENCODING;
             case MOVEQ:
                 checkOperandSize(insn.source().getValue(), Operand.SOURCE);
                 return MOVEQ_ENCODING;
             case LEA:
+                if ( insn.source().addressingMode == AddressingMode.ABSOLUTE_SHORT_ADDRESSING ) {
+                    return LEA_WORD_ENCODING;
+                }
                 return LEA_ENCODING;
             case MOVE:
                 final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
@@ -355,4 +390,33 @@ D/A   |     |   |           |
     public boolean supportsExplicitOperandSize() {
         return true;
     }
+
+
+    /*
+                case 's': return SRC_REGISTER;
+                case 'm': return SRC_MODE;
+                case 'D': return DST_REGISTER;
+                case 'M': return DST_MODE;
+                case 'S': return SIZE;
+                case 'o': return OPERATION_CODE;
+     */
+
+    private static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
+    private static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
+
+    private static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
+
+    private static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
+
+    private static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
+        "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
+    private static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
+        "vvvvvvvv_vvvvvvvv");
+
+    private static final InstructionEncoding EXG_ENCODING = InstructionEncoding.of("1100kkk1ooooolll");
+    /*
+  EXG_DATA_REGISTER('k'), // data register if EXG used with registers of different types, otherwise either the src data or src address register
+    EXG_ADDRESS_REGISTER('l'), // address register if EXG used with registers of different types, otherwise either the dst data or dst address register
+     */
 }

@@ -9,9 +9,18 @@ import de.codersourcery.m68k.emulator.cpu.CPU;
 import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
 public class CPUTest extends TestCase
 {
     private static final int MEM_SIZE = 512*1024;
+
+    public static final int ALL_USR_FLAGS = CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW | CPU.FLAG_NEGATIVE | CPU.FLAG_ZERO | CPU.FLAG_EXTENDED;
+
     private Memory memory;
     private CPU cpu;
 
@@ -23,11 +32,35 @@ public class CPUTest extends TestCase
         cpu = new CPU(memory);
     }
 
+    public void testLEA()
+    {
+        execute("lea $12345678,a0", cpu -> cpu.setFlags(ALL_USR_FLAGS))
+            .expectA0(0x12345678).carry().overflow().extended().negative().zero();
+    }
+
+    public void testLEA2()
+    {
+        execute("lea $1234,a0", cpu -> cpu.setFlags(ALL_USR_FLAGS))
+            .expectA0(0x1234).carry().overflow().extended().negative().zero();
+    }
+
     public void testMoveByteImmediate() {
 
         execute("move.b #$12,d0").expectD0(0x12).notCarry().noOverflow().notExtended().notNegative().notZero();
         execute("move.b #$00,d0").expectD0(0x00).notCarry().noOverflow().notExtended().notNegative().zero();
         execute("move.b #$ff,d0").expectD0(0xff).notCarry().noOverflow().notExtended().negative().notZero();
+    }
+
+    public void testMoveByteClearsFlags() {
+        execute("move.b #$12,d0",cpu->cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW)).expectD0(0x12).notCarry().noOverflow().notExtended().notNegative().notZero();
+    }
+
+    public void testMoveWordClearsFlags() {
+        execute("move.w #$12,d0",cpu->cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW)).expectD0(0x12).notCarry().noOverflow().notExtended().notNegative().notZero();
+    }
+
+    public void testMoveLongClearsFlags() {
+        execute("move.l #$12,d0",cpu->cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW)).expectD0(0x12).notCarry().noOverflow().notExtended().notNegative().notZero();
     }
 
     public void testMoveWordImmediate() {
@@ -44,6 +77,11 @@ public class CPUTest extends TestCase
         execute("move.l #$12345678,d0").expectD0(0x12345678).notCarry().noOverflow().notExtended().notNegative().notZero();
     }
 
+    public void testMoveQClearsCarryAndOverflow()
+    {
+        execute("moveq #$70,d0", cpu -> cpu.setFlags( CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW) ).expectD0(0x70).notCarry().noOverflow().notExtended().notNegative().notZero();
+    }
+
     public void testMoveQ()
     {
         execute("moveq #$70,d0").expectD0(0x70).notCarry().noOverflow().notExtended().notNegative().notZero();
@@ -51,17 +89,77 @@ public class CPUTest extends TestCase
         execute("moveq #$ff,d0").expectD0(0xffffffff).notCarry().noOverflow().notExtended().negative().notZero();
     }
 
-    private ExpectionBuilder execute(String program) {
+    public void testExgDataData() {
+
+        execute(cpu -> cpu.setFlags(ALL_USR_FLAGS),
+              "move.l #$12345678,d1",
+            "move.l #$76543210,d3",
+                       "exg d1,d3")
+            .expectD1(0x76543210)
+            .expectD3(0x12345678)
+            .carry().overflow().extended().negative().zero();
+    }
+
+    public void testExgAdrAdr() {
+
+        execute(cpu -> cpu.setFlags(ALL_USR_FLAGS),
+            "lea $12345678,a1",
+            "lea $76543210,a3",
+            "exg a1,a3")
+            .expectA1(0x76543210)
+            .expectA3(0x12345678)
+            .carry().overflow().extended().negative().zero();
+    }
+
+    public void testExgAdrData() {
+
+        execute(cpu -> cpu.setFlags(ALL_USR_FLAGS),
+            "lea $12345678,a1",
+            "move.l $76543210,d3",
+            "exg a1,d3")
+            .expectA1(0x76543210)
+            .expectD3(0x12345678)
+            .carry().overflow().extended().negative().zero();
+    }
+
+    private ExpectionBuilder execute(String program)
+    {
+        return execute(cpu->{},program);
+    }
+
+    private ExpectionBuilder execute(String program,Consumer<CPU> cpuSetup)
+    {
+        return execute(cpuSetup,program);
+    }
+
+    private ExpectionBuilder execute(Consumer<CPU> cpuSetup,String program1,String... additional)
+    {
+        final List<String> lines = new ArrayList<>();
+        lines.add(program1);
+        if ( additional != null ) {
+            Arrays.stream(additional).forEach(lines::add );
+        }
+
+        int insCount = lines.size();
 
         memory.writeLong(0, MEM_SIZE ); // Supervisor mode stack pointer
         memory.writeLong(4, 1024 ); // PC starting value
 
+        final String program = lines.stream().collect(Collectors.joining("\n"));
         final byte[] executable = compile(program);
         System.out.println( Memory.hexdump(1024,executable,0,executable.length) );
         memory.writeBytes(1024,executable );
 
         cpu.reset();
-        cpu.executeOneInstruction();
+        for ( ; insCount > 0 ; insCount--)
+        {
+            // assumption is that we want to test the
+            // very last instruction so we'll invoke the callback here
+            if ( (insCount-1) == 0 ) {
+                cpuSetup.accept(cpu);
+            }
+            cpu.executeOneInstruction();
+        }
         return new ExpectionBuilder();
     }
 
