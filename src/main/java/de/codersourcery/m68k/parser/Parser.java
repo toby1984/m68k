@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.parser;
 
+import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.InstructionType;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
@@ -757,6 +758,7 @@ public class Parser
         long value = NumberNode.parse(token.value,type);
         return new NumberNode(value,type,token.getRegion());
     }
+
     private ASTNode parseLabel()
     {
         final Token token1 = lexer.peek();
@@ -774,6 +776,7 @@ public class Parser
                 lexer.next();
                 final TextRegion region = token1.getRegion();
                 final Identifier identifier = new Identifier(token1.value);
+
                 return new LabelNode(new Label(identifier), region);
             }
         }

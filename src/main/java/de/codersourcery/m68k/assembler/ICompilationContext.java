@@ -43,6 +43,9 @@ public interface ICompilationContext
 
     public String getSource(CompilationUnit unit) throws IOException;
 
+    // symbol handling
+    public SymbolTable symbolTable();
+
     // object code generation
     public IObjectCodeWriter getCodeWriter();
 

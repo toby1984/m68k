@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.assembler.phases.CodeGenerationPhase;
+import de.codersourcery.m68k.assembler.phases.GatherSymbolsPhase;
 import de.codersourcery.m68k.assembler.phases.ParsePhase;
 import de.codersourcery.m68k.assembler.phases.ValidationPhase;
 import de.codersourcery.m68k.parser.TextRegion;
@@ -34,8 +35,9 @@ public class Assembler
     {
         var phases = new ArrayList<ICompilationPhase>();
         phases.add( new ParsePhase() );
+        phases.add( new GatherSymbolsPhase() );
         phases.add( new ValidationPhase() );
-        phases.add( new CodeGenerationPhase() );
+        phases.add( new CodeGenerationPhase(true) );
         return phases;
     }
 
@@ -146,6 +148,12 @@ public class Assembler
                 buffer.append(tmp,0,len);
             }
             return buffer.toString();
+        }
+
+        @Override
+        public SymbolTable symbolTable()
+        {
+            return getCompilationUnit().symbolTable;
         }
 
         @Override

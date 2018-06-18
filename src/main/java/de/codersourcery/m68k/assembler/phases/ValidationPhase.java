@@ -19,6 +19,8 @@ public class ValidationPhase implements ICompilationPhase
             {
                 final InstructionNode insn = node.asInstruction();
                 insn.getInstructionType().checkSupports(insn);
+            } else if ( node.is(NodeType.IDENTIFIER) ) {
+                ctx.error("Unknown symbol "+node.asIdentifier().getValue(),node);
             }
         };
         ctx.getCompilationUnit().getAST().visitInOrder(visitor);

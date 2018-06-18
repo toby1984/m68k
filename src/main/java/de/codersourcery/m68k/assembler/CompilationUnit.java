@@ -23,6 +23,7 @@ public class CompilationUnit
     private final IResource resource;
     private AST ast;
     private List<IntRange> lines;
+    public final SymbolTable symbolTable = new SymbolTable();
 
     public CompilationUnit(IResource resource) {
         Validate.notNull(resource, "resource must not be null");
@@ -42,6 +43,7 @@ public class CompilationUnit
         }
         children.add(child);
         child.setParent(this);
+        child.symbolTable.setParent(this.symbolTable);
     }
 
     private void setParent(CompilationUnit parent) {
