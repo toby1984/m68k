@@ -11,6 +11,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * A compilation unit (aka source file).
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class CompilationUnit
 {
     public CompilationUnit parent;
@@ -24,6 +29,11 @@ public class CompilationUnit
         this.resource = resource;
     }
 
+    /**
+     * Add a child compilation unit that depends on this unit.
+     *
+     * @param child
+     */
     public void addChild(CompilationUnit child)
     {
         Validate.notNull(child, "child must not be null");
@@ -39,16 +49,31 @@ public class CompilationUnit
         this.parent = parent;
     }
 
+    /**
+     * Returns the underlying {@link IResource} associated with this compilation unit.
+     *
+     * @return
+     */
     public IResource getResource()
     {
         return resource;
     }
 
+    /**
+     * Returns the AST for this compilation unit (if parsed).
+     *
+     * @return AST, <code>null</code> if unit was not parsed yet or failed to parse properly.
+     */
     public AST getAST()
     {
         return ast;
     }
 
+    /**
+     * Sets the AST for this compilation unit.
+     *
+     * @param ast
+     */
     public void setAST(AST ast)
     {
         this.ast = ast;
@@ -79,7 +104,8 @@ public class CompilationUnit
     }
 
     /**
-     * Find location within source file for a given offset
+     * Finds the location within the source file with a given character offset.
+     *
      * @param offset
      * @return location
      */

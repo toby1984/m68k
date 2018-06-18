@@ -25,7 +25,7 @@ public class StatementNode extends ASTNode
     }
 
     public InstructionNode getInstruction() {
-        final ASTNode n = findFirstChild(NodeType.MNEMONIC);
+        final ASTNode n = findFirstChild(NodeType.INSTRUCTION);
         return n == null ? null : n.asInstruction();
     }
 }

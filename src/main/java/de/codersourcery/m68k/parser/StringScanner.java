@@ -38,4 +38,13 @@ public class StringScanner implements IScanner
     {
         return ptr;
     }
+
+    @Override
+    public void setOffset(int offset)
+    {
+        if ( offset < 0 || offset > input.length() ) {
+            throw new IllegalArgumentException("Offset "+offset+" is out-of-range 0-"+input.length());
+        }
+        this.ptr = offset;
+    }
 }

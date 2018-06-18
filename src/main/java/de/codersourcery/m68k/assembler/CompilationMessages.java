@@ -7,6 +7,11 @@ import de.codersourcery.m68k.parser.ast.ASTNode;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Container for compilation debug/info/warning/error messages.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class CompilationMessages implements ICompilationMessages
 {
     private final List<Message> messages = new ArrayList<>();

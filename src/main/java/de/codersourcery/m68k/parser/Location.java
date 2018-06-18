@@ -3,6 +3,11 @@ package de.codersourcery.m68k.parser;
 import de.codersourcery.m68k.assembler.CompilationUnit;
 import org.apache.commons.lang3.Validate;
 
+/**
+ * Human-readable locaton in a source file (line,column).
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class Location
 {
     public final CompilationUnit unit;

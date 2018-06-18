@@ -11,8 +11,7 @@ import java.util.List;
 /**
  * Operand node.
  *
- * FIRST child is operand value.
- * SECOND child (if any) is offset in case this operand uses indirect addressing with an offset
+ * @author tobias.gierke@code-sourcery.de
  */
 public class OperandNode extends ASTNode
 {
@@ -22,9 +21,9 @@ public class OperandNode extends ASTNode
 
     private int childCount = 0;
     private IValueNode baseDisplacement; // displacement relative to base register
-    private IValueNode value; // either an absolute address or a register
-    private RegisterNode indexRegister;
-    private IValueNode outerDisplacement;
+    private IValueNode value; // either an address value/expression or the base register
+    private RegisterNode indexRegister; // index register to use for (bd,BR,Xn.SIZE*SCALE,od) syntax
+    private IValueNode outerDisplacement; // outer displacement to use for (bd,BR,Xn.SIZE*SCALE,od) syntax
 
     public OperandNode(AddressingMode mode, TextRegion region)
     {

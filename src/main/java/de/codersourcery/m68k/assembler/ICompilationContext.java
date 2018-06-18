@@ -6,17 +6,32 @@ import de.codersourcery.m68k.parser.ast.ASTNode;
 
 import java.io.IOException;
 
+/**
+ * Compilation context.
+ * @author tobias.gierke@code-sourcery.de
+ */
 public interface ICompilationContext
 {
+    /**
+     * Memory/output segment.
+     */
     public enum Segment
     {
+        /**
+         * Initialized data.
+         */
         DATA,
+        /**
+         * Program code.
+         */
         TEXT,
+        /**
+         * Uninitialized data.
+         */
         BSS
     }
 
     // compilation
-
     public void setPhase(ICompilationPhase phase);
 
     public ICompilationPhase getPhase();

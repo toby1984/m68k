@@ -7,9 +7,13 @@ import de.codersourcery.m68k.parser.ast.NodeType;
 import de.codersourcery.m68k.parser.ast.OperandNode;
 import org.apache.commons.lang3.StringUtils;
 
-import javax.xml.crypto.Data;
 import java.util.function.Function;
 
+/**
+ * Enumeration of all M68000 instructions.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public enum InstructionType
 {
     /*
@@ -32,128 +36,128 @@ Bits 15 – 12 Operation
 1111 Coprocessor Interface/MC68040 and CPU32 Extensions
      */
     EXG("exg",2,OperandSize.LONG,0b1100)
-        {
-            @Override
-            public int getOperationCode(InstructionNode insn)
             {
+                @Override
+                public int getOperationCode(InstructionNode insn)
+                {
                 /*
 01000—Data registers
 01001—Address registers
 10001—Data register and address register
                  */
-                boolean isData1 = insn.source().getValue().isDataRegister();
-                boolean isData2 = insn.destination().getValue().asRegister().isDataRegister();
-                if ( isData1 != isData2 ) {
-                    return 0b10001;
+                    boolean isData1 = insn.source().getValue().isDataRegister();
+                    boolean isData2 = insn.destination().getValue().asRegister().isDataRegister();
+                    if ( isData1 != isData2 ) {
+                        return 0b10001;
+                    }
+                    return isData1 ? 0b01000 : 0b01001;
                 }
-                return isData1 ? 0b01000 : 0b01001;
-            }
 
-            @Override
-            public void checkSupports(Operand kind, OperandNode node)
-            {
-                if ( ! node.getValue().isRegister() ) {
-                    throw new RuntimeException("Bad operand type, EXG needs a address or data register");
+                @Override
+                public void checkSupports(InstructionNode node)
+                {
+                    final OperandNode source = node.source();
+
+                    if ( ! source.getValue().isRegister() ) {
+                        throw new RuntimeException("Bad operand type, EXG needs a address or data register");
+                    }
+                    if ( ! ( source.getValue().isDataRegister() || source.getValue().isAddressRegister() ) ) {
+                        throw new RuntimeException("Unsupported register, EXG supports address or data registers");
+                    }
+                    final OperandNode destination = node.destination();
+                    if ( ! destination.getValue().isRegister() ) {
+                        throw new RuntimeException("Bad operand type, EXG needs a address or data register");
+                    }
+                    if ( ! ( destination.getValue().isDataRegister() || destination.getValue().isAddressRegister() ) ) {
+                        throw new RuntimeException("Unsupported register, EXG supports address or data registers");
+                    }
                 }
-                if ( ! ( node.getValue().isDataRegister() || node.getValue().isAddressRegister() ) ) {
-                    throw new RuntimeException("Unsupported register, EXG supports address or data registers");
+
+                @Override
+                protected int getMaxSourceOperandSizeInBits()
+                {
+                    return 32;
                 }
-            }
 
-            @Override
-            protected int getMaxSourceOperandSizeInBits()
-            {
-                return 32;
-            }
+                @Override
+                protected int getMaxDestinationOperandSizeInBits()
+                {
+                    return 32;
+                }
 
-            @Override
-            protected int getMaxDestinationOperandSizeInBits()
-            {
-                return 32;
-            }
-
-            @Override
-            public boolean supportsExplicitOperandSize()
-            {
-                return false;
-            }
-        },
+                @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return false;
+                }
+            },
     MOVEQ("moveq", 2, OperandSize.BYTE, 0b0111)
-        {
-
-            @Override
-            public void checkSupports(Operand kind, OperandNode node)
             {
-                switch(kind)
+
+                @Override
+                public void checkSupports(InstructionNode node)
                 {
-                    case SOURCE:
-                        if ( ! node.hasAddressingMode(AddressingMode.IMMEDIATE_VALUE) )
-                        {
-                            throw new RuntimeException("MOVEQ requires an immediate value as source operand");
-                        }
-                        break;
-                    case DESTINATION:
-                        if ( ! node.hasAddressingMode(AddressingMode.DATA_REGISTER_DIRECT) )
-                        {
-                            throw new RuntimeException("MOVEQ requires a data register as destination operand");
-                        }
-                        break;
+                    final OperandNode source = node.source();
+                    if ( ! source.hasAddressingMode(AddressingMode.IMMEDIATE_VALUE) )
+                    {
+                        throw new RuntimeException("MOVEQ requires an immediate value as source operand");
+                    }
+                    final OperandNode destination = node.destination();
+                    if ( ! destination.hasAddressingMode(AddressingMode.DATA_REGISTER_DIRECT) )
+                    {
+                        throw new RuntimeException("MOVEQ requires a data register as destination operand");
+                    }
                 }
-            }
 
-            @Override public boolean supportsExplicitOperandSize() { return false; }
-            @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
-            @Override protected int getMaxSourceOperandSizeInBits() { return 8; }
+                @Override public boolean supportsExplicitOperandSize() { return false; }
+                @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
+                @Override protected int getMaxSourceOperandSizeInBits() { return 8; }
 
-        },
+            },
     MOVE("move", 2, OperandSize.WORD, 0b0000)
-        {
-            @Override
-            public int getOperationCode(InstructionNode insn)
             {
-                switch (insn.getOperandSize())
+                @Override
+                public int getOperationCode(InstructionNode insn)
                 {
-                    case BYTE:
-                        return 0b0001;
-                    case WORD:
-                        return 0b0011;
-                    case LONG:
-                        return 0b0010;
+                    switch (insn.getOperandSize())
+                    {
+                        case BYTE:
+                            return 0b0001;
+                        case WORD:
+                            return 0b0011;
+                        case LONG:
+                            return 0b0010;
+                    }
+                    throw new RuntimeException("Unhandled switch/case: " + insn.getOperandSize());
                 }
-                throw new RuntimeException("Unhandled switch/case: " + insn.getOperandSize());
-            }
 
-            @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
-            @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
+                @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
+                @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
 
-            @Override
-            public void checkSupports(Operand kind, OperandNode node)
-            {
-            }
-        },
-    LEA("lea", 2, OperandSize.LONG, 0b0100)
-        {
-            @Override
-            public void checkSupports(Operand kind, OperandNode node)
-            {
-                if (kind == Operand.DESTINATION)
+                @Override
+                public void checkSupports(InstructionNode node)
                 {
-                    if ( node.getValue().isNot(NodeType.REGISTER) || ! node.getValue().asRegister().isAddressRegister() )
+                }
+            },
+    LEA("lea", 2, OperandSize.LONG, 0b0100)
+            {
+                @Override
+                public void checkSupports(InstructionNode node)
+                {
+                    final OperandNode source = node.source();
+                    final OperandNode destination = node.destination();
+                    if ( destination.getValue().isNot(NodeType.REGISTER) || ! destination.getValue().asRegister().isAddressRegister() )
                     {
                         throw new RuntimeException("LEA needs an address register as destination");
                     }
-                }
-                else if (kind == Operand.SOURCE)
-                {
-                    if ( ! node.hasAbsoluteAddressing() )
+                    if ( ! source.hasAbsoluteAddressing() )
                     {
                         throw new RuntimeException("LEA requires an absolute address value as source");
                     }
                 }
-            }
-            @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
-            @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        };
+                @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
+                @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
+            };
 
     public final OperandSize defaultOperandSize;
     private final String mnemonic;
@@ -168,7 +172,7 @@ Bits 15 – 12 Operation
         this.operationMode = operationMode;
     }
 
-    public abstract void checkSupports(Operand kind, OperandNode node);
+    public abstract void checkSupports(InstructionNode node);
 
     public int getOperationCode(InstructionNode insn)
     {
@@ -201,6 +205,13 @@ Bits 15 – 12 Operation
         return null;
     }
 
+    /**
+     * Generates the code for a given instruction and writes it
+     * using the context's current {@link de.codersourcery.m68k.assembler.IObjectCodeWriter}.
+     *
+     * @param node
+     * @param context
+     */
     public void generateCode(InstructionNode node, ICompilationContext context)
     {
         final InstructionEncoding encoding;
@@ -220,16 +231,7 @@ Bits 15 – 12 Operation
 
     protected InstructionEncoding getEncoding(InstructionType type, InstructionNode insn, ICompilationContext context)
     {
-        OperandNode operand = insn.source();
-        if (operand != null)
-        {
-            type.checkSupports(Operand.SOURCE, operand);
-        }
-        operand = insn.destination();
-        if (operand != null)
-        {
-            type.checkSupports(Operand.DESTINATION, operand);
-        }
+        type.checkSupports(insn);
 
         switch (type)
         {
@@ -337,7 +339,7 @@ D/A   |     |   |           |
 
                 if ( actualSizeInBits > insn.getOperandSize().sizeInBits() ) {
                     throw new RuntimeException("Operand has "+actualSizeInBits+" bits but instruction specifies to use only "+
-                        insn.getOperandSize().sizeInBits());
+                            insn.getOperandSize().sizeInBits());
                 }
                 // TODO: 8-bit immediate values could actually be stored in-line (MOVEQ) instead of wasting a byte here
                 // TODO: Maybe add optimization pass that turns regular MOVE into MOVEQ when possible?
@@ -391,16 +393,6 @@ D/A   |     |   |           |
         return true;
     }
 
-
-    /*
-                case 's': return SRC_REGISTER;
-                case 'm': return SRC_MODE;
-                case 'D': return DST_REGISTER;
-                case 'M': return DST_MODE;
-                case 'S': return SIZE;
-                case 'o': return OPERATION_CODE;
-     */
-
     private static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
     private static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
 
@@ -409,14 +401,10 @@ D/A   |     |   |           |
     private static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
 
     private static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
-        "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+            "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
     private static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
-        "vvvvvvvv_vvvvvvvv");
+            "vvvvvvvv_vvvvvvvv");
 
     private static final InstructionEncoding EXG_ENCODING = InstructionEncoding.of("1100kkk1ooooolll");
-    /*
-  EXG_DATA_REGISTER('k'), // data register if EXG used with registers of different types, otherwise either the src data or src address register
-    EXG_ADDRESS_REGISTER('l'), // address register if EXG used with registers of different types, otherwise either the dst data or dst address register
-     */
 }

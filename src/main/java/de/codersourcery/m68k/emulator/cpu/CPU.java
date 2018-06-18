@@ -3,6 +3,11 @@ package de.codersourcery.m68k.emulator.cpu;
 import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 
+/**
+ * M68000 cpu emulation.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class CPU
 {
     /*
@@ -33,8 +38,8 @@ public class CPU
     public int sr;
     public int pc;
 
-    private int ea;
-    private int value;
+    private int ea; // populated from address calculations
+    private int value; // value the current instruction operates on
 
     public boolean isExtended() { return (sr & FLAG_EXTENDED) != 0; }
     public boolean isNotExtended() { return (sr & FLAG_EXTENDED) == 0; }
@@ -351,7 +356,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          * MOVE (xxx).L,.... (2 extra words).
                         ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2 ),
                          */
-                        ea = memLoad(pc,4);
+                        ea = memLoadLong(pc);
                         pc += 4;
                         return;
                     case 0b100:
@@ -363,11 +368,9 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         ea = pc;
                         pc += operandSize;
                         return;
-                    default:
-                        throw new RuntimeException("Unhandled eaRegister value: %"+
-                                Integer.toBinaryString(eaRegister));
                 }
         }
+        illegalInstruction(instruction);
     }
 
     /**
@@ -463,7 +466,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     addressRegisters[dstAdrReg] = value;
                     return;
                 }
-                break;
+                return;
             case 0b0101_0000_0000_0000: // ADDQ/SUBQ/Scc/DBcc/TRAPc c
             case 0b0110_0000_0000_0000: // Bcc/BSR/BRA
             case 0b0111_0000_0000_0000: // MOVEQ
@@ -473,16 +476,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 dataRegisters[register] = value;
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
-                break;
+                return;
             case 0b1000_0000_0000_0000: // OR/DIV/SBCD
             case 0b1001_0000_0000_0000: // SUB/SUBX
             case 0b1010_0000_0000_0000: // (Unassigned, Reserved)
             case 0b1011_0000_0000_0000: // CMP/EOR
             case 0b1100_0000_0000_0000: // AND/MUL/ABCD/EXG
-                // 1100000100000000
-                if ( (instruction & 0b1100_0001_0000_0000) == 0b1100_0001_0000_0000 )
+                if ( (instruction & 0b1100_0001_0000_0000) == 0b1100_0001_0000_0000 ) // EXG
                 {
-                    // EXG
                     // hint: variable names are a bit misleading, only apply if EXG between different register types
                     final int dataReg = (instruction & 0b111_000000000) >> 9;
                     final int addressReg = instruction & 0b111;
@@ -511,12 +512,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b1110_0000_0000_0000: // Shift/Rotate/Bit Field
             case 0b1111_0000_0000_0000: // Coprocessor Interface/MC68040 and CPU32 Extensions
         }
-
-        // loadValue(instruction,operandSize);
-
-        // perform operation
-
-        // storeValue(instruction,operandSize);
+        illegalInstruction(instruction);
     }
 
     private void illegalInstruction(int instruction) {
@@ -570,11 +566,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b000:
                 // DATA_REGISTER_DIRECT;
                 value = dataRegisters[eaRegister];
-                break;
+                return;
             case 0b001:
                 // ADDRESS_REGISTER_DIRECT;
                 value = addressRegisters[eaRegister];
-                break;
+                return;
             case 0b111:
                 switch(eaRegister)
                 {
@@ -595,15 +591,23 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         pc += 4;
                         return;
                 }
+                // $$FALL-THROUGH$$
             default:
                 decodeOperand(instruction, operandSize, eaMode, eaRegister);
                 value = memLoad(ea, operandSize);
         }
     }
 
+    /**
+     * Stores the current operation's value according to the
+     * destination in the given instruction word.
+     *
+     * @param instruction
+     * @param operandSize
+     */
     private void storeValue(int instruction,int operandSize)
     {
-        // InstructionEncoding.of("ooooDDDMMMmmmsss");
+        // instruction word: ooooDDDMMMmmmsss
         int eaMode     = (instruction & 0b0001_1100_0000) >> 6;
         int eaRegister = (instruction & 0b1110_0000_0000) >> 9;
 
@@ -611,7 +615,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         {
             case 0b000:
                 // DATA_REGISTER_DIRECT;
-                switch( operandSize ) {
+                switch( operandSize )
+                {
                     case 1:
                         dataRegisters[eaRegister] = value & 0x00ff;
                         return;
@@ -638,16 +643,15 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          * MOVE (xxx).W,... (1 extra word).
                          * ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1 ),
                          */
-                        addressRegisters[eaRegister] = value;
-                        return;
                     case 0b001:
                         /*
                          * MOVE (xxx).L,.... (2 extra words).
                         ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2 ),
                          */
                         addressRegisters[eaRegister] = value;
-                        return;
+                        break;
                 }
+                illegalInstruction(instruction);
             default:
                 decodeOperand(instruction, operandSize, eaMode, eaRegister);
                 switch(operandSize)
@@ -665,11 +669,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         throw new RuntimeException("Unreachable code reached");
                 }
         }
-
     }
 
+    /**
+     * Reset CPU.
+     */
     public void reset()
     {
+        // FIXME: Implement proper IRQ handling and CPU reset (IRQ priorities etc. need to be properly initialized)
         addressRegisters[7] = memLoadLong(0 );
         pc = memLoadLong(4 );
         sr = FLAG_SUPERVISOR_MODE;

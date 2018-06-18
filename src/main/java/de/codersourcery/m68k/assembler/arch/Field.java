@@ -1,5 +1,10 @@
 package de.codersourcery.m68k.assembler.arch;
 
+/**
+ * Enumeration that defines possible data sources for values used in instruction encoding.
+ *
+ * @see InstructionEncoding
+ */
 public enum Field
 {
     // src operand
@@ -71,9 +76,7 @@ public enum Field
             case 'l': return EXG_ADDRESS_REGISTER;
             case 'S': return SIZE;
             case 'o': return OP_CODE;
-
-            default:
-                return null;
         }
+        return null;
     }
 }

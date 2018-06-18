@@ -6,7 +6,7 @@ public enum NodeType
 {
     STATEMENT,
     LABEL,
-    MNEMONIC,
+    INSTRUCTION,
     IDENTIFIER,
     STRING,
     COMMENT,

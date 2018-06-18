@@ -3,14 +3,27 @@ package de.codersourcery.m68k.assembler;
 import de.codersourcery.m68k.assembler.arch.Field;
 import org.apache.commons.lang3.Validate;
 
+/**
+ * Instruction-encoding helper class: A comparable range of two integer numbers (start,end) associated with a {@link Field}.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public final class IntRange implements Comparable<IntRange>
 {
     public final Field field;
 
     /** Start index (inclusive) */
     public int start;
+    /** End index (exclusive) */
     public int end;
 
+    /**
+     * Create instance.
+     *
+     * @param field Field associated with this int range.
+     * @param start start (inclusive)
+     * @param end end (exclusive)
+     */
     public IntRange(Field field, int start, int end)
     {
         Validate.notNull(field, "field must not be null");

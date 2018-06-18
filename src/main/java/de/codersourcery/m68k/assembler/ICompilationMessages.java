@@ -7,6 +7,11 @@ import org.apache.logging.log4j.message.Message;
 
 import java.util.List;
 
+/**
+ * A compilation debug/info/warning/error message.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public interface ICompilationMessages
 {
     public enum Level {

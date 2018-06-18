@@ -18,4 +18,10 @@ public class ParsePhase implements ICompilationPhase
         System.out.println("AST: \n"+ast);
         ctx.getCompilationUnit().setAST(ast);
     }
+
+    @Override
+    public String toString()
+    {
+        return "Parse phase";
+    }
 }

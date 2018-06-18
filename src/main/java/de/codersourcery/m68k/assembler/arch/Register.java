@@ -1,5 +1,10 @@
 package de.codersourcery.m68k.assembler.arch;
 
+/**
+ * M68000 register set.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public enum Register
 {
     D0("d0",Type.DATA,0),
@@ -20,8 +25,7 @@ public enum Register
     A6("a6",Type.ADDRESS,6),
     A7("a7",Type.ADDRESS,Type.STACKPTR,7),
     PC("pc",Type.PC,0),
-    SR("sr",Type.SR,0),
-    CCR("ccr",Type.CCR,0);
+    SR("sr",Type.SR,0);
 
     public final String name;
     public final Type type1;
@@ -39,6 +43,11 @@ public enum Register
         this.bits = index;
     }
 
+    /**
+     * Returns whether this register is a data register.
+     *
+     * @return
+     */
     public boolean isData()
     {
         switch(this) {
@@ -52,11 +61,15 @@ public enum Register
             case D6:
             case D7:
                 return true;
-            default:
-                return false;
         }
+        return false;
     }
 
+    /**
+     * Returns whether this register is an address register.
+     *
+     * @return
+     */
     public boolean isAddress()
     {
         switch(this)
@@ -70,9 +83,8 @@ public enum Register
             case A6:
             case A7:
                 return true;
-            default:
-                return false;
         }
+        return false;
     }
 
     public static enum Type {
@@ -80,36 +92,42 @@ public enum Register
         ADDRESS,
         STACKPTR,
         SR,
-        PC,CCR;
+        PC;
     }
 
+    /**
+     * Try to parse a string as a register name.
+     * @param s
+     * @return register or <code>null</code> if the string is not a valid register name
+     */
     public static Register parseRegister(String s)
     {
-        if ( s != null )
+        if ( s == null )
         {
-            switch (s)
-            {
-                case "d0": case "D0": return Register.D0;
-                case "d1": case "D1": return Register.D1;
-                case "d2": case "D2": return Register.D2;
-                case "d3": case "D3": return Register.D3;
-                case "d4": case "D4": return Register.D4;
-                case "d5": case "D5": return Register.D5;
-                case "d6": case "D6": return Register.D6;
-                case "d7": case "D7": return Register.D7;
-                case "a0": case "A0": return Register.A0;
-                case "a1": case "A1": return Register.A1;
-                case "a2": case "A2": return Register.A2;
-                case "a3": case "A3": return Register.A3;
-                case "a4": case "A4": return Register.A4;
-                case "a5": case "A5": return Register.A5;
-                case "a6": case "A6": return Register.A6;
-                case "a7": case "A7": return Register.A7;
-                case "ccr": case "CCR": return Register.CCR;
-                case "sr": case "SR": return Register.SR;
-                case "sp": case "SP": case "sP": case "Sp": return Register.A7;
-                case "pc": case "PC": case "pC": case "Pc": return Register.PC;
-            }
+            return null;
+        }
+        switch (s)
+        {
+            case "d0": case "D0": return Register.D0;
+            case "d1": case "D1": return Register.D1;
+            case "d2": case "D2": return Register.D2;
+            case "d3": case "D3": return Register.D3;
+            case "d4": case "D4": return Register.D4;
+            case "d5": case "D5": return Register.D5;
+            case "d6": case "D6": return Register.D6;
+            case "d7": case "D7": return Register.D7;
+            case "a0": case "A0": return Register.A0;
+            case "a1": case "A1": return Register.A1;
+            case "a2": case "A2": return Register.A2;
+            case "a3": case "A3": return Register.A3;
+            case "a4": case "A4": return Register.A4;
+            case "a5": case "A5": return Register.A5;
+            case "a6": case "A6": return Register.A6;
+            case "a7": case "A7": return Register.A7;
+            case "ccr": case "CCR": return Register.SR;
+            case "sr": case "SR": return Register.SR;
+            case "sp": case "SP": case "sP": case "Sp": return Register.A7;
+            case "pc": case "PC": case "pC": case "Pc": return Register.PC;
         }
         return null;
     }

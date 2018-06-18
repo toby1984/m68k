@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.assembler.arch;
 
+import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.IntRange;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
@@ -14,9 +15,14 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Instruction encoding.
+ * Instruction encoding bit pattern.
+ *
+ * This class takes a list of strings that describe the bit-encoding for a given instruction and provides a way of
+ * applying this pattern using values from {@link de.codersourcery.m68k.parser.ast.InstructionNode#getValueFor(Field, ICompilationContext)}
+ * to generate the binary representation of a CPU instruction.
  *
  * @author tobias.gierke@code-sourcery.de
+ * @see Field
  */
 public class InstructionEncoding
 {
@@ -47,9 +53,22 @@ public class InstructionEncoding
         return buffer.toString();
     }
 
-    public interface IBitMapping
+    public static abstract class IBitMapping
     {
-        public Field getField();
+        private final Field field;
+
+        public IBitMapping(Field field) {
+            Validate.notNull(field, "field must not be null");
+            this.field = field;
+        }
+
+        /**
+         * Returns the field this mapping applies to.
+         * @return
+         */
+        public final Field getField() {
+            return field;
+        }
 
         /**
          * Apply bit mapping by copying bits from the input value into the output value.
@@ -58,22 +77,20 @@ public class InstructionEncoding
          * @param outputValue target value to update with bits from <code>value</code>.
          * @return Updated outputValue
          */
-        public int apply(int inputValue,int outputValue);
+        public abstract int apply(int inputValue,int outputValue);
     }
 
     /**
      * Bit mapping that just sets a fixed value.
      */
-    public static final class FixedBitValue implements IBitMapping
+    public static final class FixedBitValue extends IBitMapping
     {
-        public final Field field;
         public final int clearMask;
         public final int setMask;
 
         public FixedBitValue(Field field,int setMask,int clearMask)
         {
-            Validate.notNull(field, "field must not be null");
-            this.field = field;
+            super(field);
             this.clearMask = clearMask;
             this.setMask = setMask;
         }
@@ -85,21 +102,14 @@ public class InstructionEncoding
         }
 
         @Override
-        public Field getField()
-        {
-            return field;
-        }
-
-        @Override
         public int apply(int inputValue, int targetValue)
         {
             return ((targetValue & clearMask) | setMask );
         }
     }
 
-    public static final class BitRangeMapping implements IBitMapping
+    public static final class BitRangeMapping extends IBitMapping
     {
-        private final Field field;
         private int srcMask;
         private int dstMask;
         private int shift;
@@ -108,7 +118,7 @@ public class InstructionEncoding
         public String toString()
         {
             return "BitRangeMapping{" +
-                    "field=" + field +
+                    "field=" + getField() +
                     ", srcMask=" + Integer.toBinaryString(srcMask) +
                     ", dstMask=" + Integer.toBinaryString(dstMask)+
                     ", shift=" + shift +
@@ -125,8 +135,7 @@ public class InstructionEncoding
          */
         public BitRangeMapping(Field field,int srcBitNo, int dstBitNo, int bitCount)
         {
-            Validate.notNull(field, "field must not be null");
-            this.field = field;
+            super(field);
             if ( bitCount < 1 || bitCount > 32 ) {
                 throw new IllegalArgumentException("Bitcount must be 1 <= x <= 32 but was "+bitCount);
             }
@@ -153,12 +162,6 @@ public class InstructionEncoding
         }
 
         @Override
-        public Field getField()
-        {
-            return field;
-        }
-
-        @Override
         public int apply(int inputValue, int targetValue)
         {
             int value = inputValue & srcMask;
@@ -171,9 +174,8 @@ public class InstructionEncoding
         }
     }
 
-    public static final class IndividualBitMapping implements IBitMapping
+    public static final class IndividualBitMapping extends IBitMapping
     {
-        private final Field field;
         /**
          * Array index corresponds to bit number in source value.
          * Each array element holds a bitmask with 1 bits where the src value should go.
@@ -191,15 +193,8 @@ public class InstructionEncoding
 
         public IndividualBitMapping(Field field)
         {
-            Validate.notNull(field, "field must not be null");
-            this.field = field;
+            super(field);
             Arrays.fill(destMasks, NOT_MAPPED);
-        }
-
-        @Override
-        public Field getField()
-        {
-            return field;
         }
 
         public void add(int srcBitNo, int dstBitNo)
@@ -404,6 +399,12 @@ public class InstructionEncoding
         return resultMap;
     }
 
+    /**
+     * Applies this instruction encoding using values from an input source.
+     *
+     * @param source
+     * @return binary representation of this encoding using values from the input source
+     */
     public byte[] apply(Function<Field,Integer> source)
     {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -491,6 +492,12 @@ public class InstructionEncoding
         return new InstructionEncoding(newPatterns,newMappings);
     }
 
+    /**
+     * Returns a new instruction encoding created from this encoding and additional patterns.
+     *
+     * @param morePatterns
+     * @return new instruction encoding, returns this instance if <code>morePatterns</code> was <code>null</code> or empty
+     */
     public InstructionEncoding append(String[] morePatterns)
     {
         if ( morePatterns == null || morePatterns.length == 0 ) {

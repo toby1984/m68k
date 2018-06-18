@@ -1,7 +1,10 @@
 package de.codersourcery.m68k.assembler.arch;
 
-import org.w3c.dom.css.Counter;
-
+/**
+ * M68000 family addressing modes.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public enum AddressingMode
 {
     /*

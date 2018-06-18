@@ -22,7 +22,6 @@ public class AssemblerTest extends TestCase
 
         assertArrayEquals(compile("move   $12(pc,a0.w*4),d1")    ,0x32,0x3b,0x84,0x12);
         assertArrayEquals(compile("move   $1234(pc),d1")    ,0x32,0x3a,0x12,0x34);
-        assertArrayEquals(compile("move   $8888(pc),d1")    ,0x32,0x3b,0x85,0x30,0x00,0x00,0x88,0x88 );
 
         assertArrayEquals(compile("move.l #$12345678,a0"),0x20,0x7c,0x12,0x34,0x56,0x78);
 
@@ -79,6 +78,8 @@ public class AssemblerTest extends TestCase
 
         assertArrayEquals(compile("move.w #$1234,d1")    ,0x32,0x3c,0x12,0x34);
         assertArrayEquals(compile("move.l #$12345678,d1"),0x22,0x3c,0x12,0x34,0x56,0x78);
+
+        // FIXME: Test PC-relative modes
     }
 
     private byte[] compile(String s)

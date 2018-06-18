@@ -2,12 +2,12 @@ package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.assembler.phases.CodeGenerationPhase;
 import de.codersourcery.m68k.assembler.phases.ParsePhase;
+import de.codersourcery.m68k.assembler.phases.ValidationPhase;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
 import de.codersourcery.m68k.parser.ast.ASTNode;
 import org.apache.commons.lang3.Validate;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -15,19 +15,39 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * M68000 assembler.
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class Assembler
 {
     private final CompilationMessages messages = new CompilationMessages();
     private MyCompilationContext context;
 
+    /**
+     * Returns the assembler's phases that will be run
+     * when {@link #compile(CompilationUnit)} is invoked.
+     *
+     * @return
+     */
     public List<ICompilationPhase> getPhases()
     {
         var phases = new ArrayList<ICompilationPhase>();
         phases.add( new ParsePhase() );
+        phases.add( new ValidationPhase() );
         phases.add( new CodeGenerationPhase() );
         return phases;
     }
 
+    /**
+     * Compiles source.
+     *
+     * Call {@link #getBytes()} to get the generated binary.
+     *
+     * @param unit
+     * @return compilation messages
+     * @see #getBytes()
+     */
     public CompilationMessages compile(CompilationUnit unit)
     {
         messages.clearMessages();
@@ -55,6 +75,12 @@ public class Assembler
         return messages;
     }
 
+    /**
+     * Returns the generated binary data from the last call to {@link #compile(CompilationUnit)}.
+     *
+     * @return
+     * @throws IllegalStateException if the last compilation failed with an error.
+     */
     public byte[] getBytes()
     {
         if ( context.hasErrors() ) {

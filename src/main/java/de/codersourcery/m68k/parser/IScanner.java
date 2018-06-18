@@ -9,4 +9,6 @@ public interface IScanner
     public char next();
 
     int offset();
+
+    public void setOffset(int offset);
 }

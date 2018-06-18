@@ -15,7 +15,7 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
 
     public InstructionNode(InstructionType type, OperandSize operandSize, TextRegion region)
     {
-        super(NodeType.MNEMONIC, region);
+        super(NodeType.INSTRUCTION, region);
         if ( type == null ) {
             throw new IllegalArgumentException("type must not be null");
         }

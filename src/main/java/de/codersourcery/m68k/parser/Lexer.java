@@ -216,9 +216,25 @@ outer:
     }
 
     @Override
-    public void setSkipWhitespace(boolean skipWhitespace)
+    public void setSkipWhitespace(boolean newValue)
     {
-        this.skipWhitespace = skipWhitespace;
+        if ( newValue && ! this.skipWhitespace)
+        {
+            // keep whitespace -> ignore whitespace
+            // remove any whitespace tokens we have might've parsed already
+            tokens.removeIf(tok -> tok.is(TokenType.WHITESPACE));
+        }
+        else if ( ! newValue && this.skipWhitespace )
+        {
+            // ignore whitespace -> keep whitespace
+            // reset scanner just in case we parsed ahead and already skipped some whitespace
+            if ( ! tokens.isEmpty() )
+            {
+                scanner.setOffset(tokens.get(0).offset);
+                tokens.clear();
+            }
+        }
+        this.skipWhitespace = newValue;
     }
 
     @Override
