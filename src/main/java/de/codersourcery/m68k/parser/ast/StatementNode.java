@@ -2,6 +2,10 @@ package de.codersourcery.m68k.parser.ast;
 
 import de.codersourcery.m68k.parser.TextRegion;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class StatementNode extends ASTNode
 {
     public StatementNode()
@@ -12,6 +16,20 @@ public class StatementNode extends ASTNode
     public StatementNode(TextRegion region)
     {
         super(NodeType.STATEMENT, region);
+    }
+
+    public List<LabelNode> getLabels()
+    {
+        List<LabelNode> result = null;
+        for ( ASTNode child : children() ) {
+            if ( child.is(NodeType.LABEL) ) {
+                if ( result == null ) {
+                    result = new ArrayList<>();
+                }
+                result.add( (LabelNode) child);
+            }
+        }
+        return result == null ? Collections.emptyList() : result;
     }
 
     @Override

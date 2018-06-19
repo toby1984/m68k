@@ -34,11 +34,17 @@ public class InstructionEncoding
 
     private final String[] patterns;
     private final Map<Field,List<IBitMapping>>[] bitMappings;
+    private final int sizeInBytes;
 
     private InstructionEncoding(String[] newPatterns, Map<Field,List<IBitMapping>>[] newMappings)
     {
         this.patterns = newPatterns;
         this.bitMappings = newMappings;
+        int size = 0;
+        for ( String pattern : newPatterns ) {
+            size += pattern.length()/8;
+        }
+        this.sizeInBytes = size;
     }
 
     public String toString()
@@ -51,6 +57,11 @@ public class InstructionEncoding
             }
         }
         return buffer.toString();
+    }
+
+    public int getSizeInBytes()
+    {
+        return sizeInBytes;
     }
 
     public static abstract class IBitMapping
@@ -248,17 +259,20 @@ public class InstructionEncoding
         this.bitMappings = new Map[len];
         this.patterns = new String[len];
         this.patterns[0] = pattern1;
+        int sizeInBytes = pattern1.length()/8;
         this.bitMappings[0] = getMappings(pattern1);
         if ( additional != null )
         {
             for (int i = 0; i < additional.length; i++)
             {
                 final String stripped = stripUnderscores( additional[i] );
+                sizeInBytes += stripped.length()/8;
                 Validate.notBlank(stripped, "additional patterns must not be null or blank");
                 this.patterns[i+1] = stripped;
                 this.bitMappings[i+1] = getMappings(stripped);
             }
         }
+        this.sizeInBytes = sizeInBytes;
     }
 
     private static String stripUnderscores(String s) {
@@ -458,6 +472,7 @@ public class InstructionEncoding
      */
     public InstructionEncoding append(String pattern)
     {
+        pattern = stripUnderscores(pattern);
         final Map<Field,List<IBitMapping>>[] newMappings = new HashMap[ bitMappings.length +1 ];
         System.arraycopy(bitMappings,0,newMappings,0,bitMappings.length);
         newMappings[newMappings.length-1] = getMappings(pattern);
@@ -465,6 +480,7 @@ public class InstructionEncoding
         final String[] newPatterns = new String[ patterns.length+1 ];
         System.arraycopy(patterns,0,newPatterns,0,patterns.length);
         newPatterns[newPatterns.length-1] = pattern;
+
         return new InstructionEncoding(newPatterns,newMappings);
     }
 
@@ -482,10 +498,11 @@ public class InstructionEncoding
         System.arraycopy(bitMappings,0,newMappings,0,oldLen);
         System.arraycopy(patterns,0,newPatterns,0,oldLen);
 
+        pattern1 = stripUnderscores(pattern1);
         newPatterns[oldLen] = pattern1;
         newMappings[oldLen] = getMappings(pattern1);
         for ( int i = 0,newIdx = oldLen+1 ; i < additionalPatternCount ; i++,newIdx++ ) {
-            final String pattern = morePatterns[i];
+            final String pattern = stripUnderscores(morePatterns[i] );
             newMappings[newIdx] = getMappings(pattern);
             newPatterns[newIdx] = pattern;
         }
@@ -515,7 +532,7 @@ public class InstructionEncoding
 
         for ( int i = 0,newIdx = oldLen,max = morePatterns.length ; i < max ; i++,newIdx++ )
         {
-            final String pattern = morePatterns[i];
+            final String pattern = stripUnderscores(morePatterns[i]);
             newMappings[newIdx] = getMappings(pattern);
             newPatterns[newIdx] = pattern;
         }

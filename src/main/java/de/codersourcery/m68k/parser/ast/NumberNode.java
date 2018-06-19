@@ -1,17 +1,12 @@
 package de.codersourcery.m68k.parser.ast;
 
+import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.parser.TextRegion;
 
 public class NumberNode extends ASTNode implements IValueNode
 {
     private final long value;
     private final NumberType type;
-
-    @Override
-    public int getBits()
-    {
-        return (int) value;
-    }
 
     public enum NumberType
     {
@@ -123,5 +118,25 @@ public class NumberNode extends ASTNode implements IValueNode
                 throw new RuntimeException("Unhandled switch/case: "+type);
         }
         buffer.append(indent(depth)).append(type.toString()).append(" number [ ").append(num).append(" ]\n");
+    }
+
+    @Override
+    public Integer getBits(ICompilationContext context) {
+        return (int) value;
+    }
+
+    public static int getSizeInBits(int value)
+    {
+        if ( (value & 0xffffff00) == 0 || ( (value & 0xffffff00) == 0xffffff00 && ( (value & 0x00ff) !=  0 ) ) ) {
+            return 8;
+        }
+        if ( (value & 0xffff0000) == 0 || ( (value & 0xffff0000) == 0xffff0000 && ( (value & 0xffff) !=  0 ) ) ) {
+            return 16;
+        }
+        if ( (value & 0xffffffff00000000L) == 0 || ( (value & 0xffffffff00000000L) == 0xffffffff00000000L &&
+            ( (value & 0xffffffff) !=  0 ) ) ) {
+            return 32;
+        }
+        return 64;
     }
 }

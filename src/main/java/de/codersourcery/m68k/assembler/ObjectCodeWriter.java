@@ -7,12 +7,23 @@ public class ObjectCodeWriter implements IObjectCodeWriter
 {
     private ByteArrayOutputStream out = new ByteArrayOutputStream();
 
+    private Integer startOffset;
     private int offset = 0;
 
     @Override
-    public void writeByte(int value)
+    public void setStartOffset(int address) throws IllegalStateException
     {
-        out.write(value);
+        if ( this.startOffset != null ) {
+            if ( this.startOffset.intValue() != address ) {
+                throw new IllegalStateException("Start offset already set to "+this.startOffset);
+            }
+            return;
+        }
+        if ( offset != 0 ) {
+            throw new IllegalStateException("Can't set start offset after bytes have been written");
+        }
+        this.startOffset = address;
+        this.offset = address;
     }
 
     @Override
@@ -26,7 +37,20 @@ public class ObjectCodeWriter implements IObjectCodeWriter
         {
             throw new RuntimeException(e);
         }
+        offset+=bytes.length;
+    }
+
+    @Override
+    public void writeByte(int value)
+    {
+        out.write(value);
         offset++;
+    }
+
+    @Override
+    public void allocateBytes(int count)
+    {
+        offset += count;
     }
 
     @Override
@@ -44,6 +68,12 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     }
 
     @Override
+    public int getStartOffset()
+    {
+        return startOffset == null ? 0 : startOffset;
+    }
+
+    @Override
     public int offset()
     {
         return offset;
@@ -54,6 +84,7 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     {
         out = new ByteArrayOutputStream();
         offset = 0;
+        startOffset = null;
     }
 
     @Override

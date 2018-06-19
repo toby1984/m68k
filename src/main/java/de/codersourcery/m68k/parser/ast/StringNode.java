@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.parser.ast;
 
+import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.parser.TextRegion;
 
 public class StringNode extends ASTNode implements IValueNode
@@ -27,7 +28,7 @@ public class StringNode extends ASTNode implements IValueNode
     }
 
     @Override
-    public int getBits()
+    public Integer getBits(ICompilationContext context)
     {
         if ( value == null ) {
             throw new IllegalStateException("No value");

@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.assembler.phases.CodeGenerationPhase;
+import de.codersourcery.m68k.assembler.phases.FixAddressingModesPhase;
 import de.codersourcery.m68k.assembler.phases.GatherSymbolsPhase;
 import de.codersourcery.m68k.assembler.phases.ParsePhase;
 import de.codersourcery.m68k.assembler.phases.ValidationPhase;
@@ -36,8 +37,10 @@ public class Assembler
         var phases = new ArrayList<ICompilationPhase>();
         phases.add( new ParsePhase() );
         phases.add( new GatherSymbolsPhase() );
-        phases.add( new ValidationPhase() );
         phases.add( new CodeGenerationPhase(true) );
+        phases.add( new ValidationPhase() );
+        phases.add( new FixAddressingModesPhase() );
+        phases.add( new CodeGenerationPhase(false) );
         return phases;
     }
 
@@ -145,7 +148,10 @@ public class Assembler
             final var tmp = new char[1024*10];
             try (var reader = new InputStreamReader( unit.getResource().createInputStream() ) ) {
                 final var len = reader.read(tmp);
-                buffer.append(tmp,0,len);
+                if ( len > 0 )
+                {
+                    buffer.append(tmp, 0, len);
+                }
             }
             return buffer.toString();
         }

@@ -1,20 +1,38 @@
 package de.codersourcery.m68k.parser;
 
+import de.codersourcery.m68k.assembler.Assembler;
+import de.codersourcery.m68k.assembler.CompilationMessages;
+import de.codersourcery.m68k.assembler.CompilationUnit;
+import de.codersourcery.m68k.assembler.ICompilationPhase;
+import de.codersourcery.m68k.assembler.IResource;
+import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.InstructionType;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.assembler.arch.Scaling;
+import de.codersourcery.m68k.assembler.phases.CodeGenerationPhase;
 import de.codersourcery.m68k.parser.ast.*;
 import junit.framework.TestCase;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ParserTest extends TestCase
 {
+    private CompilationUnit unit;
     private AST ast;
+
+    @Override
+    protected void setUp() throws Exception
+    {
+        unit = null;
+        ast = null;
+    }
 
     public void testParseEmpty()
     {
-        ast = parse("");
+        ast = parseAST("");
         assertNotNull(ast);
         assertTrue(ast.hasNoChildren());
         assertTrue(ast.hasNoParent());
@@ -22,16 +40,16 @@ public class ParserTest extends TestCase
 
     public void testParseBlankLine()
     {
-        ast = parse("         ");
+        ast = parseAST("         ");
         assertNotNull(ast);
         assertTrue(ast.hasNoChildren());
         assertTrue(ast.hasNoParent());
     }
 
     public void testMoveQOperandSizesFail() {
-        assertFails( () -> parse("moveq.b #$70,d0") );
-        assertFails( () -> parse("moveq.w #$70,d0") );
-        assertFails( () -> parse("moveq.l #$70,d0") );
+        assertFails( () -> parseAST("moveq.b #$70,d0") );
+        assertFails( () -> parseAST("moveq.w #$70,d0") );
+        assertFails( () -> parseAST("moveq.l #$70,d0") );
     }
 
     // IMMEDIATE_VALUE
@@ -340,7 +358,7 @@ public class ParserTest extends TestCase
     // ABSOLUTE_LONG_ADDRESSING
     public void testAbsoluteLongAddressing()
     {
-        OperandNode src = parseSourceOperand("LEA $12345678,D0");
+        OperandNode src = parseSourceOperand("LEA $12345678,A0");
         assertEquals(AddressingMode.ABSOLUTE_LONG_ADDRESSING,src.addressingMode);
         assertTrue( src.getValue().is(NodeType.NUMBER) );
         assertEquals( 0x12345678 , src.getValue().asNumber().getValue() );
@@ -354,7 +372,7 @@ public class ParserTest extends TestCase
 
     private OperandNode parseSourceOperand(String expression)
     {
-        AST ast = parse(expression);
+        AST ast = parseAST(expression);
         assertEquals(1,ast.childCount());
         final StatementNode stmt = ast.child(0).asStatement();
         final InstructionNode insn = stmt.getInstruction();
@@ -366,7 +384,7 @@ public class ParserTest extends TestCase
 
     public void testParseLabel()
     {
-        ast = parse("label:");
+        ast = parseAST("label:",true);
         assertNotNull(ast);
         assertEquals(1,ast.childCount());
         final StatementNode stmt = ast.child(0).asStatement();
@@ -377,11 +395,39 @@ public class ParserTest extends TestCase
         assertEquals( new TextRegion(0,5), label.getMergedRegion() );
         assertEquals( new TextRegion(0,5), stmt.getMergedRegion() );
         assertEquals( new TextRegion(0,5), ast.getMergedRegion() );
+
+        final Symbol symbol = unit.symbolTable.lookup(new Identifier("label"));
+        assertNotNull(symbol);
+        assertTrue( symbol.hasType(Symbol.SymbolType.LABEL) );
+        assertNotNull(symbol.getBits());
+        assertEquals(0, symbol.getBits().intValue() );
+    }
+
+    public void testParseLabelWithOrg()
+    {
+        ast = parseAST("ORG $1000\n" +
+            "label:",true);
+        assertNotNull(ast);
+        assertEquals(2,ast.childCount());
+        final StatementNode stmt = ast.child(1).asStatement();
+        assertEquals(1,stmt.childCount());
+        final LabelNode label = stmt.child(0).asLabel();
+
+        assertEquals( new Label(new Identifier("label") ) , label.getValue() );
+        assertEquals( new TextRegion(10,5), label.getMergedRegion() );
+        assertEquals( new TextRegion(10,5), stmt.getMergedRegion() );
+        assertEquals( new TextRegion(0,15), ast.getMergedRegion() );
+
+        final Symbol symbol = unit.symbolTable.lookup(new Identifier("label"));
+        assertNotNull(symbol);
+        assertTrue( symbol.hasType(Symbol.SymbolType.LABEL) );
+        assertNotNull(symbol.getBits());
+        assertEquals(0x1000, symbol.getBits().intValue() );
     }
 
     public void testParseLabelWithInstruction()
     {
-        ast = parse("label: move d0,d1");
+        ast = parseAST("label: move d0,d1");
         assertNotNull(ast);
         System.out.println(ast);
         assertEquals(1,ast.childCount());
@@ -403,7 +449,7 @@ public class ParserTest extends TestCase
 
     public void testParseLabelWithInstructionAndComment()
     {
-        ast = parse("label: move d0,d1 ; some comment");
+        ast = parseAST("label: move d0,d1 ; some comment");
         assertNotNull(ast);
         System.out.println(ast);
         assertEquals(1,ast.childCount());
@@ -428,7 +474,7 @@ public class ParserTest extends TestCase
 
     public void testComment()
     {
-        ast = parse("; this is a comment");
+        ast = parseAST("; this is a comment");
         assertNotNull(ast);
         assertEquals(1,ast.childCount());
         final StatementNode stmt = ast.child(0).asStatement();
@@ -442,7 +488,7 @@ public class ParserTest extends TestCase
 
     public void testParseInstruction()
     {
-        ast = parse("move d0,d1");
+        ast = parseAST("move d0,d1");
         assertNotNull(ast);
         assertEquals(1,ast.childCount());
         final StatementNode stmt = ast.child(0).asStatement();
@@ -467,7 +513,7 @@ public class ParserTest extends TestCase
 
     public void testParseAddressImmediate()
     {
-        ast = parse("LEA $1234,A0");
+        ast = parseAST("LEA $1234,A0");
         assertNotNull(ast);
         assertEquals(1,ast.childCount());
         final StatementNode stmt = ast.child(0).asStatement();
@@ -492,7 +538,7 @@ public class ParserTest extends TestCase
 
     public void testParseInstructionRegisterIndirect()
     {
-        ast = parse("move (a0),d1");
+        ast = parseAST("move (a0),d1");
         assertNotNull(ast);
         assertEquals(1,ast.childCount());
         final StatementNode stmt = ast.child(0).asStatement();
@@ -517,7 +563,7 @@ public class ParserTest extends TestCase
 
     public void testParseInstructionRegisterIndirectPostincrement()
     {
-        ast = parse("move (a0)+,d1");
+        ast = parseAST("move (a0)+,d1");
         assertNotNull(ast);
         assertEquals(1,ast.childCount());
         final StatementNode stmt = ast.child(0).asStatement();
@@ -542,7 +588,7 @@ public class ParserTest extends TestCase
 
     public void testParseInstructionRegisterIndirectPredecrement()
     {
-        ast = parse("move -(a0),d1");
+        ast = parseAST("move -(a0),d1");
         assertNotNull(ast);
         assertEquals(1,ast.childCount());
         final StatementNode stmt = ast.child(0).asStatement();
@@ -565,10 +611,40 @@ public class ParserTest extends TestCase
         assertEquals( new TextRegion(0,13), ast.getMergedRegion() );
     }
 
-    private AST parse(String source) {
+    private AST parseAST(String source) {
+        return parseAST(source,false);
+    }
 
-        final ILexer lexer = new Lexer(new StringScanner(source ) );
-        return new Parser().parse(lexer);
+    private AST parseAST(String source,boolean assignLabels) {
+
+        Assembler asm = new Assembler()
+        {
+            @Override
+            public List<ICompilationPhase> getPhases()
+            {
+                final List<ICompilationPhase> modified = new ArrayList<>(super.getPhases());
+                modified.removeIf( p ->
+                {
+                    if ( p instanceof CodeGenerationPhase )
+                    {
+                        if (! assignLabels || ! ((CodeGenerationPhase) p).isFirstPass) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+                return modified;
+            }
+        };
+        this.unit = new CompilationUnit(IResource.stringResource(source) );
+        final CompilationMessages messages = asm.compile(unit);
+        if ( messages.hasErrors() )
+        {
+            messages.getMessages().stream().forEach(System.out::println );
+            throw new RuntimeException("Compilation failed with errors");
+        }
+        this.ast = unit.getAST();
+        return unit.getAST();
     }
 
     private void assertFails(Runnable r)

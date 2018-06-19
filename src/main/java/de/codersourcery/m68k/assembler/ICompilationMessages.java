@@ -41,7 +41,16 @@ public interface ICompilationMessages
             return new Message(unit,text,level,location);
         }
 
-        
+        @Override
+        public String toString()
+        {
+            return "Message{" +
+                "unit=" + unit +
+                ", text='" + text + '\'' +
+                ", level=" + level +
+                ", location=" + location +
+                '}';
+        }
     }
 
     boolean hasErrors();

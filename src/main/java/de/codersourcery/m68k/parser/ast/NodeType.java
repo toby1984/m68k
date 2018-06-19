@@ -11,5 +11,6 @@ public enum NodeType
     STRING,
     COMMENT,
     NUMBER,
+    DIRECTIVE, // ORG
     AST, REGISTER, OPERAND;
 }

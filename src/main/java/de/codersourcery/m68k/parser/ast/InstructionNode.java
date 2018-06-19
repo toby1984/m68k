@@ -9,7 +9,6 @@ import de.codersourcery.m68k.parser.TextRegion;
 
 public class InstructionNode extends ASTNode implements ICodeGeneratingNode
 {
-
     private final InstructionType type;
     private OperandSize operandSize;
 
@@ -52,11 +51,11 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
     }
 
     @Override
-    public void generateCode(ICompilationContext ctx)
+    public void generateCode(ICompilationContext ctx,boolean estimateSizeOnly)
     {
         try
         {
-            type.generateCode(this, ctx);
+            type.generateCode(this, ctx,estimateSizeOnly);
         }
         catch(Exception e)
         {
@@ -90,7 +89,7 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
             case SRC_SCALE:
                 return source().getIndexRegister().scaling.bits;
             case SRC_8_BIT_DISPLACEMENT:
-                return source().getBaseDisplacement().getBits();
+                return source().getBaseDisplacement().getBits(ctx);
             case DST_REGISTER_KIND:
                 return destination().getIndexRegister().isDataRegister() ? 0 : 1;
             case DST_INDEX_SIZE:
@@ -98,37 +97,37 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
             case DST_SCALE:
                 return destination().getIndexRegister().scaling.bits;
             case DST_8_BIT_DISPLACEMENT:
-                return destination().getBaseDisplacement().getBits();
+                return destination().getBaseDisplacement().getBits(ctx);
             case OP_CODE:
                 return getInstructionType().getOperationCode(this);
             case SRC_VALUE:
-                return source().getValue().getBits();
+                return source().getValue().getBits(ctx);
             case SRC_BASE_REGISTER:
                 if ( source().addressingMode.eaRegisterField.isFixedValue() ) {
                     return source().addressingMode.eaRegisterField.value();
                 }
-                return source().getValue().asRegister().getBits();
+                return source().getValue().asRegister().getBits(ctx);
             case SRC_INDEX_REGISTER:
-                return source().getIndexRegister().getBits();
+                return source().getIndexRegister().getBits(ctx);
             case SRC_BASE_DISPLACEMENT:
-                return source().getBaseDisplacement().getBits();
+                return source().getBaseDisplacement().getBits(ctx);
             case SRC_OUTER_DISPLACEMENT:
-                return source().getOuterDisplacement().getBits();
+                return source().getOuterDisplacement().getBits(ctx);
             case SRC_MODE:
                 return source().addressingMode.eaModeField;
             case DST_VALUE:
-                return destination().getValue().getBits();
+                return destination().getValue().getBits(ctx);
             case DST_BASE_REGISTER:
                 if ( destination().addressingMode.eaRegisterField.isFixedValue() ) {
                     return destination().addressingMode.eaRegisterField.value();
                 }
-                return destination().getValue().asRegister().getBits();
+                return destination().getValue().asRegister().getBits(ctx);
             case DST_INDEX_REGISTER:
-                return destination().getIndexRegister().getBits();
+                return destination().getIndexRegister().getBits(ctx);
             case DST_BASE_DISPLACEMENT:
-                return destination().getBaseDisplacement().getBits();
+                return destination().getBaseDisplacement().getBits(ctx);
             case DST_OUTER_DISPLACEMENT:
-                return destination().getOuterDisplacement().getBits();
+                return destination().getOuterDisplacement().getBits(ctx);
             case DST_MODE:
                 return destination().addressingMode.eaModeField;
             case SIZE:

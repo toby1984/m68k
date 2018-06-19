@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.parser.ast;
 
+import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.assembler.arch.Scaling;
@@ -61,7 +62,7 @@ public class RegisterNode extends ASTNode implements IValueNode
     }
 
     @Override
-    public int getBits()
+    public Integer getBits(ICompilationContext context)
     {
         return register.bits;
     }

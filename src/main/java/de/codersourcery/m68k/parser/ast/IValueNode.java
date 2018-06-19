@@ -1,5 +1,7 @@
 package de.codersourcery.m68k.parser.ast;
 
+import de.codersourcery.m68k.assembler.ICompilationContext;
+
 public interface IValueNode extends IASTNode
 {
     /**
@@ -7,7 +9,9 @@ public interface IValueNode extends IASTNode
      *
      * This method is called during code generation.
      *
-     * @return value
+     * @param context current compilation context
+     *
+     * @return value value to use in instruction encoding or <code>null</code> if this value could not be determined/calculated.
      */
-    public int getBits();
+    public Integer getBits(ICompilationContext context);
 }

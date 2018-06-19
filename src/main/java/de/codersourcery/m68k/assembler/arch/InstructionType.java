@@ -4,6 +4,7 @@ import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.parser.ast.IValueNode;
 import de.codersourcery.m68k.parser.ast.InstructionNode;
 import de.codersourcery.m68k.parser.ast.NodeType;
+import de.codersourcery.m68k.parser.ast.NumberNode;
 import de.codersourcery.m68k.parser.ast.OperandNode;
 import org.apache.commons.lang3.StringUtils;
 
@@ -211,22 +212,30 @@ Bits 15 – 12 Operation
      *
      * @param node
      * @param context
+     * @param estimateSizeOnly set to <code>true</code> to call {@link de.codersourcery.m68k.assembler.IObjectCodeWriter#allocateBytes(int)}
+     *                         instead of writing the actual data bytes. Used during first code generation pass to calculate label addresses.
      */
-    public void generateCode(InstructionNode node, ICompilationContext context)
+    public void generateCode(InstructionNode node, ICompilationContext context,boolean estimateSizeOnly)
     {
         final InstructionEncoding encoding;
         final byte[] data;
         try
         {
             encoding = getEncoding(this, node, context);
-            final Function<Field, Integer> func = field -> node.getValueFor(field, context);
-            data = encoding.apply(func);
-        } catch (Exception e)
+            if ( estimateSizeOnly ) {
+                context.getCodeWriter().allocateBytes(encoding.getSizeInBytes());
+            }
+            else
+            {
+                final Function<Field, Integer> func = field -> node.getValueFor(field, context);
+                data = encoding.apply(func);
+                context.getCodeWriter().writeBytes(data);
+            }
+        }
+        catch (Exception e)
         {
             context.error(e.getMessage(), node, e);
-            return;
         }
-        context.getCodeWriter().writeBytes(data);
     }
 
     protected InstructionEncoding getEncoding(InstructionType type, InstructionNode insn, ICompilationContext context)
@@ -238,7 +247,7 @@ Bits 15 – 12 Operation
             case EXG:
                 return EXG_ENCODING;
             case MOVEQ:
-                checkOperandSize(insn.source().getValue(), Operand.SOURCE);
+                checkOperandSize(insn.source().getValue(), Operand.SOURCE,context);
                 return MOVEQ_ENCODING;
             case LEA:
                 if ( insn.source().addressingMode == AddressingMode.ABSOLUTE_SHORT_ADDRESSING ) {
@@ -335,7 +344,7 @@ D/A   |     |   |           |
             case IMMEDIATE_VALUE:
                 field = operandKind == Operand.SOURCE ? Field.SRC_VALUE : Field.DST_VALUE;
 
-                int actualSizeInBits = checkOperandSize(op.getValue(),operandKind);
+                int actualSizeInBits = checkOperandSize(op.getValue(),operandKind,ctx);
 
                 if ( actualSizeInBits > insn.getOperandSize().sizeInBits() ) {
                     throw new RuntimeException("Operand has "+actualSizeInBits+" bits but instruction specifies to use only "+
@@ -350,26 +359,18 @@ D/A   |     |   |           |
         throw new RuntimeException("Unhandled addressing mode: "+op.addressingMode);
     }
 
-    private int checkOperandSize(IValueNode value,Operand opKind)
+    private int checkOperandSize(IValueNode value,Operand opKind,ICompilationContext ctx)
     {
         final int max = opKind == Operand.SOURCE ? getMaxSourceOperandSizeInBits() : getMaxDestinationOperandSizeInBits();
-        int actualSize = getOperandSizeInBits(value);
+        Integer nodeValue = value.getBits(ctx);
+        if ( nodeValue == null ) {
+            return max;
+        }
+        int actualSize = NumberNode.getSizeInBits(nodeValue);
         if ( actualSize > max ) {
             throw new RuntimeException("Operand out of range, expected at most "+max+" bits but was "+actualSize);
         }
         return actualSize;
-    }
-
-    private static int getOperandSizeInBits(IValueNode node)
-    {
-        int bits = node.getBits();
-        if ( (bits & 0xffffff00) == 0 || ( (bits & 0xffffff00) == 0xffffff00 && ( (bits & 0x00ff) !=  0 ) ) ) {
-            return 8;
-        }
-        if ( (bits & 0xffff0000) == 0 || ( (bits & 0xffff0000) == 0xffff0000 && ( (bits & 0xffff) !=  0 ) ) ) {
-            return 16;
-        }
-        return 32;
     }
 
     /**

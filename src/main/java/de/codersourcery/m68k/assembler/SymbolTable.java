@@ -109,18 +109,32 @@ public class SymbolTable
         return s.hasValue();
     }
 
-    public void define(Symbol symbol)
+    public void define(Identifier identifier)
     {
-        Symbol existing = lookup(symbol.identifier);
+        Symbol existing = lookup(identifier);
+        if ( existing == null ) {
+            symbols.put(identifier,new Symbol(identifier,Symbol.SymbolType.UNKNOWN));
+            return;
+        }
+        if ( existing.hasType(Symbol.SymbolType.UNKNOWN) ) {
+            return; // ok
+        }
+        throw new IllegalArgumentException("Symbol already declared: "+existing);
+    }
+
+    public void declare(Symbol newSymbol)
+    {
+        if ( newSymbol.hasType(Symbol.SymbolType.UNKNOWN) ) {
+            throw new IllegalArgumentException("Cannot declare symbol "+newSymbol+" with unknown type");
+        }
+        Symbol existing = lookup(newSymbol.identifier);
         if ( existing != null )
         {
-            if ( existing.hasType(Symbol.SymbolType.UNKNOWN)
-                    && symbol.hasType(Symbol.SymbolType.UNKNOWN) )
+            if ( ! existing.hasType(Symbol.SymbolType.UNKNOWN) )
             {
-                return;
+                throw new IllegalArgumentException("Symbol already defined: " + existing);
             }
-            throw new IllegalArgumentException("Symbol already defined: "+existing);
         }
-        this.symbols.put(symbol.identifier,symbol);
+        this.symbols.put(newSymbol.identifier,newSymbol);
     }
 }

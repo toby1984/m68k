@@ -55,9 +55,17 @@ public class Parser
             result.add(node);
         }
 
-        node = parseInstruction();
+        node = parseDirective();
         if ( node != null ) {
             result.add(node);
+        }
+        else
+        {
+            node = parseInstruction();
+            if (node != null)
+            {
+                result.add(node);
+            }
         }
 
         node = parseComment();
@@ -65,6 +73,23 @@ public class Parser
             result.add(node);
         }
         return result.hasChildren() ? result : null;
+    }
+
+    private DirectiveNode parseDirective() {
+
+        final Token token = lexer.peek();
+        if ( token.is(TokenType.TEXT) && token.value.equalsIgnoreCase("org") )
+        {
+            lexer.next();
+            final DirectiveNode node = new DirectiveNode(DirectiveNode.Directive.ORG,token.getRegion());
+            final NumberNode offset = parseNumber();
+            if ( offset == null ) {
+                fail("ORG requires an address",token);
+            }
+            node.setOrigin(offset);
+            return node;
+        }
+        return null;
     }
 
     private CommentNode parseComment()
@@ -188,28 +213,6 @@ public class Parser
         return parseAtom(operandSizeSupported,registerScalingSupported,registerSupported);
     }
 
-    private boolean fitsIn16Bits(IValueNode node)
-    {
-        if ( node == null ) {
-            return true;
-        }
-        if ( !  evaluatesToNumber(node) ) {
-            fail("Expected a 16-bit number");
-        }
-        int bits = ((IValueNode) node).getBits();
-
-        return (bits & 0xffff0000) == 0 || (bits & 0xffffff00) == 0xffff0000;
-    }
-
-    private boolean fitsIn8Bits(IValueNode node)
-    {
-        if ( node == null ) {
-            return true;
-        }
-        int bits = node.getBits();
-        return (bits & 0xffffff00) == 0 || (bits & 0xffffff00) == 0xffffff00;
-    }
-
     private Token consumeComma() {
         if ( ! lexer.peek(TokenType.COMMA ) ) {
             fail("Expected a comma");
@@ -330,9 +333,10 @@ public class Parser
         // // MOVE $1234
         if ( ! lexer.peek(TokenType.PARENS_OPEN ) )
         {
-            final int bits = ((IValueNode) baseDisplacement).getBits();
-            final AddressingMode mode = ( ( bits & ~0b111_1111_1111_1111) == 0 ) ?
-                    AddressingMode.ABSOLUTE_SHORT_ADDRESSING : AddressingMode.ABSOLUTE_LONG_ADDRESSING;
+            // will be adjusted to
+            // AddressingMode.ABSOLUTE_SHORT_ADDRESSING
+            // FixAddressingModesPhase if operand fits in 16 bits
+            final AddressingMode mode = AddressingMode.ABSOLUTE_LONG_ADDRESSING;
             final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
             op.setValue(baseDisplacement);
             return op;
@@ -353,8 +357,10 @@ public class Parser
                 if ( arguments.isEmpty() )
                 {
                     tokens.add( consumeClosingParens() );
-                    final AddressingMode mode = fitsIn16Bits(baseDisplacement ) ?
-                            AddressingMode.ABSOLUTE_SHORT_ADDRESSING : AddressingMode.ABSOLUTE_LONG_ADDRESSING;
+                    // will be adjusted to
+                    // AddressingMode.ABSOLUTE_SHORT_ADDRESSING
+                    // FixAddressingModesPhase if operand fits in 16 bits
+                    final AddressingMode mode = AddressingMode.ABSOLUTE_LONG_ADDRESSING;
                     final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
                     op.setValue(baseDisplacement);
                     return op;
@@ -386,10 +392,6 @@ public class Parser
             final OperandNode op = new OperandNode(AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,Token.getMergedRegion(tokens));
             op.setValue(baseRegister);
             return op;
-        }
-
-        if ( ! fitsIn16Bits(baseDisplacement)) {
-            fail("Displacement does not fit in 16 bits",baseDisplacement);
         }
 
         // base register displacement parsed,
@@ -438,10 +440,10 @@ public class Parser
                  * (d8,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
                  * (bd,PC,Xn.SIZE*SCALE)         => PC_INDIRECT_WITH_INDEX_DISPLACEMENT
                  */
-                AddressingMode mode = AddressingMode.PC_INDIRECT_WITH_INDEX_DISPLACEMENT;
-                if ( fitsIn8Bits( baseDisplacement ) ) {
-                    mode = AddressingMode.PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT;
-                }
+                // will be adjusted to
+                // AddressingMode.PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
+                // FixAddressingModesPhase if operand fits in 8 bits
+                final AddressingMode mode = AddressingMode.PC_INDIRECT_WITH_INDEX_DISPLACEMENT;
                 final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
                 op.setValue(baseRegister);
                 op.setBaseDisplacement(baseDisplacement);
@@ -449,9 +451,6 @@ public class Parser
                 return op;
             }
             outerDisplacement = (IValueNode) arguments.get(2);
-            if ( ! fitsIn16Bits(outerDisplacement ) ) {
-                fail("Outer displacement out of 16-bit range",outerDisplacement);
-            }
             // * ([bd,PC],Xn.SIZE*SCALE,od)    => PC_MEMORY_INDIRECT_POSTINDEXED (ok)
             final OperandNode op = new OperandNode(AddressingMode.PC_MEMORY_INDIRECT_POSTINDEXED,Token.getMergedRegion(tokens));
             op.setValue(baseRegister);
@@ -491,10 +490,11 @@ public class Parser
 
         if ( arguments.size() == 2 )
         {
-            AddressingMode mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT;
-            if ( ! fitsIn8Bits(baseDisplacement ) ) {
-                mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT;
-            }
+            // will be adjusted to
+            // AddressingMode.PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
+            // FixAddressingModesPhase if operand fits in 8 bits
+            AddressingMode mode = AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT;
+
             final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
             op.setValue(baseRegister);
             op.setBaseDisplacement(baseDisplacement);
@@ -504,9 +504,6 @@ public class Parser
         }
 
         outerDisplacement = (IValueNode) arguments.get(2);
-        if ( ! fitsIn16Bits(outerDisplacement ) ) {
-            fail("Outer displacement out of 16-bit range",outerDisplacement);
-        }
 
         final OperandNode op = new OperandNode(AddressingMode.MEMORY_INDIRECT_POSTINDEXED,Token.getMergedRegion(tokens));
         op.setValue(baseRegister);

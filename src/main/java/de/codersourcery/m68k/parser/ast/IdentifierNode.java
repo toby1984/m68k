@@ -1,5 +1,7 @@
 package de.codersourcery.m68k.parser.ast;
 
+import de.codersourcery.m68k.assembler.ICompilationContext;
+import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.parser.TextRegion;
 
@@ -28,8 +30,9 @@ public class IdentifierNode extends ASTNode implements IValueNode
     }
 
     @Override
-    public int getBits()
+    public Integer getBits(ICompilationContext ctx)
     {
-        throw new UnsupportedOperationException("Symbol tables/identifier lookup not implemented yet...");
+        final Symbol symbol = ctx.symbolTable().lookup(value);
+        return symbol == null ? null : symbol.getBits();
     }
 }

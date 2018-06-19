@@ -7,6 +7,7 @@ import de.codersourcery.m68k.assembler.SymbolTable;
 import de.codersourcery.m68k.parser.ast.AST;
 import de.codersourcery.m68k.parser.ast.ASTNode;
 import de.codersourcery.m68k.parser.ast.IASTNode;
+import de.codersourcery.m68k.parser.ast.IdentifierNode;
 import de.codersourcery.m68k.parser.ast.LabelNode;
 import de.codersourcery.m68k.parser.ast.NodeType;
 
@@ -25,7 +26,7 @@ public class GatherSymbolsPhase implements ICompilationPhase
         final BiConsumer<ASTNode, IASTNode.IterationCtx<Object>> consumer =
                 (node,itCtx) ->
                 {
-                  if ( node.is(NodeType.LABEL ) )
+                  if ( node.is( NodeType.LABEL ) )
                   {
                       LabelNode label = node.asLabel();
                       final Symbol s = new Symbol(label.getValue().identifier,
@@ -33,12 +34,28 @@ public class GatherSymbolsPhase implements ICompilationPhase
                       s.setDeclaration(node);
                       try
                       {
-                          table.define(s);
+                          table.declare(s);
                       } catch(Exception e) {
-                          ctx.error("Failed to define label "+label.getValue()+": "+e.getMessage(),label);
+                          ctx.error("Failed to declare label "+label.getValue()+": "+e.getMessage(),label);
+                      }
+                  }
+                  else if ( node.is( NodeType.IDENTIFIER ) )
+                  {
+                      IdentifierNode id = (IdentifierNode) node;
+                      try
+                      {
+                          table.define(id.getValue());
+                      } catch(Exception e) {
+                          ctx.error("Failed to define identifier "+id.getValue()+": "+e.getMessage(),id);
                       }
                   }
                 };
         ast.visitInOrder(consumer);
+    }
+
+    @Override
+    public String toString()
+    {
+        return "gather symbols phase";
     }
 }

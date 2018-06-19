@@ -15,7 +15,7 @@ import java.util.List;
  */
 public class OperandNode extends ASTNode
 {
-    public final AddressingMode addressingMode;
+    public AddressingMode addressingMode;
 
     private List<ASTNode> children = new ArrayList<>();
 

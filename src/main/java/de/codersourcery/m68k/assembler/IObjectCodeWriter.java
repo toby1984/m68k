@@ -17,6 +17,13 @@ public interface IObjectCodeWriter extends AutoCloseable
     public void writeByte(int value);
 
     /**
+     * Allocate (skip) the given number of bytes.
+     *
+     * @param count
+     */
+    public void allocateBytes(int count);
+
+    /**
      * Writes all bytes from a byte array.
      *
      * @param bytes
@@ -36,6 +43,24 @@ public interface IObjectCodeWriter extends AutoCloseable
      * @param value
      */
     public void writeLong(int value);
+
+    /**
+     * Sets the start address where the first byte of data should be stored.
+     *
+     * Calling this method more than once with different values or
+     * calling it after bytes have been {@link #allocateBytes(int) allocated}
+     * or {@link #writeBytes(byte[]) written} will throw an {@link IllegalStateException}.
+     * @param address
+     * @throws IllegalStateException
+     */
+    public void setStartOffset(int address) throws IllegalStateException;
+
+    /**
+     * Returns the start offset for this object writer.
+     *
+     * @return
+     */
+    public int getStartOffset();
 
     /**
      * Returns the current write offset (in bytes) for this writer.

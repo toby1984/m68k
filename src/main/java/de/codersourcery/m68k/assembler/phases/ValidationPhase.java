@@ -2,9 +2,15 @@ package de.codersourcery.m68k.assembler.phases;
 
 import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.ICompilationPhase;
+import de.codersourcery.m68k.assembler.Symbol;
+import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.parser.ast.IValueNode;
+import de.codersourcery.m68k.parser.ast.IdentifierNode;
 import de.codersourcery.m68k.parser.ast.InstructionNode;
 import de.codersourcery.m68k.parser.ast.NodeType;
+import de.codersourcery.m68k.parser.ast.NumberNode;
+import de.codersourcery.m68k.parser.ast.OperandNode;
 
 import java.util.function.BiConsumer;
 
@@ -15,15 +21,79 @@ public class ValidationPhase implements ICompilationPhase
     {
         final BiConsumer<ASTNode, ASTNode.IterationCtx<Void>> visitor = (node, itCtx) ->
         {
+            if ( node instanceof IValueNode)
+            {
+                final Integer value = ((IValueNode) node).getBits(ctx);
+                if ( value == null )
+                {
+                    if ( node instanceof IdentifierNode) {
+
+                        final Symbol symbol = ctx.symbolTable().lookup(((IdentifierNode) node).getValue());
+                        ctx.error("Failed to resolve symbol "+symbol.identifier,node);
+                    } else
+                    {
+                        ctx.error("Failed to determine value for " + node, node);
+                    }
+                }
+            }
+
             if ( node.is(NodeType.INSTRUCTION) )
             {
                 final InstructionNode insn = node.asInstruction();
                 insn.getInstructionType().checkSupports(insn);
-            } else if ( node.is(NodeType.IDENTIFIER) ) {
+                checkValueSize( insn.source() , ctx );
+                checkValueSize( insn.destination(), ctx );
+            }
+            else if ( node.is(NodeType.IDENTIFIER) )
+            {
                 ctx.error("Unknown symbol "+node.asIdentifier().getValue(),node);
             }
         };
         ctx.getCompilationUnit().getAST().visitInOrder(visitor);
+    }
+
+    private void checkValueSize(OperandNode op,ICompilationContext ctx)
+    {
+        switch(op.addressingMode)
+        {
+            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
+            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
+            case PC_INDIRECT_WITH_DISPLACEMENT:
+            case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
+            case ABSOLUTE_SHORT_ADDRESSING:
+                assertFitsIn16Bits(op,ctx);
+                break;
+            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+            case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                assertFitsIn8Bits(op,ctx);
+                break;
+        }
+    }
+
+    private void assertFitsIn8Bits(OperandNode op,ICompilationContext ctx)
+    {
+        assertFits(op,8,ctx);
+    }
+
+    private void assertFitsIn16Bits(OperandNode op,ICompilationContext ctx) {
+        assertFits(op,16,ctx);
+    }
+
+    private void assertFits(OperandNode op,int maxBits,ICompilationContext ctx)
+    {
+        Integer value = op.getBaseDisplacement().getBits(ctx);
+        if ( value == null )
+        {
+            if ( op.getValue() == null || op.getValue().isRegister() )
+            {
+                return;
+            }
+            value = op.getValue().getBits(ctx);
+        }
+        if (value != null && NumberNode.getSizeInBits(value) > maxBits)
+        {
+            ctx.error("Value does not fit in "+maxBits+" bits: " + value, op);
+        }
     }
 
     @Override

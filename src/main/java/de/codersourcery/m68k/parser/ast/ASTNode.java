@@ -171,6 +171,11 @@ public abstract class ASTNode implements IASTNode
         child.parent = this;
     }
 
+    public final void removeAllChildren()
+    {
+        children().stream().forEach( this::remove );
+    }
+
     public void remove(ASTNode child)
     {
         if (child == null)

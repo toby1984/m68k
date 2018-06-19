@@ -2,6 +2,7 @@ package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.parser.ast.IValueNode;
 
 public class Symbol
 {
@@ -92,5 +93,23 @@ public class Symbol
     public int hashCode()
     {
         return identifier.hashCode();
+    }
+
+    public Integer getBits()
+    {
+        if ( hasValue() )
+        {
+            if ( getValue() instanceof Byte ) {
+                return ((Byte) getValue()).intValue();
+            }
+            if ( getValue() instanceof Short) {
+                return ((Short) getValue()).intValue();
+            }
+            if ( getValue() instanceof Integer) {
+                return (Integer) getValue();
+            }
+            throw new RuntimeException("Internal error, don't know how to convert "+this+" into bits");
+        }
+        return null;
     }
 }
