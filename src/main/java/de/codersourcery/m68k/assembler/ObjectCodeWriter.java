@@ -19,8 +19,12 @@ public class ObjectCodeWriter implements IObjectCodeWriter
             }
             return;
         }
-        if ( offset != 0 ) {
-            throw new IllegalStateException("Can't set start offset after bytes have been written");
+        if ( offset != 0 )
+        {
+            System.err.println("WARNING: ====================================================");
+            System.err.println("WARNING: Changing start offset after bytes have been written has no effect unless generating proper AMIGA executables is implemented");
+            System.err.println("WARNING: ====================================================");
+            // throw new IllegalStateException("Can't set start offset after bytes have been written");
         }
         this.startOffset = address;
         this.offset = address;

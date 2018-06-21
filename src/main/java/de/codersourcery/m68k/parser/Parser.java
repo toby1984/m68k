@@ -1,8 +1,7 @@
 package de.codersourcery.m68k.parser;
 
-import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.arch.AddressingMode;
-import de.codersourcery.m68k.assembler.arch.InstructionType;
+import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.assembler.arch.Scaling;
@@ -24,7 +23,7 @@ public class Parser
         final AST result = new AST();
         while ( ! lexer.eof() )
         {
-            while ( lexer.peek(TokenType.EOL) ) {
+            while ( lexer.peek(TokenType.EOL) || lexer.peek(TokenType.WHITESPACE)) {
                 lexer.next();
             }
             if ( lexer.eof() ) {
@@ -34,7 +33,7 @@ public class Parser
             final StatementNode node = parseStatement();
             if ( node == null )
             {
-                fail("Syntax error");
+                fail("Syntax error: "+lexer.next());
             }
             result.add(node);
         }
@@ -126,7 +125,7 @@ public class Parser
         final Token tok = lexer.peek();
         if ( tok.is(TokenType.TEXT) )
         {
-            final InstructionType t = InstructionType.getType(tok.value);
+            final Instruction t = Instruction.getType(tok.value);
             if ( t != null )
             {
                 TextRegion region = tok.getRegion();
@@ -204,7 +203,12 @@ public class Parser
     {
         // Method MUST be NULL safe
         // FIXME: Does not recognize expressions yet...
-        return node != null && node.is(NodeType.NUMBER);
+        if ( node != null )
+        {
+            return node.is(NodeType.NUMBER) ||
+                    node.is(NodeType.IDENTIFIER); // crude check but the identifier might be a forward reference so the actual value is not known yet and thus cannot be checked
+        }
+        return false;
     }
 
     private IValueNode parseExpression(boolean operandSizeSupported,boolean registerScalingSupported,boolean registerSupported)
@@ -326,7 +330,7 @@ public class Parser
             }
             // MOVE $1234
             if ( ! evaluatesToNumber(baseDisplacement ) ) {
-                fail("Expected an address value",baseDisplacement);
+                fail("Expected an address value but got "+baseDisplacement,baseDisplacement);
             }
         }
 

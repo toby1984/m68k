@@ -31,12 +31,12 @@ public class FixAddressingModesPhase implements ICompilationPhase
             {
                 case ABSOLUTE_LONG_ADDRESSING:
                     value = op.getValue().getBits(ctx );
-                    sizeInBits = NumberNode.getSizeInBits( value );
+                    sizeInBits = NumberNode.getSizeInBitsUnsigned( value );
                     break;
                 case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
                 case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
                     value = op.getBaseDisplacement().getBits(ctx );
-                    sizeInBits = NumberNode.getSizeInBits( value );
+                    sizeInBits = NumberNode.getSizeInBitsSigned( value );
                     break;
                 default:
                     return;

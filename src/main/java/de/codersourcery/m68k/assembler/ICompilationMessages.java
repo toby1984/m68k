@@ -3,9 +3,12 @@ package de.codersourcery.m68k.assembler;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
 import de.codersourcery.m68k.parser.ast.ASTNode;
+import jdk.jfr.StackTrace;
 import org.apache.logging.log4j.message.Message;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * A compilation debug/info/warning/error message.
@@ -20,6 +23,7 @@ public interface ICompilationMessages
 
     public static final class Message
     {
+        public final StackTraceElement[] origin;
         public final CompilationUnit unit;
         public final String text;
         public final Level level;
@@ -27,6 +31,7 @@ public interface ICompilationMessages
 
         private Message(CompilationUnit unit,String text, Level level, TextRegion location)
         {
+            this.origin = new Exception("dummy").getStackTrace();
             this.unit = unit;
             this.text = text;
             this.level = level;
@@ -49,6 +54,7 @@ public interface ICompilationMessages
                 ", text='" + text + '\'' +
                 ", level=" + level +
                 ", location=" + location +
+                    ",origin = "+Arrays.stream(origin).map( x -> x.toString() ).collect(Collectors.joining("\n" ) )+
                 '}';
         }
     }

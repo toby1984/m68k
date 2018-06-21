@@ -5,7 +5,7 @@ import de.codersourcery.m68k.assembler.arch.Field;
 
 public interface ICodeGeneratingNode
 {
-    public void generateCode(ICompilationContext ctx,boolean estimateSizeOnly);
+    public void generateCode(ICompilationContext ctx,boolean estimateSizeForUnknownOperands);
 
     public int getValueFor(Field field, ICompilationContext ctx);
 }

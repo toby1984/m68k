@@ -7,14 +7,19 @@ import de.codersourcery.m68k.assembler.ICompilationPhase;
 import de.codersourcery.m68k.assembler.IResource;
 import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.arch.AddressingMode;
-import de.codersourcery.m68k.assembler.arch.InstructionType;
+import de.codersourcery.m68k.assembler.arch.Instruction;
+import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.assembler.arch.Scaling;
 import de.codersourcery.m68k.assembler.phases.CodeGenerationPhase;
 import de.codersourcery.m68k.parser.ast.*;
+import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;
+import org.apache.commons.lang3.StringUtils;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,12 +27,28 @@ public class ParserTest extends TestCase
 {
     private CompilationUnit unit;
     private AST ast;
+    private Assembler asm;
 
     @Override
     protected void setUp() throws Exception
     {
+        ast = null;
         unit = null;
         ast = null;
+    }
+
+    public void testParseLargeSource() throws IOException
+    {
+        final String source = Misc.read(getClass().getResourceAsStream("/long_source.s") );
+        final ILexer lexer = new Lexer( new StringScanner(source.toString()) );
+        final AST ast = new Parser().parse( lexer );
+        final int astSize = ast.childCount();
+        System.out.println("AST size: "+ astSize);
+        final StatementNode stmt =ast.child(astSize-1).asStatement();
+        List<LabelNode> labels = stmt.getLabels();
+        assertEquals(1,labels.size());
+        LabelNode ln = labels.get(0);
+        assertEquals("next",ln.getValue().identifier.getValue());
     }
 
     public void testParseEmpty()
@@ -50,6 +71,96 @@ public class ParserTest extends TestCase
         assertFails( () -> parseAST("moveq.b #$70,d0") );
         assertFails( () -> parseAST("moveq.w #$70,d0") );
         assertFails( () -> parseAST("moveq.l #$70,d0") );
+    }
+
+    public void testParseTrap() {
+
+        final AST ast = parseAST("TRAP #10");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.TRAP, insn.getInstructionType() );
+        assertEquals( (Integer) 10 , insn.source().getValue().getBits(null ) );
+    }
+
+    public void testParseRTE() {
+
+        final AST ast = parseAST("RTE");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.RTE, insn.getInstructionType() );
+    }
+
+    public void testParseBranchInstructions()
+    {
+        InstructionEncoding.DEBUG = false;
+
+        branchInstructionTest("RA" );
+        branchInstructionTest("HI");
+        branchInstructionTest("LS");
+        branchInstructionTest("CC");
+        branchInstructionTest("CS");
+        branchInstructionTest("NE");
+        branchInstructionTest("EQ");
+        branchInstructionTest("VC");
+        branchInstructionTest("VS");
+        branchInstructionTest("PL");
+        branchInstructionTest("MI");
+        branchInstructionTest("GE");
+        branchInstructionTest("LT");
+        branchInstructionTest("GT");
+        branchInstructionTest("LE");
+    }
+
+    private void branchInstructionTest(String conditionCode)
+    {
+        branchInstructionTest(conditionCode,16);
+        branchInstructionTest(conditionCode,8);
+        branchInstructionTest(conditionCode,32);
+    }
+
+    private void branchInstructionTest(String conditionCode,int bitSize)
+    {
+        final String source;
+        Integer expectedBranchTarget;
+        int nops;
+        if ( bitSize == 8 )
+        {
+            // max offset (bytes): -128 <= x <= 127
+            expectedBranchTarget = (Byte.MAX_VALUE & 0b11111110) - 6 - 2 ;
+            nops = expectedBranchTarget >> 1; // make value even and divide by two to get the number of words we need to insert
+            expectedBranchTarget +=2; // instruction size itself
+            final String nopString = StringUtils.repeat("NOP\n", nops );
+            source = "B" + conditionCode + " next\n" + nopString + "\nnext:";
+        }
+        else if ( bitSize == 16 )
+        {
+            // max offset (bytes): -32768 <= x <= 32767
+            expectedBranchTarget = (Short.MAX_VALUE & 0b11111111_11111110) - 6 - 4 ;
+            nops = expectedBranchTarget >> 1; // make value even and divide by two to get the number of words we need to insert
+            expectedBranchTarget +=4; // instruction size itself
+            final String nopString = StringUtils.repeat("NOP\n", nops );
+            source = "B" + conditionCode + " next\n" + nopString + "\nnext:";
+        } else if ( bitSize == 32 ) {
+            // max offset (bytes): 0x80000000 <= x <= 0x7fffffff
+            expectedBranchTarget = (Integer.MAX_VALUE & 0b11111111_11111111_11111111_11111110) - 6 -6  ;
+            expectedBranchTarget +=6; // instruction size itself
+            source = "B" + conditionCode + " next\n" +
+                    "ORG "+expectedBranchTarget+"\n" +
+                    "next:";
+        } else {
+            throw new IllegalArgumentException("Invalid bit size "+bitSize);
+        }
+
+        AST ast = parseAST(source, true);
+        StatementNode stmt = ast.child(0).asStatement();
+        InstructionNode branch = stmt.getInstruction();
+        assertEquals(Instruction.valueOf("B"+conditionCode.toUpperCase()), branch.getInstructionType());
+        final Symbol symbol = unit.symbolTable.lookup(new Identifier("next"));
+        assertNotNull(symbol);
+        assertEquals(Symbol.SymbolType.LABEL,symbol.type);
+        assertEquals(expectedBranchTarget, symbol.getBits() );
     }
 
     // IMMEDIATE_VALUE
@@ -211,7 +322,7 @@ public class ParserTest extends TestCase
         assertNull( src.getOuterDisplacement() );
     }
 
-        // ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT
+    // ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT
     public void testAddressRegisterIndirectWihIndex16BitDisplacement() {
 
         OperandNode src = parseSourceOperand("MOVE $1234(A1,A2.l*2),D1");
@@ -406,7 +517,7 @@ public class ParserTest extends TestCase
     public void testParseLabelWithOrg()
     {
         ast = parseAST("ORG $1000\n" +
-            "label:",true);
+                "label:",true);
         assertNotNull(ast);
         assertEquals(2,ast.childCount());
         final StatementNode stmt = ast.child(1).asStatement();
@@ -438,7 +549,7 @@ public class ParserTest extends TestCase
 
         final InstructionNode insn = stmt.child(1).asInstruction();
         assertEquals(2,insn.childCount());
-        assertEquals(InstructionType.MOVE, insn.getInstructionType() );
+        assertEquals(Instruction.MOVE, insn.getInstructionType() );
 
         final RegisterNode regA = insn.source().getValue().asRegister();
         assertEquals(Register.D0, regA.register );
@@ -460,7 +571,7 @@ public class ParserTest extends TestCase
 
         final InstructionNode insn = stmt.child(1).asInstruction();
         assertEquals(2,insn.childCount());
-        assertEquals(InstructionType.MOVE, insn.getInstructionType() );
+        assertEquals(Instruction.MOVE, insn.getInstructionType() );
 
         final RegisterNode regA = insn.source().getValue().asRegister();
         assertEquals(Register.D0, regA.register );
@@ -495,7 +606,7 @@ public class ParserTest extends TestCase
         assertEquals(1,stmt.childCount());
 
         final InstructionNode insn = stmt.child(0).asInstruction();
-        assertEquals(InstructionType.MOVE, insn.getInstructionType() );
+        assertEquals(Instruction.MOVE, insn.getInstructionType() );
 
         final OperandNode source = insn.source();
         assertEquals(AddressingMode.DATA_REGISTER_DIRECT,source.addressingMode);
@@ -520,7 +631,7 @@ public class ParserTest extends TestCase
         assertEquals(1,stmt.childCount());
 
         final InstructionNode insn = stmt.child(0).asInstruction();
-        assertEquals(InstructionType.LEA, insn.getInstructionType() );
+        assertEquals(Instruction.LEA, insn.getInstructionType() );
 
         final OperandNode source = insn.source();
         assertEquals(AddressingMode.ABSOLUTE_SHORT_ADDRESSING,source.addressingMode);
@@ -545,7 +656,7 @@ public class ParserTest extends TestCase
         assertEquals(1,stmt.childCount());
 
         final InstructionNode insn = stmt.child(0).asInstruction();
-        assertEquals(InstructionType.MOVE, insn.getInstructionType() );
+        assertEquals(Instruction.MOVE, insn.getInstructionType() );
 
         final OperandNode source = insn.source();
         assertEquals(AddressingMode.ADDRESS_REGISTER_INDIRECT,source.addressingMode);
@@ -570,7 +681,7 @@ public class ParserTest extends TestCase
         assertEquals(1,stmt.childCount());
 
         final InstructionNode insn = stmt.child(0).asInstruction();
-        assertEquals(InstructionType.MOVE, insn.getInstructionType() );
+        assertEquals(Instruction.MOVE, insn.getInstructionType() );
 
         final OperandNode source = insn.source();
         assertEquals(AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,source.addressingMode);
@@ -595,7 +706,7 @@ public class ParserTest extends TestCase
         assertEquals(1,stmt.childCount());
 
         final InstructionNode insn = stmt.child(0).asInstruction();
-        assertEquals(InstructionType.MOVE, insn.getInstructionType() );
+        assertEquals(Instruction.MOVE, insn.getInstructionType() );
 
         final OperandNode source = insn.source();
         assertEquals(AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT,source.addressingMode);
@@ -617,7 +728,7 @@ public class ParserTest extends TestCase
 
     private AST parseAST(String source,boolean assignLabels) {
 
-        Assembler asm = new Assembler()
+        asm = new Assembler()
         {
             @Override
             public List<ICompilationPhase> getPhases()
@@ -627,7 +738,8 @@ public class ParserTest extends TestCase
                 {
                     if ( p instanceof CodeGenerationPhase )
                     {
-                        if (! assignLabels || ! ((CodeGenerationPhase) p).isFirstPass) {
+//                        if (! assignLabels || ! ((CodeGenerationPhase) p).estimateSizeForUnknownOperands) {
+                        if (! assignLabels ) {
                             return true;
                         }
                     }
@@ -636,12 +748,23 @@ public class ParserTest extends TestCase
                 return modified;
             }
         };
+        asm.getOptions().debug = false;
+
         this.unit = new CompilationUnit(IResource.stringResource(source) );
         final CompilationMessages messages = asm.compile(unit);
         if ( messages.hasErrors() )
         {
             messages.getMessages().stream().forEach(System.out::println );
             throw new RuntimeException("Compilation failed with errors");
+        }
+        final byte[] data = asm.getBytes();
+        try ( FileOutputStream binOut = new FileOutputStream("/home/tgierke/tmp/binout") )
+        {
+            binOut.write(data);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException(e);
         }
         this.ast = unit.getAST();
         return unit.getAST();

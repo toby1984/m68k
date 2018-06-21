@@ -6,6 +6,7 @@ import de.codersourcery.m68k.assembler.CompilationMessages;
 import de.codersourcery.m68k.assembler.CompilationUnit;
 import de.codersourcery.m68k.assembler.IResource;
 import de.codersourcery.m68k.emulator.cpu.CPU;
+import de.codersourcery.m68k.emulator.cpu.IllegalInstructionException;
 import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
 
@@ -20,6 +21,9 @@ public class CPUTest extends TestCase
     private static final int MEM_SIZE = 512*1024;
 
     public static final int ALL_USR_FLAGS = CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW | CPU.FLAG_NEGATIVE | CPU.FLAG_ZERO | CPU.FLAG_EXTENDED;
+
+    // program start address in memory (in bytes)
+    public static final int PROGRAM_START_ADDRESS = 1024;
 
     private Memory memory;
     private CPU cpu;
@@ -36,6 +40,20 @@ public class CPUTest extends TestCase
     {
         execute("lea $12345678,a0", cpu -> cpu.setFlags(ALL_USR_FLAGS))
             .expectA0(0x12345678).carry().overflow().extended().negative().zero();
+    }
+
+    public void testIllegal()
+    {
+        // TODO: This test needs to be rewritten once emulator supports interrupt handling
+        try
+        {
+            execute(cpu->{},"nop","illegal");
+        }
+        catch(IllegalInstructionException e)
+        {
+            // ok
+            assertEquals(PROGRAM_START_ADDRESS + 2, e.pc);
+        }
     }
 
     public void testLEA2()
@@ -87,6 +105,100 @@ public class CPUTest extends TestCase
         execute("moveq #$70,d0").expectD0(0x70).notCarry().noOverflow().notExtended().notNegative().notZero();
         execute("moveq #$0,d0").expectD0(0x0).notCarry().noOverflow().notExtended().notNegative().zero();
         execute("moveq #$ff,d0").expectD0(0xffffffff).notCarry().noOverflow().notExtended().negative().notZero();
+    }
+
+    public void testBranchTaken()
+    {
+        /*
+Mnemonic Condition Encoding Test
+BRA* True            0000 = 1 (ok)
+F*   False           0001 = 0
+BHI High             0010 = !C & !Z (ok)
+BLS Low or Same      0011 = C | Z (ok)
+BCC/BHI Carry Clear  0100 = !C (ok)
+BCS/BLO Carry Set    0101 = C (ok)
+BNE Not Equal        0110 = !Z (ok)
+BEQ Equal            0111 = Z (ok)
+BVC Overflow Clear   1000 = !V (ok)
+BVS Overflow Set     1001 = V (ok)
+BPL Plus             1010 = !N (ok)
+BMI Minus            1011 = N (ok)
+BGE Greater or Equal 1100 = (N &  V) | (!N & !V) (ok)
+BLT Less Than        1101 = (N & !V) | (!N & V) (ok)
+BGT Greater Than     1110 = ((N & V) | (!N & !V)) & !Z; // (ok)
+BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
+         */
+        execute(cpu -> {},"BRA next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+
+        execute(cpu -> {},"BHI next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+
+        execute(cpu -> cpu.carry(),"BLS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.zero(),"BLS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+
+        execute(cpu -> {},"BCC next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> {},"BNE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> {},"BVC next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> {},"BPL next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+
+        execute(cpu -> cpu.carry(),"BCS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.zero(),"BEQ next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.overflow(),"BVS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.negative(),"BMI next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+
+        // >=
+        execute(cpu -> cpu.negative().overflow(),"BGE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> {},"BGE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+
+        // <
+        execute(cpu -> cpu.negative(),"BLT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.overflow(),"BLT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+
+        // >
+        execute(cpu -> cpu.negative().overflow(),"BGT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> {} ,"BGT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+
+        // <=
+        execute(cpu -> cpu.zero() ,"BLE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.negative() ,"BLE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.overflow() ,"BLE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+    }
+
+    public void testNOP() {
+        execute("nop", cpu -> cpu.setFlags( ALL_USR_FLAGS ) )
+                .expectPC(PROGRAM_START_ADDRESS+2)
+                .carry().overflow().extended().negative().zero();
+    }
+
+    public void testBranchNotTaken()
+    {
+        /*
+Mnemonic Condition Encoding Test
+BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
+         */
+        execute(cpu -> cpu.carry(),"BHI next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.zero(),"BHI next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+
+        execute(cpu -> {},"BLS next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.carry(),"BCC next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> {},"BCS next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.zero(),"BNE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> {},"BEQ next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.overflow(),"BVC next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> {},"BVS next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.negative(),"BPL next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> {},"BMI next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+
+        execute(cpu -> cpu.negative(),"BGE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.overflow(),"BGE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+
+        execute(cpu -> cpu.negative().overflow(),"BLT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+
+        execute(cpu -> cpu.negative() ,"BGT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.overflow(),"BGT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.zero(),"BGT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+
+        execute(cpu -> {},"BLE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.negative().overflow(),"BLE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
     }
 
     public void testExgDataData() {
@@ -143,7 +255,7 @@ public class CPUTest extends TestCase
         int insCount = lines.size();
 
         memory.writeLong(0, MEM_SIZE ); // Supervisor mode stack pointer
-        memory.writeLong(4, 1024 ); // PC starting value
+        memory.writeLong(4, PROGRAM_START_ADDRESS); // PC starting value
 
         final String program = lines.stream().collect(Collectors.joining("\n"));
         final byte[] executable = compile(program);
@@ -191,6 +303,8 @@ public class CPUTest extends TestCase
         public ExpectionBuilder expectA5(int value) { return assertHexEquals( "A5 mismatch" , value, cpu.addressRegisters[5]); }
         public ExpectionBuilder expectA6(int value) { return assertHexEquals( "A6 mismatch" , value, cpu.addressRegisters[6]); }
         public ExpectionBuilder expectA7(int value) { return assertHexEquals( "A7 mismatch" , value, cpu.addressRegisters[7]); }
+
+        public ExpectionBuilder expectPC(int value) { return assertHexEquals( "PC mismatch" , value, cpu.pc); }
 
         public ExpectionBuilder zero() { assertTrue( "Z flag not set ?" , cpu.isZero() ); return this; };
         public ExpectionBuilder notZero() { assertTrue( "Z flag set ?" , cpu.isNotZero() ); return this; };

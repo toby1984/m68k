@@ -3,16 +3,16 @@ package de.codersourcery.m68k.parser.ast;
 import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.arch.Field;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
-import de.codersourcery.m68k.assembler.arch.InstructionType;
+import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.parser.TextRegion;
 
 public class InstructionNode extends ASTNode implements ICodeGeneratingNode
 {
-    private final InstructionType type;
+    private final Instruction type;
     private OperandSize operandSize;
 
-    public InstructionNode(InstructionType type, OperandSize operandSize, TextRegion region)
+    public InstructionNode(Instruction type, OperandSize operandSize, TextRegion region)
     {
         super(NodeType.INSTRUCTION, region);
         if ( type == null ) {
@@ -30,12 +30,20 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         return (OperandNode) child(1);
     }
 
+    public boolean hasSource() {
+        return childCount() > 0;
+    }
+
+    public boolean hasDestination() {
+        return childCount() > 1;
+    }
+
     public OperandSize getOperandSize()
     {
         return operandSize;
     }
 
-    public InstructionType getInstructionType()
+    public Instruction getInstructionType()
     {
         return type;
     }
@@ -51,11 +59,11 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
     }
 
     @Override
-    public void generateCode(ICompilationContext ctx,boolean estimateSizeOnly)
+    public void generateCode(ICompilationContext ctx,boolean estimateSizeForUnknownOperands)
     {
         try
         {
-            type.generateCode(this, ctx,estimateSizeOnly);
+            type.generateCode(this, ctx,estimateSizeForUnknownOperands);
         }
         catch(Exception e)
         {
@@ -154,6 +162,8 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
                 return dstReg.bits;
             case NONE:
                 return 0;
+            case CONDITION_CODE: // encoded branch condition,stored as operationMode on Instruction
+                return getInstructionType().getOperationMode();
             default:
                 throw new RuntimeException("Internal error,unhandled field "+field);
         }

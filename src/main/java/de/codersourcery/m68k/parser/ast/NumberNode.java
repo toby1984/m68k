@@ -125,7 +125,7 @@ public class NumberNode extends ASTNode implements IValueNode
         return (int) value;
     }
 
-    public static int getSizeInBits(int value)
+    public static int getSizeInBitsUnsigned(int value)
     {
         if ( (value & 0xffffff00) == 0 || ( (value & 0xffffff00) == 0xffffff00 && ( (value & 0x00ff) !=  0 ) ) ) {
             return 8;
@@ -138,5 +138,23 @@ public class NumberNode extends ASTNode implements IValueNode
             return 32;
         }
         return 64;
+    }
+
+    public static int getSizeInBitsSigned(int value)
+    {
+        if ( value >=  Byte.MIN_VALUE && value <= Byte.MAX_VALUE) {
+            return 8;
+        }
+        if ( value >= Short.MIN_VALUE && value <= Short.MAX_VALUE) {
+            return 16;
+        }
+        if ( value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE) {
+            return 32;
+        }
+        return 64;
+    }
+
+    public static void main(String[] args) {
+        System.out.println( "128 => "+getSizeInBitsSigned(128));
     }
 }

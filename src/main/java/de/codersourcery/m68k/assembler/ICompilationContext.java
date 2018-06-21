@@ -36,6 +36,10 @@ public interface ICompilationContext
 
     public ICompilationPhase getPhase();
 
+    public AssemblerOptions options();
+
+    public boolean isDebugModeEnabled();
+
     // compilation unit
     public void setCompilationUnit(CompilationUnit unit);
 

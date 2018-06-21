@@ -31,7 +31,7 @@ public class GatherSymbolsPhase implements ICompilationPhase
                       LabelNode label = node.asLabel();
                       final Symbol s = new Symbol(label.getValue().identifier,
                       Symbol.SymbolType.LABEL);
-                      s.setDeclaration(node);
+                      s.setDeclarationSite(node);
                       try
                       {
                           table.declare(s);

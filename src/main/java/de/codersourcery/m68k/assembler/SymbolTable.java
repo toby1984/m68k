@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.parser.Identifier;
+import de.codersourcery.m68k.parser.ast.ASTNode;
 
 import java.util.ArrayList;
 import java.util.HashMap;

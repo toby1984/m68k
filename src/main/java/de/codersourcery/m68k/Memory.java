@@ -1,10 +1,57 @@
 package de.codersourcery.m68k;
 
+import de.codersourcery.m68k.emulator.cpu.BadAlignmentException;
+import de.codersourcery.m68k.emulator.cpu.MemoryAccessException;
 import org.apache.commons.lang3.StringUtils;
-
-import java.util.function.Function;
+import org.apache.logging.log4j.core.config.plugins.convert.HexConverter;
 
 public class Memory {
+
+    private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
+
+    private static final HexConverter HEX_CONVERTER = new HexConverter();
+    private static final HexConverter BIN_CONVERTER = new BinConverter();
+
+    private static class HexConverter
+    {
+        protected final char[] buffer;
+
+        public HexConverter() {
+            this(2);
+        }
+
+        protected HexConverter(int bufferSize)
+        {
+            this.buffer = new char[bufferSize];
+        }
+
+        public char[] convert(byte input)
+        {
+            buffer[0] = HEX_CHARS[ (input >> 4 ) & 0x0f ];
+            buffer[1] = HEX_CHARS[ input & 0x0f ];
+            return buffer;
+        }
+    }
+
+    private static class BinConverter extends Memory.HexConverter
+    {
+        public BinConverter() {
+            super(8);
+        }
+
+        public char[] convert(byte input)
+        {
+            buffer[0] = ( (input & ( 1<<7 )) != 0 ) ? '1' : '0';
+            buffer[1] = ( (input & ( 1<<6 )) != 0 ) ? '1' : '0';
+            buffer[2] = ( (input & ( 1<<5 )) != 0 ) ? '1' : '0';
+            buffer[3] = ( (input & ( 1<<4 )) != 0 ) ? '1' : '0';
+            buffer[4] = ( (input & ( 1<<3 )) != 0 ) ? '1' : '0';
+            buffer[5] = ( (input & ( 1<<2 )) != 0 ) ? '1' : '0';
+            buffer[6] = ( (input & ( 1<<1 )) != 0 ) ? '1' : '0';
+            buffer[7] = ( (input & ( 1<<0 )) != 0 ) ? '1' : '0';
+            return buffer;
+        }
+    }
 
     private final byte[] data;
 
@@ -12,7 +59,16 @@ public class Memory {
     {
         this.data = new byte[ sizeInBytes ];
     }
+
     public short readWord(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits when assigned to int later on
+    {
+        assertReadWordAligned(address);
+        int hi = data[address];
+        int lo = data[address+1];
+        return (short) (hi<<8|(lo & 0xff));
+    }
+
+    public short readWordNoCheck(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits when assigned to int later on
     {
         int hi = data[address];
         int lo = data[address+1];
@@ -20,6 +76,13 @@ public class Memory {
     }
 
     public void writeWord(int address,int value)
+    {
+        assertWriteWordAligned(address);
+        data[address] = (byte) (value>>8);
+        data[address+1] = (byte) value;
+    }
+
+    private void writeWordNoCheck(int address,int value)
     {
         data[address] = (byte) (value>>8);
         data[address+1] = (byte) value;
@@ -42,17 +105,26 @@ public class Memory {
         }
     }
 
+    public int readLongNoCheck(int address)
+    {
+        int hi = readWordNoCheck(address);
+        int lo = readWordNoCheck(address+2);
+        return (hi << 16) | (lo & 0xffff);
+    }
+
     public int readLong(int address)
     {
-        int hi = readWord(address);
-        int lo = readWord(address+2);
+        assertReadLongAligned(address);
+        int hi = readWordNoCheck(address);
+        int lo = readWordNoCheck(address+2);
         return (hi << 16) | (lo & 0xffff);
     }
 
     public void writeLong(int address,int value)
     {
-        writeWord(address,value>>16);
-        writeWord(address+2,value);
+        assertWriteLongAligned(address);
+        writeWordNoCheck(address,value>>16);
+        writeWordNoCheck(address+2,value);
     }
 
     public String hexdump(int startAddress,int count)
@@ -62,54 +134,6 @@ public class Memory {
             tmp[i] = (byte) readByte(startAddress+i);
         }
         return hexdump(startAddress, tmp, 0,count);
-    }
-
-    private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
-
-    private static final HexConverter HEX_CONVERTER = new HexConverter();
-    private static final HexConverter BIN_CONVERTER = new BinConverter() {
-
-    };
-
-    public static class HexConverter
-    {
-        protected final char[] buffer;
-
-        public HexConverter() {
-            this(2);
-        }
-
-        protected HexConverter(int bufferSize)
-        {
-            this.buffer = new char[bufferSize];
-        }
-
-        public char[] convert(byte input)
-        {
-            buffer[0] = HEX_CHARS[ (input >> 4 ) & 0x0f ];
-            buffer[1] = HEX_CHARS[ input & 0x0f ];
-            return buffer;
-        }
-    }
-
-    public static class BinConverter extends HexConverter
-    {
-        public BinConverter() {
-            super(8);
-        }
-
-        public char[] convert(byte input)
-        {
-            buffer[0] = ( (input & ( 1<<7 )) != 0 ) ? '1' : '0';
-            buffer[1] = ( (input & ( 1<<6 )) != 0 ) ? '1' : '0';
-            buffer[2] = ( (input & ( 1<<5 )) != 0 ) ? '1' : '0';
-            buffer[3] = ( (input & ( 1<<4 )) != 0 ) ? '1' : '0';
-            buffer[4] = ( (input & ( 1<<3 )) != 0 ) ? '1' : '0';
-            buffer[5] = ( (input & ( 1<<2 )) != 0 ) ? '1' : '0';
-            buffer[6] = ( (input & ( 1<<1 )) != 0 ) ? '1' : '0';
-            buffer[7] = ( (input & ( 1<<0 )) != 0 ) ? '1' : '0';
-            return buffer;
-        }
     }
 
     public static String hexdump(int startAddress, byte[] data, int offset, int count) {
@@ -149,5 +173,33 @@ public class Memory {
             result.append(" ").append( ascii );
         }
         return result.toString();
+    }
+
+    private static void assertReadWordAligned(int address)
+    {
+        if ( (address & 1 ) != 0 ) {
+            throw new BadAlignmentException(MemoryAccessException.Operation.READ_WORD,address);
+        }
+    }
+
+    private static void assertWriteWordAligned(int address)
+    {
+        if ( (address & 1 ) != 0 ) {
+            throw new BadAlignmentException(MemoryAccessException.Operation.WRITE_WORD,address);
+        }
+    }
+
+    private static void assertReadLongAligned(int address)
+    {
+        if ( (address & 1 ) != 0 ) {
+            throw new BadAlignmentException(MemoryAccessException.Operation.READ_LONG,address);
+        }
+    }
+
+    private static void assertWriteLongAligned(int address)
+    {
+        if ( (address & 1 ) != 0 ) {
+            throw new BadAlignmentException(MemoryAccessException.Operation.WRITE_LONG,address);
+        }
     }
 }

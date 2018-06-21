@@ -2,7 +2,6 @@ package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.parser.ast.ASTNode;
-import de.codersourcery.m68k.parser.ast.IValueNode;
 
 public class Symbol
 {
@@ -20,7 +19,7 @@ public class Symbol
     }
 
     public final Identifier identifier;
-    public ASTNode declaration;
+    public ASTNode declarationSite;
     public SymbolType type;
     public Object value;
 
@@ -35,17 +34,28 @@ public class Symbol
         this.type = type;
     }
 
-    public void setDeclaration(ASTNode declaration)
+    @Override
+    public String toString()
+    {
+        return "Symbol{" +
+                "identifier=" + identifier +
+                ", declarationSite=" + declarationSite +
+                ", type=" + type +
+                ", value=" + value +
+                '}';
+    }
+
+    public void setDeclarationSite(ASTNode declaration)
     {
         if ( declaration == null ) {
             throw new IllegalArgumentException("Declaration AST node must not be NULL");
         }
-        this.declaration = declaration;
+        this.declarationSite = declaration;
     }
 
-    public ASTNode getDeclaration()
+    public ASTNode getDeclarationSite()
     {
-        return declaration;
+        return declarationSite;
     }
 
     public void setType(SymbolType type)
@@ -69,6 +79,9 @@ public class Symbol
     }
 
     public Object getValue() {
+        if ( hasType(SymbolType.UNKNOWN ) ) {
+            throw new UnsupportedOperationException("Cannot invoke getValue() on a symbol with type UNKNOWN");
+        }
         return value;
     }
 

@@ -14,7 +14,7 @@ public class DirectiveNode extends ASTNode implements ICodeGeneratingNode
     public final Directive directive;
 
     @Override
-    public void generateCode(ICompilationContext ctx,boolean estimateSizeOnly)
+    public void generateCode(ICompilationContext ctx,boolean estimateSizeForUnknownOperands)
     {
         if ( directive == Directive.ORG )
         {

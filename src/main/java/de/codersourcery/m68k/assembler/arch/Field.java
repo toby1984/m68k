@@ -30,10 +30,12 @@ public enum Field
     DST_SCALE('E'), // (bd,br,Rx.w{*4},od)
     DST_8_BIT_DISPLACEMENT('W'), // (bd,br,Rx,{od}
     // misc
+    RELATIVE_OFFSET('C'), // relative offset (used in branches etc.)
     SIZE('S'), // operation size: .b/.w/.l
     OP_CODE('o'), // bits 15-12
     EXG_DATA_REGISTER('k'), // data register if EXG used with registers of different types, otherwise either the src data or src address register
     EXG_ADDRESS_REGISTER('l'), // address register if EXG used with registers of different types, otherwise either the dst data or dst address register
+    CONDITION_CODE('c'), // encoded branch condition,stored as operationMode on Instruction
     /**
      * Dummy field that indicates
      * the {@link InstructionEncoding.IBitMapping} requires no
@@ -50,6 +52,7 @@ public enum Field
     public static Field getField(char c)
     {
         switch(c) {
+            case 'c': return CONDITION_CODE;
             case 'v': return SRC_VALUE; // immediate/absolute mode value
             case 's': return SRC_BASE_REGISTER;
             case 'i': return SRC_INDEX_REGISTER;
@@ -72,6 +75,7 @@ public enum Field
             case 'E': return DST_SCALE;
             case 'W': return DST_8_BIT_DISPLACEMENT;
             // --
+            case 'C': return RELATIVE_OFFSET;
             case 'k': return EXG_DATA_REGISTER;
             case 'l': return EXG_ADDRESS_REGISTER;
             case 'S': return SIZE;

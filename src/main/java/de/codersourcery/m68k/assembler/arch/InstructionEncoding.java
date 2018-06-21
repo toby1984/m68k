@@ -26,6 +26,8 @@ import java.util.function.Function;
  */
 public class InstructionEncoding
 {
+    public static boolean DEBUG = true; // TODO: make this final and 'false' when done debugging
+
     private static final int NOT_MAPPED = 0xffff;
 
     public static final int MAX_BITNO = 31;
@@ -319,7 +321,8 @@ public class InstructionEncoding
     {
         Validate.notBlank( pattern, "pattern must not be null or blank");
         if ( (pattern.length() % PATTERN_MULTIPLE_OF) != 0) {
-            throw new IllegalArgumentException("Pattern length needs to be a multiple of "+PATTERN_MULTIPLE_OF+" bits but was "+pattern.length());
+            throw new IllegalArgumentException("Pattern length needs to be a multiple of "+PATTERN_MULTIPLE_OF+" bits " +
+                    "but was "+pattern.length());
         }
         if ( pattern.length() > (MAX_BITNO+1) ) {
             throw new IllegalArgumentException("Pattern length must not exceed "+(MAX_BITNO+1)+" bits but was "+pattern.length());
@@ -425,7 +428,10 @@ public class InstructionEncoding
         for (int i = 0; i < patterns.length; i++)
         {
             var pattern = patterns[i];
-            System.out.println("Pattern: "+pattern);
+            if ( DEBUG )
+            {
+                System.out.println("Pattern: " + pattern);
+            }
             int outputValue = 0;
             for ( var entry : bitMappings[i].entrySet() ) {
                 final Field field = entry.getKey();
@@ -434,10 +440,13 @@ public class InstructionEncoding
                 final int inputValue = field == Field.NONE ? 0 : source.apply(field );
                 for ( var mapping : mappings )
                 {
-                    System.out.println("=== Applying "+mapping+" with "+StringUtils.leftPad(Integer.toBinaryString(inputValue),16,'0')+" ===");
+                    if ( DEBUG )
+                    {
+                        System.out.println("=== Applying " + mapping + " with " + StringUtils.leftPad(Integer.toBinaryString(inputValue), 16, '0') + " ===");
+                    }
                     final int oldValue = outputValue;
                     outputValue = mapping.apply(inputValue,outputValue);
-                    if ( oldValue != outputValue )
+                    if ( DEBUG && oldValue != outputValue )
                     {
                         System.out.println("BEFORE: "+pattern);
                         System.out.println("BEFORE: "+ StringUtils.leftPad(Integer.toBinaryString(oldValue),16,'0'));

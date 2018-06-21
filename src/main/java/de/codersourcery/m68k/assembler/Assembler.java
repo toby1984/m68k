@@ -8,10 +8,10 @@ import de.codersourcery.m68k.assembler.phases.ValidationPhase;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
 import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +26,8 @@ public class Assembler
     private final CompilationMessages messages = new CompilationMessages();
     private MyCompilationContext context;
 
+    private final AssemblerOptions options = new AssemblerOptions();
+
     /**
      * Returns the assembler's phases that will be run
      * when {@link #compile(CompilationUnit)} is invoked.
@@ -37,10 +39,11 @@ public class Assembler
         var phases = new ArrayList<ICompilationPhase>();
         phases.add( new ParsePhase() );
         phases.add( new GatherSymbolsPhase() );
-        phases.add( new CodeGenerationPhase(true) );
+        phases.add( new CodeGenerationPhase(true) ); // 1st pass, all instructions with as-of-now unknown operands will assume their maximum length
+        phases.add( new CodeGenerationPhase(true) ); // 2nd pass, by now all operands should have addresses assigned so the size estimate gets more accurate
         phases.add( new ValidationPhase() );
         phases.add( new FixAddressingModesPhase() );
-        phases.add( new CodeGenerationPhase(false) );
+        phases.add( new CodeGenerationPhase(false) ); // 3rd pass, generate code
         return phases;
     }
 
@@ -57,7 +60,8 @@ public class Assembler
     {
         messages.clearMessages();
 
-        context = createContext();
+        final boolean debug = options.debug;
+        context = createContext(options);
         context.setCompilationUnit(unit);
         for ( ICompilationPhase phase : getPhases() )
         {
@@ -65,6 +69,10 @@ public class Assembler
             context.setPhase(phase);
             try
             {
+                if ( debug )
+                {
+                    System.out.println("RUNNING: " + phase);
+                }
                 phase.run(context);
             }
             catch (Exception e)
@@ -78,6 +86,11 @@ public class Assembler
             }
          }
         return messages;
+    }
+
+    public AssemblerOptions getOptions()
+    {
+        return options;
     }
 
     /**
@@ -96,9 +109,9 @@ public class Assembler
         return writer.getBytes();
     }
 
-    private MyCompilationContext createContext()
+    private MyCompilationContext createContext(AssemblerOptions options)
     {
-        return new MyCompilationContext();
+        return new MyCompilationContext(options);
     }
 
     private IObjectCodeWriter createObjectCodeWriter(ICompilationContext context)
@@ -113,12 +126,31 @@ public class Assembler
         private Map<Segment,IObjectCodeWriter> writers = new HashMap<>();
         private IObjectCodeWriter currentWriter;
         private ICompilationContext.Segment segment = Segment.TEXT;
+        private final AssemblerOptions options;
+
+        private MyCompilationContext(AssemblerOptions options)
+        {
+            Validate.notNull(options, "options must not be null");
+            this.options = options;
+        }
 
         @Override
         public void setPhase(ICompilationPhase phase)
         {
             Validate.notNull(phase, "phase must not be null");
             this.phase = phase;
+        }
+
+        @Override
+        public AssemblerOptions options()
+        {
+            return options;
+        }
+
+        @Override
+        public boolean isDebugModeEnabled()
+        {
+            return options.debug;
         }
 
         @Override
@@ -144,16 +176,10 @@ public class Assembler
         public String getSource(CompilationUnit unit) throws IOException
         {
             Validate.notNull(unit, "unit must not be null");
-            final var buffer = new StringBuilder();
-            final var tmp = new char[1024*10];
-            try (var reader = new InputStreamReader( unit.getResource().createInputStream() ) ) {
-                final var len = reader.read(tmp);
-                if ( len > 0 )
-                {
-                    buffer.append(tmp, 0, len);
-                }
+            try (var input = unit.getResource().createInputStream() )
+            {
+                return Misc.read(input);
             }
-            return buffer.toString();
         }
 
         @Override

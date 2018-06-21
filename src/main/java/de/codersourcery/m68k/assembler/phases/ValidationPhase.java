@@ -29,8 +29,14 @@ public class ValidationPhase implements ICompilationPhase
                     if ( node instanceof IdentifierNode) {
 
                         final Symbol symbol = ctx.symbolTable().lookup(((IdentifierNode) node).getValue());
-                        ctx.error("Failed to resolve symbol "+symbol.identifier,node);
-                    } else
+                        if ( symbol == null )
+                        {
+                            ctx.error("Failed to resolve " + symbol, node);
+                        } else {
+                            ctx.error("No value assigned to " + symbol, node);
+                        }
+                    }
+                    else
                     {
                         ctx.error("Failed to determine value for " + node, node);
                     }
@@ -41,12 +47,14 @@ public class ValidationPhase implements ICompilationPhase
             {
                 final InstructionNode insn = node.asInstruction();
                 insn.getInstructionType().checkSupports(insn);
-                checkValueSize( insn.source() , ctx );
-                checkValueSize( insn.destination(), ctx );
-            }
-            else if ( node.is(NodeType.IDENTIFIER) )
-            {
-                ctx.error("Unknown symbol "+node.asIdentifier().getValue(),node);
+                if (insn.hasSource())
+                {
+                    checkValueSize(insn.source(), ctx);
+                }
+                if (insn.hasDestination())
+                {
+                    checkValueSize(insn.destination(), ctx);
+                }
             }
         };
         ctx.getCompilationUnit().getAST().visitInOrder(visitor);
@@ -61,25 +69,25 @@ public class ValidationPhase implements ICompilationPhase
             case PC_INDIRECT_WITH_DISPLACEMENT:
             case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
             case ABSOLUTE_SHORT_ADDRESSING:
-                assertFitsIn16Bits(op,ctx);
+                assertFitsIn16BitsSigned(op,ctx);
                 break;
             case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
             case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
-                assertFitsIn8Bits(op,ctx);
+                assertFitsIn8BitsSigned(op,ctx);
                 break;
         }
     }
 
-    private void assertFitsIn8Bits(OperandNode op,ICompilationContext ctx)
+    private void assertFitsIn8BitsSigned(OperandNode op,ICompilationContext ctx)
     {
-        assertFits(op,8,ctx);
+        assertFitsSigned(op,8,ctx);
     }
 
-    private void assertFitsIn16Bits(OperandNode op,ICompilationContext ctx) {
-        assertFits(op,16,ctx);
+    private void assertFitsIn16BitsSigned(OperandNode op,ICompilationContext ctx) {
+        assertFitsSigned(op,16,ctx);
     }
 
-    private void assertFits(OperandNode op,int maxBits,ICompilationContext ctx)
+    private void assertFitsSigned(OperandNode op,int maxBits,ICompilationContext ctx)
     {
         Integer value = op.getBaseDisplacement().getBits(ctx);
         if ( value == null )
@@ -90,7 +98,7 @@ public class ValidationPhase implements ICompilationPhase
             }
             value = op.getValue().getBits(ctx);
         }
-        if (value != null && NumberNode.getSizeInBits(value) > maxBits)
+        if (value != null && NumberNode.getSizeInBitsSigned(value) > maxBits)
         {
             ctx.error("Value does not fit in "+maxBits+" bits: " + value, op);
         }
