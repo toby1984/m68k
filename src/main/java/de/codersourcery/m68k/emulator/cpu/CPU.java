@@ -594,6 +594,16 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         switch( insBits  )
         {
             case 0b0000_0000_0000_0000: // Bit Manipulation/MOVEP/Immediate
+                if ( instruction == 0b0000001001111100)
+                {
+                    // ANDI to SR
+                    if ( assertSupervisorMode() )
+                    {
+                        loadValue(instruction, 2);
+                        sr = (sr & value);
+                    }
+                    return;
+                }
                 operandSize = 1;
                 break;
             case 0b0001_0000_0000_0000: // Move Byte
@@ -1002,6 +1012,15 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
         queueInterrupt(IRQ.RESET,0);
     }
 
+    private boolean assertSupervisorMode()
+    {
+        if ( isSupervisorMode() ) {
+            return true;
+        }
+        queueInterrupt(IRQ.PRIVILEGE_VIOLATION,0);
+        return false;
+    }
+
     private void queueInterrupt(IRQ irq,long irqData)
     {
         if ( this.activeIrq != null && this.activeIrq.priority > irq.priority )
@@ -1203,4 +1222,7 @@ R/W (READ/WRITE): WRITE = 0, READ = 1. I/N
 
     public boolean isCarry() { return (sr & FLAG_CARRY) != 0; }
     public boolean isNotCarry() { return (sr & FLAG_CARRY) == 0; }
+
+    public boolean isSupervisorMode() { return ( sr & FLAG_SUPERVISOR_MODE) != 0; }
+    public boolean isUserMode() { return ( sr & FLAG_SUPERVISOR_MODE) == 0; }
 }

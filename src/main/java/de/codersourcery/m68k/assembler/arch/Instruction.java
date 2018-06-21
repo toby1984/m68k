@@ -6,6 +6,7 @@ import de.codersourcery.m68k.parser.ast.InstructionNode;
 import de.codersourcery.m68k.parser.ast.NodeType;
 import de.codersourcery.m68k.parser.ast.NumberNode;
 import de.codersourcery.m68k.parser.ast.OperandNode;
+import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.function.Function;
@@ -43,6 +44,26 @@ Bits 15 – 12 Operation
     /*
      * Branch instructions.
      */
+    AND("AND",2,OperandSize.LONG,0b0000)
+            {
+        @Override
+        public void checkSupports(InstructionNode node)
+        {
+
+        }
+
+        @Override
+        protected int getMaxSourceOperandSizeInBits()
+        {
+            return 32;
+        }
+
+        @Override
+        protected int getMaxDestinationOperandSizeInBits()
+        {
+            return 0;
+        }
+    },
     TRAP("TRAP",1,OperandSize.BYTE,0b0100)
      {
         @Override
@@ -428,12 +449,34 @@ Bits 15 – 12 Operation
         }
     }
 
-    protected InstructionEncoding getEncoding(Instruction type, InstructionNode insn, ICompilationContext context, boolean estimateSizeOnly)
+    protected InstructionEncoding getEncoding(Instruction type,
+                                              InstructionNode insn,
+                                              ICompilationContext context,
+                                              boolean estimateSizeOnly)
     {
         type.checkSupports(insn);
 
         switch (type)
         {
+            case AND:
+                if ( insn.source().addressingMode == IMMEDIATE_VALUE &&
+                     insn.destination().isRegister() &&
+                     insn.destination().asRegister().register == Register.SR )
+                {
+                    if ( insn.getOperandSize() != OperandSize.WORD ) {
+                        throw new RuntimeException("ANDI to SR needs a 16-bit operand");
+                    }
+                    if ( ! estimateSizeOnly )
+                    {
+                        final int bits = insn.source().getValue().getBits(context);
+                        if ( NumberNode.getSizeInBitsUnsigned(bits) > 16 ) {
+                            throw new RuntimeException("ANDI to SR needs a 16-bit operand, was: "+Misc.hex(bits));
+                        }
+                    }
+                    return ANDI_TO_SR_ENCODING;
+                }
+                // TODO: Implement the other variants of AND ...
+                throw new RuntimeException("Sorry, AND operation not fully implemented");
             case TRAP:
                 if ( ! estimateSizeOnly )
                 {
@@ -657,7 +700,7 @@ D/A   |     |   |           |
     protected abstract int getMaxSourceOperandSizeInBits();
 
     /**
-     * Returns the maximum size (in bits) this instruction supports for the source operand.
+     * Returns the maximum size (in bits) this instruction supports for the destination operand.
      * @return
      */
     protected abstract int getMaxDestinationOperandSizeInBits();
@@ -674,6 +717,9 @@ D/A   |     |   |           |
 
     private static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
     private static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
+
+    private static final InstructionEncoding ANDI_TO_SR_ENCODING =
+            InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
     private static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
 

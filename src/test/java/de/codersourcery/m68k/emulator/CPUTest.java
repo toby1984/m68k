@@ -69,6 +69,15 @@ public class CPUTest extends TestCase
         execute("move.b #$ff,d0").expectD0(0xff).notCarry().noOverflow().notExtended().negative().notZero();
     }
 
+    public void testTrap() {
+
+        final String[] src = {
+                "MOVE.L #$ffffffff,d0\n",
+                "TRAP #3\n"
+                xxx
+        };
+    }
+
     public void testMoveByteClearsFlags() {
         execute("move.b #$12,d0",cpu->cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW)).expectD0(0x12).notCarry().noOverflow().notExtended().notNegative().notZero();
     }
@@ -244,7 +253,8 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         return execute(cpuSetup,program);
     }
 
-    private ExpectionBuilder execute(Consumer<CPU> cpuSetup,String program1,String... additional)
+    private ExpectionBuilder execute(Consumer<CPU> cpuSetup,String program1,
+                                     String... additional)
     {
         final List<String> lines = new ArrayList<>();
         lines.add(program1);
