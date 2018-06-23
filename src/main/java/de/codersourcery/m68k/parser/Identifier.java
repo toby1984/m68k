@@ -16,6 +16,10 @@ public class Identifier
         this.value = value;
     }
 
+    public static Identifier of(String s) {
+        return new Identifier(s);
+    }
+
     @Override
     public boolean equals(Object o)
     {

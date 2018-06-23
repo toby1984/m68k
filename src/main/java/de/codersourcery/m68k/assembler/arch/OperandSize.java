@@ -8,7 +8,11 @@ public enum OperandSize
 {
     BYTE(0b00),
     WORD(0b01),
-    LONG(0b10);
+    LONG(0b10),
+    /*
+     * Used when the user writes stuff like "move #3,d0" etc.
+     */
+    UNSPECIFIED(0b11);
 
     /**
      * The bit pattern to encode into a generated instruction when this size is used.
@@ -42,6 +46,8 @@ public enum OperandSize
                 return 16;
             case LONG:
                 return 32;
+            case UNSPECIFIED:
+                throw new RuntimeException("Unspecified OperandSize has no size");
         }
         throw new RuntimeException("Unreachable code reached");
     }

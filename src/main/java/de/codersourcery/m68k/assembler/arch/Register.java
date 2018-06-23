@@ -25,7 +25,8 @@ public enum Register
     A6("a6",Type.ADDRESS,6),
     A7("a7",Type.ADDRESS,Type.STACKPTR,7),
     PC("pc",Type.PC,0),
-    SR("sr",Type.SR,0);
+    SR("sr",Type.SR,0),
+    USP("usp",Type.STACKPTR,0); // usermode stack ptr
 
     public final String name;
     public final Type type1;
@@ -82,12 +83,13 @@ public enum Register
             case A5:
             case A6:
             case A7:
+            case USP:
                 return true;
         }
         return false;
     }
 
-    public static enum Type {
+    public enum Type {
         DATA,
         ADDRESS,
         STACKPTR,
@@ -128,6 +130,15 @@ public enum Register
             case "sr": case "SR": return Register.SR;
             case "sp": case "SP": case "sP": case "Sp": return Register.A7;
             case "pc": case "PC": case "pC": case "Pc": return Register.PC;
+            case "usp":
+            case "usP":
+            case "uSp":
+            case "uSP":
+            case "Usp":
+            case "UsP":
+            case "USp":
+            case "USP":
+                return Register.USP;
         }
         return null;
     }

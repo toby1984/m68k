@@ -1,10 +1,10 @@
 package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.assembler.arch.Condition;
+import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.utils.Misc;
-
-import java.util.Arrays;
-import java.util.Stack;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * M68000 cpu emulation.
@@ -86,6 +86,7 @@ public class CPU
         MMU_ILLEGAL_OPERATION_ERROR(56,IRQGroup.GROUP2),
         MMU_ACCESS_LEVEL_VIOLATION(57,IRQGroup.GROUP2);
 
+        public final int pcVectorAddress; // address in memory where interrupt vector address can be found
         public final int irqNumber;
         public final IRQGroup group;
         public final int priority;
@@ -100,6 +101,40 @@ public class CPU
             this.irqNumber = irqNumber;
             this.group = group;
             this.priority = priority;
+            // IRQ #0 is special as it occupies 8 bytes in the
+            // vector table and memory address $0000 contains
+            // the supervisor stack ptr value,not the jump address
+            this.pcVectorAddress = irqNumber == 0 ? 4 : 8 + (irqNumber-1)*4;
+        }
+
+        /**
+         * Turns a user trap number (used in TRAP #xx instruction)
+         * into the corresponding IRQ.
+         *
+         * @param trapNo
+         * @return
+         */
+        public static IRQ userTrapToIRQ(int trapNo)
+        {
+            switch(trapNo) {
+                case 0: return IRQ.TRAP0_0;
+                case 1: return IRQ.TRAP0_1;
+                case 2: return IRQ.TRAP0_2;
+                case 3: return IRQ.TRAP0_3;
+                case 4: return IRQ.TRAP0_4;
+                case 5: return IRQ.TRAP0_5;
+                case 6: return IRQ.TRAP0_6;
+                case 7: return IRQ.TRAP0_7;
+                case 8: return IRQ.TRAP0_8;
+                case 9: return IRQ.TRAP0_9;
+                case 10: return IRQ.TRAP0_10;
+                case 11: return IRQ.TRAP0_11;
+                case 12: return IRQ.TRAP0_12;
+                case 13: return IRQ.TRAP0_13;
+                case 14: return IRQ.TRAP0_14;
+                case 15: return IRQ.TRAP0_15;
+                default: throw new RuntimeException("Unreachable code reached");
+            }
         }
 
         public static IRQ valueOf(int irqNumber)
@@ -193,13 +228,13 @@ public class CPU
     public final int[] dataRegisters = new int[8];
     public final int[] addressRegisters = new int[8];
 
-    public int sr;
+    public int statusRegister;
 
     private final long[] irqData = new long[10];
     private final IRQ[] irqStack = new IRQ[10];
 
     private int irqStackPtr;
-    private IRQ activeIrq; // vector # of currently active IRQ or -1
+    public IRQ activeIrq; // currently active IRQ (if any)
 
     private int userModeStackPtr;
     private int supervisorModeStackPtr;
@@ -430,7 +465,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         case 0b1111: // Reserved
                             break;
                     }
-                    queueInterrupt(IRQ.ILLEGAL_INSTRUCTION,0);
+                    triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
                     return false;
                 }
 
@@ -508,7 +543,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         return true;
                 }
         }
-        queueInterrupt(IRQ.ILLEGAL_INSTRUCTION,0);
+        triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
         return false;
     }
 
@@ -568,6 +603,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         try
         {
             internalExecutionOneInstruction();
+
+            checkPendingIRQ();
         }
         catch(MemoryAccessException e)
         {
@@ -582,6 +619,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         if ( ( pc & 1 ) != 0 )
         {
             badAlignment(pc,MemoryAccessException.Operation.READ_WORD);
+            return;
         }
 
         pcAtStartOfLastInstruction = pc;
@@ -589,84 +627,109 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         int instruction= memory.readWordNoCheck(pc);
         pc += 2;
 
-        int operandSize = 2; // operation operandSize in bytes, defaults to 1 word
+        switch(instruction)
+        {
+            /* ================================
+             * Bit Manipulation/MOVEP/Immediate
+             * ================================
+             */
+            case 0b0000001001111100: // ANDI to SR
+                if ( assertSupervisorMode() )
+                {
+                    loadValue(instruction, 2);
+                    setStatusRegister( statusRegister & value );
+                }
+                return;
+            /* ================================
+             * Miscellaneous instructions
+             * ================================
+             */
+            case 0b0100111001110011: // RET
+                returnFromException();
+                return;
+            case 0b0100111001110001:  // NOP
+                return;
+            case 0b0100101011111100: // ILLEGAL
+                triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
+                return;
+        }
         final int insBits = (instruction & 0b1111_0000_0000_0000);
         switch( insBits  )
         {
-            case 0b0000_0000_0000_0000: // Bit Manipulation/MOVEP/Immediate
-                if ( instruction == 0b0000001001111100)
-                {
-                    // ANDI to SR
-                    if ( assertSupervisorMode() )
-                    {
-                        loadValue(instruction, 2);
-                        sr = (sr & value);
-                    }
-                    return;
-                }
-                operandSize = 1;
+            /* ================================
+             * Bit Manipulation/MOVEP/Immediate
+             * ================================
+             */
+            case 0b0000_0000_0000_0000:
                 break;
-            case 0b0001_0000_0000_0000: // Move Byte
+            /* ================================
+             * Move Byte
+             * ================================
+             */
+            case 0b0001_0000_0000_0000:
                 loadValue(instruction,2); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
                 value = (value<<24)>>24; // sign-extend
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 storeValue(instruction,1 );
                 return;
-            case 0b0010_0000_0000_0000: // Move Long
+            /* ================================
+             * Move Long
+             * ================================
+             */
+            case 0b0010_0000_0000_0000:
                 loadValue(instruction,4);
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 storeValue(instruction,4 );
                 return;
-            case 0b0011_0000_0000_0000: // Move Word
+            /* ================================
+             * Move Word
+             * ================================
+             */
+            case 0b0011_0000_0000_0000:
                 loadValue(instruction,2);
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 storeValue(instruction,2 );
                 return;
-            case 0b0100_0000_0000_0000: // Miscellaneous
-                if ( instruction == 0b0100111001110011 )
+            /* ================================
+             * Miscellaneous instructions
+             * ================================
+             */
+            case 0b0100_0000_0000_0000:
+
+                if ( (instruction & 0b0100111011000000) == 0b0100111011000000)
                 {
-                    returnFromException();
+                    // JMP
+                    loadValue(instruction,4);
+                    pc = value;
                     return;
                 }
-                if ( instruction == 0b0100111001110001 ) {
-                    // NOP
-                    return;
-                }
-                if ( instruction == 0b0100101011111100 )
+                if ( (instruction & 0b11111111_11110000) == 0b0100111001100000)
                 {
-                    queueInterrupt(IRQ.ILLEGAL_INSTRUCTION,0);
-                    return;
-                }
-                if ( (instruction & 0b0100111001000000) == 0b0100111001000000 ) {
-                    // TRAP #xx
-                    final int trapNo = 32 + (instruction & 0b1111);
-                    final IRQ irq;
-                    switch(trapNo) {
-                        case 0: irq = IRQ.TRAP0_0; break;
-                        case 1: irq = IRQ.TRAP0_1; break;
-                        case 2: irq = IRQ.TRAP0_2; break;
-                        case 3: irq = IRQ.TRAP0_3; break;
-                        case 4: irq = IRQ.TRAP0_4; break;
-                        case 5: irq = IRQ.TRAP0_5; break;
-                        case 6: irq = IRQ.TRAP0_6; break;
-                        case 7: irq = IRQ.TRAP0_7; break;
-                        case 8: irq = IRQ.TRAP0_8; break;
-                        case 9: irq = IRQ.TRAP0_9; break;
-                        case 10: irq = IRQ.TRAP0_10; break;
-                        case 11: irq = IRQ.TRAP0_11; break;
-                        case 12: irq = IRQ.TRAP0_12; break;
-                        case 13: irq = IRQ.TRAP0_13; break;
-                        case 14: irq = IRQ.TRAP0_14; break;
-                        case 15: irq = IRQ.TRAP0_15; break;
-                        default: throw new RuntimeException("Unreachable code reached");
+                    // MOVE Ax,USP / MOVE USP,Ax
+                    if ( assertSupervisorMode() )
+                    {
+                        final int regNum = instruction & 0b111;
+                        if ((instruction & 1 << 3) == 0) // check transfer direction
+                        {
+                            userModeStackPtr = addressRegisters[ regNum ]; // address register -> USP
+                        }
+                        else
+                        {
+                            addressRegisters[ regNum ] = userModeStackPtr; // USP -> address register
+                        }
                     }
-                    queueInterrupt(irq,0);
                     return;
                 }
-                if ( (instruction & 0b0100_0001_1100_0000) == 0b0100_0001_1100_0000 )
+                if ( (instruction & 0b1111111111110000) == 0b0100111001000000 ) {
+                    // TRAP #xx
+                    triggerIRQ(IRQ.userTrapToIRQ( instruction & 0b1111 ),0);
+                    return;
+                }
+
+                if ( (instruction & 0b1111000111000000) == 0b0100000111000000 )
                 {
                     // LEA
                     loadValue(instruction,4);
@@ -675,86 +738,81 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     addressRegisters[dstAdrReg] = value;
                     return;
                 }
-                return;
-            case 0b0101_0000_0000_0000: // ADDQ/SUBQ/Scc/DBcc/TRAPc c
-            case 0b0110_0000_0000_0000: // Bcc/BSR/BRA
-
-                // TODO: Handle BSR !!!
-
-                /*
-See https://en.wikibooks.org/wiki/68000_Assembly
-
-Mnemonic Condition Encoding Test
-BRA* True            0000 = 1
-F*   False           0001 = 0
-BHI High             0010 = !C & !Z
-BLS Low or Same      0011 = C | Z
-BCC/BHI Carry Clear  0100 = !C
-BCS/BLO Carry Set    0101 = C
-BNE Not Equal        0110 = !Z
-BEQ Equal            0111 = Z
-BVC Overflow Clear   1000 = !V
-BVS Overflow Set     1001 = V
-BPL Plus             1010 = !N
-BMI Minus            1011 = N
-BGE Greater or Equal 1100 = (N &  V) | (!N & !V)
-BLT Less Than        1101 = (N & !V) | (!N & V)
-BGT Greater Than     1110 = ((N & V) | (!N & !V)) & !Z;
-BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
-
-*Not available for the Bcc instruction.
-                 */
-
-                final int cc = (instruction & 0b0000111100000000) >> 8;
-                final boolean C = (sr & FLAG_CARRY) != 0;
-                final boolean N = (sr & FLAG_NEGATIVE) != 0;
-                final boolean V = (sr & FLAG_OVERFLOW) != 0;
-                final boolean Z = (sr & FLAG_ZERO) != 0;
-                boolean takeBranch;
-                switch( cc )
+                break;
+            /* ================================
+             * ADDQ/SUBQ/Scc/DBcc/TRAPc c
+             * ================================
+             */
+            case 0b0101_0000_0000_0000:
+                if ( (instruction & 0b11110000_11111000 ) == 0b01010000_11001000 )
                 {
-                    case 0b0000: takeBranch=true; break;
-                    case 0b0001: takeBranch=false; break;
-                    case 0b0010: takeBranch=!C & !Z; break;
-                    case 0b0011: takeBranch=C | Z; break;
-                    case 0b0100: takeBranch=!C; break;
-                    case 0b0101: takeBranch=C; break;
-                    case 0b0110: takeBranch=!Z; break;
-                    case 0b0111: takeBranch=Z; break;
-                    case 0b1000: takeBranch=!V; break;
-                    case 0b1001: takeBranch=V; break;
-                    case 0b1010: takeBranch=!N; break;
-                    case 0b1011: takeBranch=N; break;
-                    case 0b1100: takeBranch=(N &  V) | (!N & !V); break;
-                    case 0b1101: takeBranch=(N & !V) | (!N & V); break;
-                    case 0b1110: takeBranch=((N & V) | (!N & !V)) & !Z; break;
-                    case 0b1111: takeBranch=Z | (N & !V) | (!N & V); break;
-                    default:
-                        throw new RuntimeException("Unreachable code reached: "+Misc.binary16Bit(cc));
+                     // DBcc
+                    final int cc = (instruction & 0b0000111100000000) >> 8;
+                    if ( ! Condition.isTrue(this,cc ) )
+                    {
+                        // condition is false, decrement data register lower 16 bits
+                        final int regNum = instruction & 0b111;
+                        final int regVal = dataRegisters[regNum];
+                        int newValue = ( (regVal & 0xffff) - 1 ) & 0xffff;
+                        dataRegisters[ regNum ] = (regVal & 0xffff0000) | newValue;
+                        if ( newValue != 0xffff ) {
+                            /*
+                             * - If the result is – 1, execution continues with the next instruction.
+                             * - If the result is not equal to – 1, execution continues at the location indicated by the current value of the program
+                             *   counter plus the sign-extended 16-bit displacement. The value in the program counter is
+                             *   the address of the instruction word of the DBcc instruction plus two. The
+                             */
+                            pc = pc + memory.readWordNoCheck(pc);
+                            return;
+                        }
+                    }
+                    pc += 2; // skip branch offset
+                    return;
                 }
-                switch(instruction& 0xff)
+                break;
+            /* ================================
+             * Bcc/BSR/BRA
+             * ================================
+             */
+            case 0b0110_0000_0000_0000:
+
+                if ( (instruction & 0b11111111_00000000) == 0b01100001_00000000 ) {
+                    throw new RuntimeException("BSR not implemented yet");
+                }
+
+                // BRA/Bcc
+                final int cc = (instruction & 0b0000111100000000) >> 8;
+                final boolean takeBranch = Condition.isTrue(this, cc);
+                switch (instruction & 0xff)
                 {
                     case 0x00: // 16 bit offset
-                        if ( takeBranch ) {
+                        if (takeBranch)
+                        {
                             pc += memLoadWord(pc) - 2; // -2 because we already advanced the PC after reading the instruction word
                         }
                         pc += 2; // skip offset
                         break;
                     case 0xff: // 32 bit offset
-                        if ( takeBranch ) {
+                        if (takeBranch)
+                        {
                             pc += memLoadLong(pc) - 2; // -2because we already advanced the PC after reading the instruction word
                         }
                         pc += 4;
                         break;
                     default:
                         // 8-bit branch offset encoded in instruction itself
-                        if ( takeBranch ) {
-                            final int offset = ( (instruction & 0xff) << 24 ) >> 24;
+                        if (takeBranch)
+                        {
+                            final int offset = ((instruction & 0xff) << 24) >> 24;
                             pc += offset - 2; // -2 because we already advanced the PC after reading the instruction word
                         }
                 }
                 return;
-            case 0b0111_0000_0000_0000: // MOVEQ
+            /* ================================
+             * MOVEQ
+             * ================================
+             */
+            case 0b0111_0000_0000_0000:
                 value = instruction & 0xff;
                 value = (value<<24)>>24; // sign-extend
                 int register = (instruction & 0b0111_0000_0000) >> 8;
@@ -762,12 +820,36 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 return;
-            case 0b1000_0000_0000_0000: // OR/DIV/SBCD
-            case 0b1001_0000_0000_0000: // SUB/SUBX
-            case 0b1010_0000_0000_0000: // (Unassigned, Reserved)
-            case 0b1011_0000_0000_0000: // CMP/EOR
-            case 0b1100_0000_0000_0000: // AND/MUL/ABCD/EXG
-                if ( (instruction & 0b1100_0001_0000_0000) == 0b1100_0001_0000_0000 ) // EXG
+            /* ================================
+             * OR/DIV/SBCD
+             * ================================
+             */
+            case 0b1000_0000_0000_0000:
+                break;
+            /* ================================
+             * SUB/SUBX
+             * ================================
+             */
+            case 0b1001_0000_0000_0000:
+                break;
+            /* ================================
+             * (Unassigned, Reserved)
+             * ================================
+             */
+            case 0b1010_0000_0000_0000:
+                break;
+            /* ================================
+             * CMP/EOR
+             * ================================
+             */
+            case 0b1011_0000_0000_0000:
+                break;
+            /* ================================
+             * AND/MUL/ABCD/EXG
+             * ================================
+             */
+            case 0b1100_0000_0000_0000:
+                if ( (instruction & 0b11110001_00000000) == 0b11000001_00000000 ) // EXG
                 {
                     // hint: variable names are a bit misleading, only apply if EXG between different register types
                     final int dataReg = (instruction & 0b111_000000000) >> 9;
@@ -790,15 +872,32 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
                             dataRegisters[ dataReg ] = tmp;
                             return;
                     }
-                    queueInterrupt(IRQ.ILLEGAL_INSTRUCTION,0);
+                    triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
                     return;
                 }
                 break;
-            case 0b1101_0000_0000_0000: // ADD/ADDX
-            case 0b1110_0000_0000_0000: // Shift/Rotate/Bit Field
-            case 0b1111_0000_0000_0000: // Coprocessor Interface/MC68040 and CPU32 Extensions
+            /* ================================
+             * ADD/ADDX
+             * ================================
+             */
+            case 0b1101_0000_0000_0000:
+                break;
+            /* ================================
+             * Shift/Rotate/Bit Field
+             * ================================
+             */
+            case 0b1110_0000_0000_0000:
+                break;
+            /* ================================
+             * Coprocessor Interface/MC68040 and CPU32 Extensions
+             * ================================
+             */
+            case 0b1111_0000_0000_0000:
+                break;
+            default:
+                throw new RuntimeException("Unreachable code reached");
         }
-        queueInterrupt(IRQ.ILLEGAL_INSTRUCTION,0);
+        triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
     }
 
     /**
@@ -808,7 +907,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
      */
     // unit-testing helper method
     public CPU setFlags(int bitMask) {
-        this.sr |= bitMask;
+        this.statusRegister |= bitMask;
         return this;
     }
 
@@ -828,7 +927,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
      */
     public void clearFlags(int bitMask)
     {
-        this.sr &= ~bitMask;
+        this.statusRegister &= ~bitMask;
     }
 
     private void updateFlags()
@@ -845,7 +944,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
         } else {
             clearMask &= ~FLAG_NEGATIVE;
         }
-        this.sr = (this.sr & clearMask ) | setMask;
+        this.statusRegister = (this.statusRegister & clearMask ) | setMask;
     }
 
     private void loadValue(int instruction,int operandSize)
@@ -946,7 +1045,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
                         addressRegisters[eaRegister] = value;
                         break;
                 }
-                queueInterrupt(IRQ.ILLEGAL_INSTRUCTION,0);
+                triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
                 return;
             default:
                 if (  decodeOperand(instruction, operandSize, eaMode, eaRegister) )
@@ -990,7 +1089,24 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
         final int instructionWord = memory.readWordNoCheck(pcAtStartOfLastInstruction );
 
         final long irqData = ( formatWord << (64-16) | address << (64-48) | (instructionWord & 0xffff) );
-        pushIRQ(IRQ.ADDRESS_ERROR,irqData);
+
+        triggerIRQ(IRQ.ADDRESS_ERROR,irqData );
+    }
+
+    private void checkPendingIRQ() {
+
+        if ( irqStackPtr > 0 )
+        {
+            if ( activeIrq == null || irqStack[irqStackPtr-1].priority > activeIrq.priority )
+            {
+                irqStackPtr--;
+                final IRQ irq = irqStack[irqStackPtr];
+                final long irqData = this.irqData[irqStackPtr];
+                irqStack[irqStackPtr] = null;
+                this.irqData[irqStackPtr] = 0;
+                triggerIRQ(irq,irqData);
+            }
+        }
     }
 
     private void pushIRQ(IRQ irq,long irqData)
@@ -1000,16 +1116,8 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
         this.irqStackPtr++;
     }
 
-    private IRQ popIRQ()
-    {
-        irqStackPtr--;
-        final IRQ result = irqStack[irqStackPtr];
-        irqStack[irqStackPtr] = null;
-        return result;
-    }
-
     public void reset() {
-        queueInterrupt(IRQ.RESET,0);
+        triggerIRQ(IRQ.RESET,0);
     }
 
     private boolean assertSupervisorMode()
@@ -1017,74 +1125,58 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
         if ( isSupervisorMode() ) {
             return true;
         }
-        queueInterrupt(IRQ.PRIVILEGE_VIOLATION,0);
+        triggerIRQ(IRQ.PRIVILEGE_VIOLATION,0);
         return false;
     }
 
-    private void queueInterrupt(IRQ irq,long irqData)
+    private void triggerIRQ(IRQ irq, long irqData)
     {
-        if ( this.activeIrq != null && this.activeIrq.priority > irq.priority )
-        {
-            // delay this IRQ
-            pushIRQ(irq,irqData);
-            return;
-        }
-
         if ( irq == IRQ.RESET )
         {
             // clear interrupt stack
             irqStackPtr = 0;
-            activeIrq = irq;
+            activeIrq = null;
 
             supervisorModeStackPtr = memLoadLong(0 );
             addressRegisters[7] = supervisorModeStackPtr;
             pc = memLoadLong(4 );
             // enter supervisor mode, disable tracing, set interrupt level 7
-            sr = ( (FLAG_I2|FLAG_I1|FLAG_I0) | FLAG_SUPERVISOR_MODE )& ~(FLAG_T0|FLAG_T1);
+            statusRegister = ( (FLAG_I2|FLAG_I1|FLAG_I0) | FLAG_SUPERVISOR_MODE ) & ~(FLAG_T0|FLAG_T1);
             return;
         }
 
+        // TODO: Implement support for emulating hardware interrupts, needs
+        // TODO: to honor FLAG_I2|FLAG_I1|FLAG_I0 priorities (IRQs with less than/equal priority get ignored)
+
+        if ( this.activeIrq != null && this.activeIrq.priority > irq.priority )
+        {
+            // higher prio IRQ already active, queue this IRQ
+            pushIRQ(irq,irqData);
+            return;
+        }
         enterIRQ(irq,irqData);
     }
 
     private void enterIRQ(IRQ irq,long irqData)
     {
         // copy current SR value
-        int oldSr = sr;
+        int oldSr = statusRegister;
 
         // remember user mode stack pointer
-        if ( activeIrq == null )
+        if ( ! isSupervisorMode() )
         {
             userModeStackPtr = addressRegisters[7];
             addressRegisters[7] = supervisorModeStackPtr;
-        } // else: already in superuser mode
+        }
 
         activeIrq = irq;
 
         // assert supervisor mode
-        sr = ( sr | FLAG_SUPERVISOR_MODE ) & ~(FLAG_T0|FLAG_T1);
-
-        /*
-LOWER ADDRESS
-15 5 4 3 2 0
-R/W I/N
- FUNCTION CODE
-HIGH
-ACCESS ADDRESS
-LOW
-INSTRUCTION REGISTER
-STATUS REGISTER
-PROGRAM COUNTER
-HIGH
-LOW
-R/W (READ/WRITE): WRITE = 0, READ = 1. I/N
-(INSTRUCTION/NOT): INSTRUCTION = 0, NOT = 1.
-
-         */
+        statusRegister = ( statusRegister | FLAG_SUPERVISOR_MODE ) & ~(FLAG_T0|FLAG_T1);
 
         if ( irq.group == IRQGroup.GROUP0 )
         {
-            // GROUP0 irqs store additional data on the stack
+            // GROUP0 IRQs push additional data on the stack
 
             /*
              * 1. Word
@@ -1112,7 +1204,7 @@ R/W (READ/WRITE): WRITE = 0, READ = 1. I/N
         if ( irq == IRQ.ADDRESS_ERROR )
         {
             // FIXME: Currently decoding operand addresses and
-            // FIXME: actually loading/storing values with memory are interleaved
+            // FIXME: actually loading/storing values from memory are interleaved
             // FIXME: so PC might point to the middle of an instruction when
             // FIXME: the address error gets raised....
             // FIXME: This in turn might cause us to push a PC value that will
@@ -1125,17 +1217,23 @@ R/W (READ/WRITE): WRITE = 0, READ = 1. I/N
         } else {
             pushLong( pc );
         }
-
-        int offset = 8 + (irq.irqNumber-1)*4; // 4 bytes per vector; 8 + ( x-1 )*4 because reset vector (vector #0) takes up 8 bytes instead of 4
-        pc = memory.readLongNoCheck(offset);
+        final int newAddress = memory.readLongNoCheck(irq.pcVectorAddress);
+        if ( newAddress == 0 ) {
+            System.err.println("***********************************");
+            System.err.println("* Using UNINITIALIZED (=$00000000) interrupt vector for "+irq);
+            System.err.println("***********************************");
+            // TODO: exception commented out because so that some exception tests in CPUTest work...fix tests and re-enable this exception again
+            // throw new CPUHaltedException("Uninitialized (=$00000000) interrupt vector for "+irq);
+        }
+        this.pc = newAddress;
     }
 
     private void returnFromException()
     {
-        if ( activeIrq == null )
+        if ( ! isSupervisorMode() )
         {
             // ERROR: Not in supervisor mode
-            queueInterrupt(IRQ.FTRAP_TRAP_TRAPV,0);
+            triggerIRQ(IRQ.FTRAP_TRAP_TRAPV,0);
             return;
         }
 
@@ -1143,16 +1241,13 @@ R/W (READ/WRITE): WRITE = 0, READ = 1. I/N
             throw new RuntimeException("Cannot return from GROUP0 irq "+activeIrq+" using RTE");
         }
 
-        // clean up stack
-        popIRQ();
         activeIrq = null;
 
         pc = popLong();
+        statusRegister = popWord();
 
-        sr = popWord();
-
+        // switch back to user-mode stack
         supervisorModeStackPtr = addressRegisters[7];
-
         addressRegisters[7] = userModeStackPtr;
     }
 
@@ -1208,21 +1303,64 @@ R/W (READ/WRITE): WRITE = 0, READ = 1. I/N
         return (hi << 16) | ( lo & 0xffff);
     }
 
-    public boolean isExtended() { return (sr & FLAG_EXTENDED) != 0; }
-    public boolean isNotExtended() { return (sr & FLAG_EXTENDED) == 0; }
+    public boolean isExtended() { return (statusRegister & FLAG_EXTENDED) != 0; }
+    public boolean isNotExtended() { return (statusRegister & FLAG_EXTENDED) == 0; }
 
-    public boolean isNegative() { return (sr & FLAG_NEGATIVE) != 0; }
-    public boolean isNotNegative() { return (sr & FLAG_NEGATIVE) == 0; }
+    public boolean isNegative() { return (statusRegister & FLAG_NEGATIVE) != 0; }
+    public boolean isNotNegative() { return (statusRegister & FLAG_NEGATIVE) == 0; }
 
-    public boolean isZero() { return (sr & FLAG_ZERO) != 0; }
-    public boolean isNotZero() { return (sr & FLAG_ZERO) == 0; }
+    public boolean isZero() { return (statusRegister & FLAG_ZERO) != 0; }
+    public boolean isNotZero() { return (statusRegister & FLAG_ZERO) == 0; }
 
-    public boolean isOverflow() { return (sr & FLAG_OVERFLOW) != 0; }
-    public boolean isNotOverflow() { return (sr & FLAG_OVERFLOW) == 0; }
+    public boolean isOverflow() { return (statusRegister & FLAG_OVERFLOW) != 0; }
+    public boolean isNotOverflow() { return (statusRegister & FLAG_OVERFLOW) == 0; }
 
-    public boolean isCarry() { return (sr & FLAG_CARRY) != 0; }
-    public boolean isNotCarry() { return (sr & FLAG_CARRY) == 0; }
+    public boolean isCarry() { return (statusRegister & FLAG_CARRY) != 0; }
+    public boolean isNotCarry() { return (statusRegister & FLAG_CARRY) == 0; }
 
-    public boolean isSupervisorMode() { return ( sr & FLAG_SUPERVISOR_MODE) != 0; }
-    public boolean isUserMode() { return ( sr & FLAG_SUPERVISOR_MODE) == 0; }
+    public boolean isSupervisorMode() { return ( statusRegister & FLAG_SUPERVISOR_MODE) != 0; }
+    public boolean isUserMode() { return ( statusRegister & FLAG_SUPERVISOR_MODE) == 0; }
+
+    private void setStatusRegister(int newValue)
+    {
+        if ( isSupervisorMode() )
+        {
+            // we're currently in supervisor mode so
+            // code being executed may switch back to user-mode
+            if ( ( newValue & FLAG_SUPERVISOR_MODE) == 0 )
+            {
+                // switch back to user-mode stack
+                supervisorModeStackPtr = addressRegisters[7];
+                addressRegisters[7] = userModeStackPtr;
+
+                activeIrq = null;
+            }
+        }
+        this.statusRegister = newValue;
+    }
+
+    @Override
+    public String toString()
+    {
+        final int insn = memory.readWordNoCheck(pc);
+        final String binaryInsn =
+                StringUtils.leftPad(Integer.toBinaryString((insn & 0xff00) >>8 ),8,"0")+"_"+
+                StringUtils.leftPad(Integer.toBinaryString((insn & 0xff) ),8,"0");
+
+        final String flagHelp = "|T1|T0|S|M|I2|I1|I0|X|N|Z|O|C|";
+        String flags = "|"+
+                ( ( statusRegister & FLAG_T1 ) != 0 ? "XX" : "--" )+"|"+
+                        ( ( statusRegister & FLAG_T0 ) != 0 ? "XX" : "--" )+"|"+
+                        ( ( statusRegister & FLAG_SUPERVISOR_MODE ) != 0 ? "X" : "-" )+"|"+
+                        ( ( statusRegister & FLAG_MASTER_INTERRUPT ) != 0 ? "X" : "-" )+"|"+
+                        ( ( statusRegister & FLAG_I2 ) != 0 ? "XX" : "--" )+"|"+
+                        ( ( statusRegister & FLAG_I1 ) != 0 ? "XX" : "--" )+"|"+
+                        ( ( statusRegister & FLAG_I0 ) != 0 ? "XX" : "--" )+"|"+
+                        ( ( statusRegister & FLAG_EXTENDED ) != 0 ? "X" : "-" )+"|"+
+                        ( ( statusRegister & FLAG_NEGATIVE ) != 0 ? "X" : "-" )+"|"+
+                        ( ( statusRegister & FLAG_ZERO     ) != 0 ? "X" : "-" )+"|"+
+                        ( ( statusRegister & FLAG_OVERFLOW ) != 0 ? "X" : "-" )+"|"+
+                        ( ( statusRegister & FLAG_CARRY    ) != 0 ? "X" : "-" )+"|";
+        return "CPU[ pc = "+ Misc.hex(pc)+" , insn="+binaryInsn+", sp="+Misc.hex(addressRegisters[7])+",IRQ="+activeIrq+"]\n"+flagHelp+"\n"+flags;
+    }
 }

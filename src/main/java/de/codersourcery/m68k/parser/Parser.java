@@ -131,7 +131,7 @@ public class Parser
                 TextRegion region = tok.getRegion();
 
                 lexer.next(); // consume instruction
-                OperandSize operandSize = t.defaultOperandSize;
+                OperandSize operandSize = OperandSize.UNSPECIFIED;
                 if ( lexer.peek(TokenType.DOT ) )
                 {
                     if ( ! t.supportsExplicitOperandSize() ) {
@@ -322,7 +322,7 @@ public class Parser
                 } else if ( r.isData() ) {
                     mode = AddressingMode.DATA_REGISTER_DIRECT;
                 } else {
-                    fail("Expected a data or address register",baseDisplacement);
+                    mode = AddressingMode.IMPLIED;
                 }
                 final OperandNode op = new OperandNode(mode,Token.getMergedRegion(tokens));
                 op.setValue(baseDisplacement);

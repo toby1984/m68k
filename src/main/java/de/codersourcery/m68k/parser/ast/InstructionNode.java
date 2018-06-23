@@ -9,17 +9,38 @@ import de.codersourcery.m68k.parser.TextRegion;
 
 public class InstructionNode extends ASTNode implements ICodeGeneratingNode
 {
-    private final Instruction type;
+    public final Instruction instruction;
+
+    public final boolean useImpliedOperandSize;
+
+    // actual operand size of this operation, will be automatically
+    // populated by code generation when size was not specified by the user
     private OperandSize operandSize;
 
     public InstructionNode(Instruction type, OperandSize operandSize, TextRegion region)
     {
         super(NodeType.INSTRUCTION, region);
-        if ( type == null ) {
-            throw new IllegalArgumentException("type must not be null");
+        if ( operandSize == null ) {
+            throw new IllegalArgumentException("Operand size must not be NULL");
         }
-        this.type = type;
+        if ( type == null ) {
+            throw new IllegalArgumentException("instruction must not be null");
+        }
+        this.instruction = type;
         this.operandSize = operandSize;
+        this.useImpliedOperandSize = operandSize == OperandSize.UNSPECIFIED;
+    }
+
+    public void setImplicitOperandSize(OperandSize size)
+    {
+        if ( size == null ) {
+            throw new IllegalArgumentException("Operand size must not be NULL");
+        }
+
+        if ( useImpliedOperandSize )
+        {
+            this.operandSize = size;
+        }
     }
 
     public OperandNode source() {
@@ -45,13 +66,13 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
 
     public Instruction getInstructionType()
     {
-        return type;
+        return instruction;
     }
 
     @Override
     public void toString(StringBuilder buffer, int depth)
     {
-        buffer.append(indent(depth)).append("Instruction [").append(type).append("]\n");
+        buffer.append(indent(depth)).append("Instruction [").append(instruction).append("]\n");
         for (ASTNode child : children() )
         {
             child.toString(buffer,depth+1);
@@ -63,7 +84,7 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
     {
         try
         {
-            type.generateCode(this, ctx,estimateSizeForUnknownOperands);
+            instruction.generateCode(this, ctx,estimateSizeForUnknownOperands);
         }
         catch(Exception e)
         {
@@ -139,6 +160,9 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
             case DST_MODE:
                 return destination().addressingMode.eaModeField;
             case SIZE:
+                if ( operandSize == OperandSize.UNSPECIFIED ) {
+                    throw new RuntimeException("Operand size not specified");
+                }
                 return operandSize.bits;
             case EXG_DATA_REGISTER:
             case EXG_ADDRESS_REGISTER:

@@ -34,6 +34,10 @@ public class RegisterNode extends ASTNode implements IValueNode
         return register.isAddress();
     }
 
+    public boolean is(Register register) {
+        return this.register == register;
+    }
+
     public boolean isPC() {
         return register == Register.PC;
     }

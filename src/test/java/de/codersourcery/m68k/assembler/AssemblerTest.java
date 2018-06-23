@@ -1,12 +1,15 @@
 package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.assembler.arch.ConditionalInstructionType;
 import de.codersourcery.m68k.assembler.arch.Instruction;
+import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.parser.ast.AST;
 import de.codersourcery.m68k.parser.ast.InstructionNode;
 import de.codersourcery.m68k.parser.ast.StatementNode;
 import junit.framework.TestCase;
 
+import java.util.Arrays;
 import java.util.function.Consumer;
 
 public class AssemblerTest extends TestCase
@@ -23,6 +26,44 @@ public class AssemblerTest extends TestCase
     public void testIllegal()
     {
         assertArrayEquals(compile("illegal")    ,0b01001010,0b11111100);
+    }
+
+    public void testMoveToUSP() {
+
+        assertArrayEquals(compile("move a3,usp")    ,0x4e,0x63 );
+    }
+
+    public void testMoveFromUSP() {
+
+        assertArrayEquals(compile("move usp,a3")    ,0x4e,0x6b );
+        assertFailsToCompile("move usp,usp" );
+        assertFailsToCompile("move.b a3,usp" );
+        assertFailsToCompile("move.w a3,usp" );
+        assertFailsToCompile("move.b usp,a3" );
+        assertFailsToCompile("move.w usp,a3" );
+    }
+
+    public void testANDISR() {
+        assertArrayEquals(compile("AND #$1234,sr")    ,0x02,0x7c,0x12,0x34 );
+        assertFailsToCompile( "AND.l #$1234,sr");
+        assertFailsToCompile( "AND.b #$12,sr");
+    }
+
+    public void testDBRA()
+    {
+        testDBcc(Instruction.DBHI);
+
+        Arrays.stream( Instruction.values() )
+                .filter( insn -> insn.conditionalType == ConditionalInstructionType.DBCC )
+                .peek(x->System.out.println("Testing "+x))
+                .forEach(this::testDBcc );
+    }
+
+    private void testDBcc(Instruction instruction)
+    {
+        // 0101cccc11001sss
+        final int insWord = 0b0101000011001000 | instruction.condition.bits<< 8 | Register.D1.bits;
+        assertArrayEquals(compile("loop: "+instruction.getMnemonic()+" d1,loop")    ,(insWord & 0xff00)>>8,insWord&0xff,0xff,0xfe);
     }
 
     public void testRelativeBranching()
@@ -67,13 +108,13 @@ public class AssemblerTest extends TestCase
         {
             case 8:
                 offset = 100;
-                firstByte = (0b0110_0000 | it.getOperationMode());
+                firstByte = (0b0110_0000 | it.condition.bits);
                 secondByte = offset;
                 check = actualBytes -> assertArrayEquals(actualBytes,firstByte,secondByte);
                 break;
             case 16:
                 offset = 16384;
-                firstByte = (0b0110_0000 | it.getOperationMode());
+                firstByte = (0b0110_0000 | it.condition.bits);
                 secondByte = 0;
                 thirdByte = (offset & 0xff00) >> 8;
                 fourthByte = offset & 0x00ff;
@@ -81,7 +122,7 @@ public class AssemblerTest extends TestCase
                 break;
             case 32:
                 offset = 65536;
-                firstByte = (0b0110_0000 | it.getOperationMode());
+                firstByte = (0b0110_0000 | it.condition.bits);
                 secondByte = 0xff;
 
                 thirdByte =  (offset & 0xff000000) >> 24;
@@ -117,13 +158,18 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("rte")    ,0x4e,0x73);
     }
 
+    public void testJMP() {
+        assertArrayEquals(compile("jmp $1234")    ,0x4e,0xf8,0x12,0x34);
+        assertArrayEquals(compile("jmp $12345678")    ,0x4e,0xf9,0x12,0x34,0x56,0x78);
+    }
+
     public void testMove()
     {
         // Pattern: ooooDDDMMMmmmsss
         //          0010001000111100 00010010 00110100 01010110 01111000
         //          0010000001111100 00010010 00110100 01010110 01111000
 
-        assertArrayEquals(compile("move   $12(pc,a0.w*4),d1")    ,0x32,0x3b,0x84,0x12);
+//        assertArrayEquals(compile("move   $12(pc,a0.w*4),d1")    ,0x32,0x3b,0x84,0x12);
         assertArrayEquals(compile("move   $1234(pc),d1")    ,0x32,0x3a,0x12,0x34);
 
         assertArrayEquals(compile("move.l #$12345678,a0"),0x20,0x7c,0x12,0x34,0x56,0x78);
@@ -200,6 +246,17 @@ public class AssemblerTest extends TestCase
         return this.asm.getBytes();
     }
 
+    private void assertFailsToCompile(String program)
+    {
+        try
+        {
+            compile(program);
+            fail("Should have failed to compile");
+        }
+        catch(Exception e) {
+            // ok
+        }
+    }
     private static void assertArrayEquals(byte[] actual,int...values)
     {
         int len = values == null ? 0 : values.length;

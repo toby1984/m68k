@@ -1,5 +1,7 @@
 package de.codersourcery.m68k;
 
+import de.codersourcery.m68k.emulator.cpu.BadAlignmentException;
+import de.codersourcery.m68k.emulator.cpu.MemoryAccessException;
 import junit.framework.TestCase;
 
 public class MemoryTest extends TestCase
@@ -34,10 +36,15 @@ public class MemoryTest extends TestCase
 
         memory.writeByte(1,0x12 );
         memory.writeByte(2,0x34 );
-        assertEquals(0x1234,memory.readWord(1 ) );
+        assertEquals(0x1234,memory.readWordNoCheck(1 ) );
 
-        memory.writeWord(1, 0x1234 );
-        assertEquals(0x1234,memory.readWord(1 ) );
+        try
+        {
+            memory.writeWord(1, 0x1234);
+            fail("Should've failed");
+        } catch(BadAlignmentException e) {
+            // ok
+        }
     }
 
     public void testLongs() {
@@ -59,10 +66,15 @@ public class MemoryTest extends TestCase
         memory.writeByte(2,0x34 );
         memory.writeByte(3,0x56 );
         memory.writeByte(4,0x78 );
-        assertHexEquals(0x12345678, memory.readLong(1 ) );
+        assertHexEquals(0x12345678, memory.readLongNoCheck(1 ) );
 
-        memory.writeLong(1, 0x12345678 );
-        assertHexEquals(0x12345678,memory.readLong(1 ) );
+        try
+        {
+            memory.writeLong(1, 0x12345678);
+            fail("Should've failed");
+        } catch(BadAlignmentException e) {
+            // ok
+        }
     }
 
     private static void assertHexEquals(int expected,int actual) {

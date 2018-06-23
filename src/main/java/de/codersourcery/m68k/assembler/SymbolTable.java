@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * A symbol table.
@@ -117,10 +118,6 @@ public class SymbolTable
             symbols.put(identifier,new Symbol(identifier,Symbol.SymbolType.UNKNOWN));
             return;
         }
-        if ( existing.hasType(Symbol.SymbolType.UNKNOWN) ) {
-            return; // ok
-        }
-        throw new IllegalArgumentException("Symbol already declared: "+existing);
     }
 
     public void declare(Symbol newSymbol)
@@ -137,5 +134,11 @@ public class SymbolTable
             }
         }
         this.symbols.put(newSymbol.identifier,newSymbol);
+    }
+
+    @Override
+    public String toString()
+    {
+        return symbols.values().stream().map(x->x.toString()).collect(Collectors.joining("\n"));
     }
 }

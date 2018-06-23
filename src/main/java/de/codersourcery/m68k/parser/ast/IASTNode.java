@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.parser.ast;
 
+import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.parser.TextRegion;
 
 import java.util.List;
@@ -78,6 +79,8 @@ public interface IASTNode
     public  TextRegion getMergedRegion();
 
     // convenience methods for commonly required checks
+    public boolean isRegister(Register r);
+
     public boolean isRegister();
 
     public boolean isAddressRegister();

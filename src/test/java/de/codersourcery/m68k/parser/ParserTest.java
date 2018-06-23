@@ -73,6 +73,16 @@ public class ParserTest extends TestCase
         assertFails( () -> parseAST("moveq.l #$70,d0") );
     }
 
+    public void testParseDBRA() {
+        final AST ast = parseAST("loop: DBRA d1,loop",true);
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.getInstruction();
+        assertEquals( Instruction.DBRA, insn.getInstructionType() );
+        assertEquals( Register.D1, insn.source().getValue().asRegister().register );
+        assertEquals( Identifier.of("loop"), insn.destination().getValue().asIdentifier().value );
+    }
+
     public void testParseTrap() {
 
         final AST ast = parseAST("TRAP #10");
@@ -81,6 +91,54 @@ public class ParserTest extends TestCase
         final InstructionNode insn = stmt.child(0).asInstruction();
         assertEquals( Instruction.TRAP, insn.getInstructionType() );
         assertEquals( (Integer) 10 , insn.source().getValue().getBits(null ) );
+    }
+
+    public void testMoveToUSP() {
+
+        final AST ast = parseAST("move.l a3,USP");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.MOVE, insn.getInstructionType() );
+        assertTrue( insn.source().getValue().isRegister(Register.A3) );
+        assertTrue( insn.destination().getValue().isRegister(Register.USP) );
+        assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.source().addressingMode );
+        assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.destination().addressingMode );
+    }
+
+    public void testMoveFromUSP() {
+
+        final AST ast = parseAST("move usp,a3");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.MOVE, insn.getInstructionType() );
+        assertTrue( insn.source().getValue().isRegister(Register.USP) );
+        assertTrue( insn.destination().getValue().isRegister(Register.A3) );
+        assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.source().addressingMode );
+        assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.destination().addressingMode );
+    }
+
+    public void testParseShortJMP()
+    {
+        final AST ast = parseAST("JMP $1234");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.JMP, insn.getInstructionType() );
+        assertEquals( AddressingMode.ABSOLUTE_SHORT_ADDRESSING, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
+    }
+
+    public void testParseLongJMP()
+    {
+        final AST ast = parseAST("JMP $12345678");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.JMP, insn.getInstructionType() );
+        assertEquals( AddressingMode.ABSOLUTE_LONG_ADDRESSING, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x12345678), insn.source().getValue().getBits(null) );
     }
 
     public void testParseRTE() {
@@ -738,7 +796,6 @@ public class ParserTest extends TestCase
                 {
                     if ( p instanceof CodeGenerationPhase )
                     {
-//                        if (! assignLabels || ! ((CodeGenerationPhase) p).estimateSizeForUnknownOperands) {
                         if (! assignLabels ) {
                             return true;
                         }
@@ -748,7 +805,7 @@ public class ParserTest extends TestCase
                 return modified;
             }
         };
-        asm.getOptions().debug = false;
+//        asm.getOptions().debug = false;
 
         this.unit = new CompilationUnit(IResource.stringResource(source) );
         final CompilationMessages messages = asm.compile(unit);

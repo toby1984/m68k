@@ -40,34 +40,24 @@ Bits 15 – 12 Operation
 1110 Shift/Rotate/Bit Field
 1111 Coprocessor Interface/MC68040 and CPU32 Extensions
      */
-
-    /*
-     * Branch instructions.
-     */
-    AND("AND",2,OperandSize.LONG,0b0000)
-            {
+    JMP("JMP",1, 0b0000)
+    {
         @Override
-        public void checkSupports(InstructionNode node)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
         {
-
-        }
-
-        @Override
-        protected int getMaxSourceOperandSizeInBits()
-        {
-            return 32;
-        }
-
-        @Override
-        protected int getMaxDestinationOperandSizeInBits()
-        {
-            return 0;
         }
     },
-    TRAP("TRAP",1,OperandSize.BYTE,0b0100)
-     {
+    AND("AND",2, 0b0000)
+    {
         @Override
-        public void checkSupports(InstructionNode node)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+        }
+    },
+    TRAP("TRAP",1, 0b0100)
+    {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
         {
             if ( node.hasDestination() ) {
                 throw new RuntimeException("TRAP only supports one operand");
@@ -76,166 +66,134 @@ Bits 15 – 12 Operation
                 throw new RuntimeException("TRAP requires an immediate mode value as operand");
             }
         }
-
-        @Override
-        protected int getMaxSourceOperandSizeInBits()
-        {
-            return 0;
-        }
-
-        @Override
-        protected int getMaxDestinationOperandSizeInBits()
-        {
-            return 0;
-        }
     },
-    RTE("RTE",0,OperandSize.WORD,0b0000)
-            {
-        @Override
-        public void checkSupports(InstructionNode node)
-        {
-        }
-
-        @Override
-        protected int getMaxSourceOperandSizeInBits()
-        {
-            return 0;
-        }
-
-        @Override
-        protected int getMaxDestinationOperandSizeInBits()
-        {
-            return 0;
-        }
-    },
-    ILLEGAL("ILLEGAL",0,OperandSize.WORD,0b0000) {
-        @Override
-        public void checkSupports(InstructionNode node)
-        {
-        }
-
-        @Override
-        protected int getMaxSourceOperandSizeInBits()
-        {
-            return 0;
-        }
-
-        @Override
-        protected int getMaxDestinationOperandSizeInBits()
-        {
-            return 0;
-        }
-    },
-    BRA("BRA",1,OperandSize.LONG,0b0000) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-//    BRF("BRF",1,OperandSize.LONG,0b0001) { // TODO: this is essentially "never branch" .... not very useful...
-//        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-//        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-//        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-//        @Override public boolean isRelativeBranch() { return true; }
-//    },
-    BHI("BHI",1,OperandSize.LONG,0b0010) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BLS("BLS",1,OperandSize.LONG,0b0011) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BCC("BCC",1,OperandSize.LONG,0b0100) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BCS("BCS",1,OperandSize.LONG,0b0101) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BNE("BNE",1,OperandSize.LONG,0b0110) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BEQ("BEQ",1,OperandSize.LONG,0b0111) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BVC("BVC",1,OperandSize.LONG,0b1000) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BVS("BVS",1,OperandSize.LONG,0b1001) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BPL("BPL",1,OperandSize.LONG,0b1010) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BMI("BMI",1,OperandSize.LONG,0b1011) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BGE("BGE",1,OperandSize.LONG,0b1100) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BLT("BLT",1,OperandSize.LONG,0b1101) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BGT("BGT",1,OperandSize.LONG,0b1110) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    BLE("BLE",1,OperandSize.LONG,0b1111) {
-        @Override public void checkSupports(InstructionNode node) { checkBranchInstructionValid(node); }
-        @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
-        @Override public boolean isRelativeBranch() { return true; }
-    },
-    NOP("nop",0,OperandSize.WORD,0b0100)
+    RTE("RTE",0, 0b0000)
     {
         @Override
-        public void checkSupports(InstructionNode node)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+        }
+    },
+    ILLEGAL("ILLEGAL",0, 0b0000) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+        }
+    },
+    /*
+     * DBcc instructions
+     */
+    DBT("DBT",2, 0b0000,Condition.BRT,ConditionalInstructionType.DBCC) { // aka 'always branch'
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBRA("DBRA",2, 0b0001,Condition.BRF,ConditionalInstructionType.DBCC) { // ignores condition check
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBHI("DBHI",2, 0b0010,Condition.BHI,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBLS("DBLS",2, 0b0011,Condition.BLS,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBCC("DBCC",2, 0b0100,Condition.BCC,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBCS("DBCS",2, 0b0101,Condition.BCS,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBNE("DBNE",2, 0b0110,Condition.BNE,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBEQ("DBEQ",2, 0b0111,Condition.BEQ,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBVC("DBVC",2, 0b1000,Condition.BVC,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBVS("DBVS",2, 0b1001,Condition.BVS,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBPL("DBPL",2, 0b1010,Condition.BPL,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBMI("DBMI",2, 0b1011,Condition.BMI,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBGE("DBGE",2, 0b1100,Condition.BGE,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBLT("DBLT",2, 0b1101,Condition.BLT,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBGT("DBGT",2, 0b1110,Condition.BGT,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    DBLE("DBLE",2, 0b1111,Condition.BLE,ConditionalInstructionType.DBCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+    },
+    /*
+     * Bcc instructions.
+     */
+    BRA("BRA",1, 0b0000,Condition.BRT,ConditionalInstructionType.BCC) { // aka 'always branch'
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BRF("BRF",1, 0b0001,Condition.BRF,ConditionalInstructionType.BCC) { // TODO: this is essentially "never branch" .... not very useful as NOP exists as well...
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BHI("BHI",1, 0b0010,Condition.BHI,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BLS("BLS",1, 0b0011,Condition.BLS,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BCC("BCC",1, 0b0100,Condition.BCC,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BCS("BCS",1, 0b0101,Condition.BCS,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BNE("BNE",1, 0b0110,Condition.BNE,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BEQ("BEQ",1, 0b0111,Condition.BEQ,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BVC("BVC",1, 0b1000,Condition.BVC,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BVS("BVS",1, 0b1001,Condition.BVS,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BPL("BPL",1, 0b1010,Condition.BPL,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BMI("BMI",1, 0b1011,Condition.BMI,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BGE("BGE",1, 0b1100,Condition.BGE,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BLT("BLT",1, 0b1101,Condition.BLT,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BGT("BGT",1, 0b1110,Condition.BGT,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    BLE("BLE",1, 0b1111,Condition.BLE,ConditionalInstructionType.BCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+    },
+    // Misc
+    NOP("nop",0, 0b0100)
+    {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
         {
             if ( node.hasChildren() ) {
                 throw new RuntimeException("NOP does not accept operands");
             }
         }
-
-        @Override protected int getMaxSourceOperandSizeInBits() { return 0; }
-        @Override protected int getMaxDestinationOperandSizeInBits() { return 0; }
     },
-    EXG("exg",2,OperandSize.LONG,0b1100)
+    EXG("exg",2, 0b1100)
             {
                 @Override
                 public int getOperationCode(InstructionNode insn)
@@ -254,7 +212,7 @@ Bits 15 – 12 Operation
                 }
 
                 @Override
-                public void checkSupports(InstructionNode node)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
                     final OperandNode source = node.source();
 
@@ -272,15 +230,12 @@ Bits 15 – 12 Operation
                         throw new RuntimeException("Unsupported register, EXG supports address or data registers");
                     }
                 }
-
-                @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
-                @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
             },
-    MOVEQ("moveq", 2, OperandSize.BYTE, 0b0111)
+    MOVEQ("moveq", 2, 0b0111)
             {
 
                 @Override
-                public void checkSupports(InstructionNode node)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
                     final OperandNode source = node.source();
                     if ( ! source.hasAddressingMode(AddressingMode.IMMEDIATE_VALUE) )
@@ -292,13 +247,11 @@ Bits 15 – 12 Operation
                     {
                         throw new RuntimeException("MOVEQ requires a data register as destination operand");
                     }
+                    Instruction.checkOperandSizeUnsigned(node.source().getValue(),Operand.SOURCE,8,ctx);
                 }
 
-                @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
-                @Override protected int getMaxSourceOperandSizeInBits() { return 8; }
-
             },
-    MOVE("move", 2, OperandSize.WORD, 0b0000)
+    MOVE("move", 2, 0b0000)
             {
                 @Override
                 public int getOperationCode(InstructionNode insn)
@@ -316,18 +269,16 @@ Bits 15 – 12 Operation
                 }
 
                 @Override public boolean supportsExplicitOperandSize() { return true; }
-                @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
-                @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
 
                 @Override
-                public void checkSupports(InstructionNode node)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
                 }
             },
-    LEA("lea", 2, OperandSize.LONG, 0b0100)
+    LEA("lea", 2, 0b0100)
             {
                 @Override
-                public void checkSupports(InstructionNode node)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
                     final OperandNode source = node.source();
                     final OperandNode destination = node.destination();
@@ -340,21 +291,25 @@ Bits 15 – 12 Operation
                         throw new RuntimeException("LEA requires an absolute address value as source");
                     }
                 }
-                @Override protected int getMaxDestinationOperandSizeInBits() { return 32; }
-                @Override protected int getMaxSourceOperandSizeInBits() { return 32; }
             };
 
-    public final OperandSize defaultOperandSize;
+    public final ConditionalInstructionType conditionalType;
+    public final Condition condition;
     private final String mnemonic;
     private final int operandCount;
     private final int operationMode; // bits 15-12 of first instruction word
 
-    private Instruction(String mnemonic, int operandCount, OperandSize defaultOperandSize, int operationMode)
+    Instruction(String mnemonic, int operandCount, int operationMode) {
+        this(mnemonic,operandCount, operationMode,null,ConditionalInstructionType.NONE);
+    }
+
+    Instruction(String mnemonic, int operandCount, int operationMode, Condition condition, ConditionalInstructionType conditionalType)
     {
         this.mnemonic = mnemonic.toLowerCase();
         this.operandCount = operandCount;
-        this.defaultOperandSize = defaultOperandSize;
         this.operationMode = operationMode;
+        this.condition = condition;
+        this.conditionalType = conditionalType;
     }
 
     public int getOperationMode()
@@ -362,7 +317,7 @@ Bits 15 – 12 Operation
         return operationMode;
     }
 
-    public abstract void checkSupports(InstructionNode node);
+    public abstract void checkSupports(InstructionNode node, ICompilationContext ctx);
 
     public int getOperationCode(InstructionNode insn)
     {
@@ -417,23 +372,50 @@ Bits 15 – 12 Operation
             }
 
             final Function<Field, Integer> func;
-            if ( insn.getInstructionType().isRelativeBranch() )
+            final Condition condition = insn.instruction.condition;
+            if ( condition != null )
             {
                 final int instructionAddress = context.getCodeWriter().offset();
                 func = field ->
                 {
-                    if ( field == Field.CONDITION_CODE )
+                    switch( insn.instruction.conditionalType )
                     {
-                        // operation mode field in enum is abused for condition code encoding
-                        return insn.getInstructionType().getOperationMode();
-                    }
-                    if ( field == Field.RELATIVE_OFFSET )
-                    {
-                        final Integer branchTargetAddress = insn.source().getValue().getBits(context);
-                        if ( (branchTargetAddress & 1) != 0 ) {
-                            throw new RuntimeException("Relative branche needs an even target address but got "+branchTargetAddress);
-                        }
-                        return branchTargetAddress - instructionAddress;
+                        case DBCC:
+                            if (field == Field.SRC_BASE_REGISTER)
+                            { // DBcc Dx,...
+                                return insn.source().getValue().getBits(context);
+                            }
+                            if ( field == Field.CONDITION_CODE)
+                            {
+                                return condition.bits;
+                            }
+                            if ( field == Field.RELATIVE_OFFSET )
+                            {
+                                final Integer branchTargetAddress = insn.destination().getValue().getBits(context);
+                                if ( (branchTargetAddress & 1) != 0 ) {
+                                    throw new RuntimeException("Relative branch needs an even target address but got "+branchTargetAddress);
+                                }
+                                return branchTargetAddress - instructionAddress - 2;
+                            }
+                            break;
+                        case BCC:
+                            if ( field == Field.CONDITION_CODE)
+                            {
+                                return condition.bits;
+                            }
+                            if ( field == Field.RELATIVE_OFFSET )
+                            {
+                                final Integer branchTargetAddress = insn.source().getValue().getBits(context);
+                                if ( (branchTargetAddress & 1) != 0 ) {
+                                    throw new RuntimeException("Relative branch needs an even target address but got "+branchTargetAddress);
+                                }
+                                return branchTargetAddress - instructionAddress;
+                            }
+                            break;
+                        case NONE:
+                            throw new RuntimeException("Internal error - Instruction "+insn.instruction+" has non-NULL CC value but conditional instruction type NONE ?");
+                        default:
+                            throw new RuntimeException("Internal error - Instruction "+insn.instruction+" has unhandled conditional instruction type "+insn.instruction.conditionalType);
                     }
                     throw new RuntimeException("Internal error,unhandled field "+field);
                 };
@@ -454,16 +436,43 @@ Bits 15 – 12 Operation
                                               ICompilationContext context,
                                               boolean estimateSizeOnly)
     {
-        type.checkSupports(insn);
+        type.checkSupports(insn, context);
 
         switch (type)
         {
+            case JMP:
+                switch( insn.source().addressingMode )
+                {
+                    case ADDRESS_REGISTER_INDIRECT:
+                    case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
+                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                    case MEMORY_INDIRECT_POSTINDEXED:
+                    case MEMORY_INDIRECT_PREINDEXED:
+                    case PC_INDIRECT_WITH_DISPLACEMENT:
+                    case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                    case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                    case PC_MEMORY_INDIRECT_POSTINDEXED:
+                    case PC_MEMORY_INDIRECT_PREINDEXED:
+                        return JMP_INDIRECT_ENCODING;
+                    case ABSOLUTE_SHORT_ADDRESSING:
+                        return JMP_SHORT_ENCODING;
+                    case ABSOLUTE_LONG_ADDRESSING:
+                        return JMP_LONG_ENCODING;
+                    default:
+                        throw new RuntimeException("Unsupported addressing mode for JMP: "+insn.source().addressingMode);
+                }
             case AND:
                 if ( insn.source().addressingMode == IMMEDIATE_VALUE &&
-                     insn.destination().isRegister() &&
-                     insn.destination().asRegister().register == Register.SR )
+                     insn.destination().getValue().isRegister(Register.SR) )
                 {
-                    if ( insn.getOperandSize() != OperandSize.WORD ) {
+                    // ANDI #xx,SR
+                    if ( insn.useImpliedOperandSize )
+                    {
+                        insn.setImplicitOperandSize(OperandSize.WORD);
+                    }
+                    else if (insn.getOperandSize() != OperandSize.WORD)
+                    {
                         throw new RuntimeException("ANDI to SR needs a 16-bit operand");
                     }
                     if ( ! estimateSizeOnly )
@@ -481,7 +490,7 @@ Bits 15 – 12 Operation
                 if ( ! estimateSizeOnly )
                 {
                     final int value = insn.source().getValue().getBits(context);
-                    if ( value <= 0 || value > 15 ) {
+                    if ( value < 0 || value > 15 ) {
                         throw new RuntimeException("TRAP # out-of-range (0-15), was "+value);
                     }
                 }
@@ -490,9 +499,27 @@ Bits 15 – 12 Operation
                 return RTE_ENCODING;
             case ILLEGAL:
                 return ILLEGAL_ENCODING;
-            // Relative branch instructions
+                // DBcc instructions
+            case DBRA:
+            case DBT:
+            case DBHI:
+            case DBLS:
+            case DBCC:
+            case DBCS:
+            case DBNE:
+            case DBEQ:
+            case DBVC:
+            case DBVS:
+            case DBPL:
+            case DBMI:
+            case DBGE:
+            case DBLT:
+            case DBGT:
+            case DBLE:
+                return DBCC_ENCODING;
+            // Bcc branch instructions
             case BRA:
-            // case BRF:
+              // case BRF:
             case BHI:
             case BLS:
             case BCC:
@@ -549,7 +576,6 @@ Bits 15 – 12 Operation
             case EXG:
                 return EXG_ENCODING;
             case MOVEQ:
-                checkOperandSizeUnsigned(insn.source().getValue(), Operand.SOURCE,context);
                 return MOVEQ_ENCODING;
             case LEA:
                 if ( insn.source().addressingMode == ABSOLUTE_SHORT_ADDRESSING ) {
@@ -557,6 +583,47 @@ Bits 15 – 12 Operation
                 }
                 return LEA_ENCODING;
             case MOVE:
+
+                // check for MOVE USP
+                final int srcIsUSP = insn.source().getValue().isRegister(Register.USP)      ? 0b01 : 0b00;
+                final int dstIsUSP = insn.destination().getValue().isRegister(Register.USP) ? 0b10 : 0b00;
+                switch( srcIsUSP | dstIsUSP )
+                {
+                    case 0b00:
+                        break;
+                    case 0b01:
+                        if (!insn.destination().getValue().isAddressRegister())
+                        {
+                            throw new RuntimeException("MOVE USP,Ax requires  an address register as destination");
+                        }
+                        if ( insn.useImpliedOperandSize ) {
+                            insn.setImplicitOperandSize( OperandSize.LONG );
+                        }
+                        if (insn.getOperandSize() != OperandSize.LONG ) {
+                            throw new RuntimeException("MOVE USP,Ax only works on long-sized operands");
+                        }
+                        return MOVE_USP_TO_AX_ENCODING;
+                    case 0b10:
+                        if ( !insn.source().getValue().isAddressRegister())
+                        {
+                            throw new RuntimeException("MOVE Ax,USP requires an address register as source");
+                        }
+                        if ( insn.useImpliedOperandSize ) {
+                            insn.setImplicitOperandSize( OperandSize.LONG );
+                        }
+                        if (insn.getOperandSize() != OperandSize.LONG ) {
+                            throw new RuntimeException("MOVE Ax,USP only works on long-sized operands");
+                        }
+                        return MOVE_AX_TO_USP_ENCODING;
+                    case 0b11:
+                        throw new RuntimeException("MOVE USP,USP does not exist");
+                }
+
+                if ( insn.useImpliedOperandSize ) {
+                    insn.setImplicitOperandSize( OperandSize.WORD );
+                }
+
+                // regular move instruction
                 final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 final String[] extraDstWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
 
@@ -646,64 +713,45 @@ D/A   |     |   |           |
             case IMMEDIATE_VALUE:
                 field = operandKind == Operand.SOURCE ? Field.SRC_VALUE : Field.DST_VALUE;
 
-                int actualSizeInBits = checkOperandSizeUnsigned(op.getValue(),operandKind,ctx);
-
-                if ( actualSizeInBits > insn.getOperandSize().sizeInBits() ) {
-                    throw new RuntimeException("Operand has "+actualSizeInBits+" bits but instruction specifies to use only "+
-                            insn.getOperandSize().sizeInBits());
-                }
                 // TODO: 8-bit immediate values could actually be stored in-line (MOVEQ) instead of wasting a byte here
                 // TODO: Maybe add optimization pass that turns regular MOVE into MOVEQ when possible?
                 final int words = insn.getOperandSize() == OperandSize.LONG ? 2 : 1;
                 return new String[] { StringUtils.repeat(field.c,words*16) };
-            case NO_OPERAND: return null; // handled
+            case IMPLIED: return null; // handled
         }
         throw new RuntimeException("Unhandled addressing mode: "+op.addressingMode);
     }
 
-    private int checkOperandSizeUnsigned(IValueNode value,Operand opKind,ICompilationContext ctx)
+    private static int checkOperandSizeUnsigned(IValueNode value,Operand opKind,int maxSizeInBits,ICompilationContext ctx)
     {
-        final int max = opKind == Operand.SOURCE ? getMaxSourceOperandSizeInBits() : getMaxDestinationOperandSizeInBits();
         Integer nodeValue = value.getBits(ctx);
         if ( nodeValue == null ) {
-            return max;
+            return maxSizeInBits;
         }
         int actualSize = NumberNode.getSizeInBitsUnsigned(nodeValue);
-        if ( actualSize > max ) {
-            throw new RuntimeException("Operand out of range, expected at most "+max+" bits but was "+actualSize);
+        if ( actualSize > maxSizeInBits ) {
+            throw new RuntimeException("Operand out of range, expected at most "+maxSizeInBits+" bits but was "+actualSize);
         }
         return actualSize;
     }
 
-    private int checkOperandSizeSigned(IValueNode value,Operand opKind,ICompilationContext ctx)
+    private static int checkOperandSizeSigned(IValueNode value,Operand opKind,int maxSizeInBits,ICompilationContext ctx)
     {
-        final int max = opKind == Operand.SOURCE ? getMaxSourceOperandSizeInBits() : getMaxDestinationOperandSizeInBits();
         Integer nodeValue = value.getBits(ctx);
         if ( nodeValue == null ) {
-            return max;
+            return maxSizeInBits;
         }
         int actualSize = NumberNode.getSizeInBitsSigned(nodeValue);
-        if ( actualSize > max ) {
-            throw new RuntimeException("Operand out of range, expected at most "+max+" bits but was "+actualSize);
+        if ( actualSize > maxSizeInBits ) {
+            throw new RuntimeException("Operand out of range, expected at most "+maxSizeInBits+" bits but was "+actualSize);
         }
         return actualSize;
     }
 
-    public boolean isRelativeBranch() {
-        return false;
+    public Condition getCondition()
+    {
+        return condition;
     }
-
-    /**
-     * Returns the maximum size (in bits) this instruction supports for the source operand.
-     * @return
-     */
-    protected abstract int getMaxSourceOperandSizeInBits();
-
-    /**
-     * Returns the maximum size (in bits) this instruction supports for the destination operand.
-     * @return
-     */
-    protected abstract int getMaxDestinationOperandSizeInBits();
 
     /**
      * Whether this instruction supports explicit .b/.w/.l suffixes or not.
@@ -721,6 +769,10 @@ D/A   |     |   |           |
     private static final InstructionEncoding ANDI_TO_SR_ENCODING =
             InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
+    private static final InstructionEncoding JMP_INDIRECT_ENCODING = InstructionEncoding.of( "0100111011mmmsss");
+    private static final InstructionEncoding JMP_SHORT_ENCODING = InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
+    private static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
     private static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
 
     private static final InstructionEncoding RTE_ENCODING = InstructionEncoding.of( "0100111001110011");
@@ -735,11 +787,17 @@ D/A   |     |   |           |
     private static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
             "vvvvvvvv_vvvvvvvv");
 
-    private static final InstructionEncoding ILLEGAL_ENCODING = InstructionEncoding.of("0100101011111100");
+    private static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
+
+    private static final InstructionEncoding MOVE_USP_TO_AX_ENCODING = InstructionEncoding.of("0100111001101DDD");
+
+    private static final InstructionEncoding ILLEGAL_ENCODING = InstructionEncoding.of( "0100101011111100");
 
     private static final InstructionEncoding EXG_ENCODING = InstructionEncoding.of("1100kkk1ooooolll");
 
     private static final InstructionEncoding NOP_ENCODING = InstructionEncoding.of("0100111001110001");
+
+    private static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss","CCCCCCCC_CCCCCCCC");
 
     private static final InstructionEncoding BCC_8BIT_ENCODING = InstructionEncoding.of(  "0110ccccCCCCCCCC");
 
@@ -748,7 +806,23 @@ D/A   |     |   |           |
     private static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111",
             "CCCCCCCC_CCCCCCCC_CCCCCCCC_CCCCCCCC");
 
-    private static final void checkBranchInstructionValid(InstructionNode node)
+    private static final void checkDBccInstructionValid(InstructionNode node,ICompilationContext ctx)
+    {
+        if ( node.source().addressingMode != AddressingMode.DATA_REGISTER_DIRECT ) {
+            throw new RuntimeException("Unsupported addressing mode: "+node.source().addressingMode );
+        }
+        switch( node.destination().addressingMode )
+        {
+            case ABSOLUTE_LONG_ADDRESSING:
+            case ABSOLUTE_SHORT_ADDRESSING:
+                break;
+            default:
+                throw new RuntimeException("Unsupported addressing mode: "+node.destination().addressingMode );
+        }
+        checkOperandSizeSigned(node.destination().getValue(),Operand.DESTINATION,16,ctx);
+    }
+
+    private static final void checkBranchInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
         switch( node.source().addressingMode )
         {
@@ -758,5 +832,6 @@ D/A   |     |   |           |
             default:
                 throw new RuntimeException("Unsupported addressing mode: "+node.source().addressingMode );
         }
+        checkOperandSizeSigned(node.source().getValue(),Operand.DESTINATION,32,ctx);
     }
 }

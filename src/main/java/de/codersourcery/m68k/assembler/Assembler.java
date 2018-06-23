@@ -85,6 +85,10 @@ public class Assembler
                 break;
             }
          }
+         if ( options.debug )
+         {
+            System.out.println( "==== Symbols =====\n\n"+unit.symbolTable );
+         }
         return messages;
     }
 

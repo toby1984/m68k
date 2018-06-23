@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.parser.ast;
 
+import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.parser.TextRegion;
 import org.apache.commons.lang3.StringUtils;
 
@@ -63,6 +64,10 @@ public abstract class ASTNode implements IASTNode
 
     public boolean isRegister() {
         return is(NodeType.REGISTER);
+    }
+
+    public boolean isRegister(Register r) {
+        return isRegister() && asRegister().is(r);
     }
 
     public boolean isAddressRegister() {

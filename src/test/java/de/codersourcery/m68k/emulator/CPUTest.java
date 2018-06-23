@@ -7,6 +7,7 @@ import de.codersourcery.m68k.assembler.CompilationUnit;
 import de.codersourcery.m68k.assembler.IResource;
 import de.codersourcery.m68k.emulator.cpu.CPU;
 import de.codersourcery.m68k.emulator.cpu.IllegalInstructionException;
+import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
 
@@ -18,12 +19,12 @@ import java.util.stream.Collectors;
 
 public class CPUTest extends TestCase
 {
-    private static final int MEM_SIZE = 512*1024;
+    private static final int MEM_SIZE = 10*1024;
 
     public static final int ALL_USR_FLAGS = CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW | CPU.FLAG_NEGATIVE | CPU.FLAG_ZERO | CPU.FLAG_EXTENDED;
 
     // program start address in memory (in bytes)
-    public static final int PROGRAM_START_ADDRESS = 1024;
+    public static final int PROGRAM_START_ADDRESS = 4096;
 
     private Memory memory;
     private CPU cpu;
@@ -39,51 +40,66 @@ public class CPUTest extends TestCase
     public void testLEA()
     {
         execute("lea $12345678,a0", cpu -> cpu.setFlags(ALL_USR_FLAGS))
-            .expectA0(0x12345678).carry().overflow().extended().negative().zero();
+            .expectA0(0x12345678).carry().overflow().extended().negative().zero().notSupervisor();
     }
 
     public void testIllegal()
     {
         // TODO: This test needs to be rewritten once emulator supports interrupt handling
-        try
-        {
-            execute(cpu->{},"nop","illegal");
-        }
-        catch(IllegalInstructionException e)
-        {
-            // ok
-            assertEquals(PROGRAM_START_ADDRESS + 2, e.pc);
-        }
+        execute(cpu->{},"illegal").supervisor().irqActive(CPU.IRQ.ILLEGAL_INSTRUCTION);
     }
 
     public void testLEA2()
     {
         execute("lea $1234,a0", cpu -> cpu.setFlags(ALL_USR_FLAGS))
-            .expectA0(0x1234).carry().overflow().extended().negative().zero();
+            .expectA0(0x1234).carry().overflow().extended().negative().zero().notSupervisor();
     }
 
     public void testMoveByteImmediate() {
 
-        execute("move.b #$12,d0").expectD0(0x12).notCarry().noOverflow().notExtended().notNegative().notZero();
-        execute("move.b #$00,d0").expectD0(0x00).notCarry().noOverflow().notExtended().notNegative().zero();
-        execute("move.b #$ff,d0").expectD0(0xff).notCarry().noOverflow().notExtended().negative().notZero();
+        execute("move.b #$12,d0").expectD0(0x12).notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
+        execute("move.b #$00,d0").expectD0(0x00).notCarry().noOverflow().notExtended().notNegative().zero().notSupervisor();
+        execute("move.b #$ff,d0").expectD0(0xff).notCarry().noOverflow().notExtended().negative().notZero().notSupervisor();
     }
 
-    public void testTrap() {
+    public void testTrap()
+    {
+        execute("TRAP #0").supervisor().irqActive(CPU.IRQ.TRAP0_0);
+        execute("TRAP #1").supervisor().irqActive(CPU.IRQ.TRAP0_1);
+        execute("TRAP #2").supervisor().irqActive(CPU.IRQ.TRAP0_2);
+        execute("TRAP #3").supervisor().irqActive(CPU.IRQ.TRAP0_3);
+        execute("TRAP #4").supervisor().irqActive(CPU.IRQ.TRAP0_4);
+        execute("TRAP #5").supervisor().irqActive(CPU.IRQ.TRAP0_5);
+        execute("TRAP #6").supervisor().irqActive(CPU.IRQ.TRAP0_6);
+        execute("TRAP #7").supervisor().irqActive(CPU.IRQ.TRAP0_7);
+        execute("TRAP #8").supervisor().irqActive(CPU.IRQ.TRAP0_8);
+        execute("TRAP #9").supervisor().irqActive(CPU.IRQ.TRAP0_9);
+        execute("TRAP #10").supervisor().irqActive(CPU.IRQ.TRAP0_10);
+        execute("TRAP #11").supervisor().irqActive(CPU.IRQ.TRAP0_11);
+        execute("TRAP #12").supervisor().irqActive(CPU.IRQ.TRAP0_12);
+        execute("TRAP #13").supervisor().irqActive(CPU.IRQ.TRAP0_13);
+        execute("TRAP #14").supervisor().irqActive(CPU.IRQ.TRAP0_14);
+        execute("TRAP #15").supervisor().irqActive(CPU.IRQ.TRAP0_15);
+    }
 
-        final String[] src = {
-                "MOVE.L #$ffffffff,d0\n",
-                "TRAP #3\n"
-                xxx
-        };
+    public void testDBRA() {
+
+        execute(cpu-> {}, 3, "move.l #1,D0",
+                "move.l #0,d1",
+                "loop: dbeq d0,loop").expectD0(1).noOverflow().notNegative().zero().notExtended().notSupervisor();
+
+        execute(cpu-> {}, 3, "move.l #1,D0",
+                "loop: dbra d0,loop").expectD0(0xffff).noOverflow().notNegative().notZero().notExtended().notSupervisor();
     }
 
     public void testMoveByteClearsFlags() {
-        execute("move.b #$12,d0",cpu->cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW)).expectD0(0x12).notCarry().noOverflow().notExtended().notNegative().notZero();
+        execute("move.b #$12,d0",cpu->cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW)).expectD0(0x12)
+                .notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
     }
 
     public void testMoveWordClearsFlags() {
-        execute("move.w #$12,d0",cpu->cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW)).expectD0(0x12).notCarry().noOverflow().notExtended().notNegative().notZero();
+        execute("move.w #$12,d0",cpu->cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW)).expectD0(0x12).notCarry()
+                .noOverflow().notExtended().notNegative().notZero().notSupervisor();
     }
 
     public void testMoveLongClearsFlags() {
@@ -92,28 +108,29 @@ public class CPUTest extends TestCase
 
     public void testMoveWordImmediate() {
 
-        execute("move.w #$1234,d0").expectD0(0x1234).notCarry().noOverflow().notExtended().notNegative().notZero();
-        execute("move.w #$00,d0").expectD0(0x00).notCarry().noOverflow().notExtended().notNegative().zero();
-        execute("move.w #$ffff,d0").expectD0(0xffff).notCarry().noOverflow().notExtended().negative().notZero();
+        execute("move.w #$1234,d0").expectD0(0x1234).notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
+        execute("move.w #$00,d0").expectD0(0x00).notCarry().noOverflow().notExtended().notNegative().zero().notSupervisor();
+        execute("move.w #$ffff,d0").expectD0(0xffff).notCarry().noOverflow().notExtended().negative().notZero().notSupervisor();
     }
 
     public void testMoveLongImmediate() {
 
-        execute("move.l #$fffffffe,d0").expectD0(0xfffffffe).notCarry().noOverflow().notExtended().negative().notZero();
-        execute("move.l #$00,d0").expectD0(0x00).notCarry().noOverflow().notExtended().notNegative().zero();
-        execute("move.l #$12345678,d0").expectD0(0x12345678).notCarry().noOverflow().notExtended().notNegative().notZero();
+        execute("move.l #$fffffffe,d0").expectD0(0xfffffffe).notCarry().noOverflow().notExtended().negative().notZero().notSupervisor();
+        execute("move.l #$00,d0").expectD0(0x00).notCarry().noOverflow().notExtended().notNegative().zero().notSupervisor();
+        execute("move.l #$12345678,d0").expectD0(0x12345678).notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
     }
 
     public void testMoveQClearsCarryAndOverflow()
     {
-        execute("moveq #$70,d0", cpu -> cpu.setFlags( CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW) ).expectD0(0x70).notCarry().noOverflow().notExtended().notNegative().notZero();
+        execute("moveq #$70,d0", cpu -> cpu.setFlags( CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW) ).expectD0(0x70)
+                .notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
     }
 
     public void testMoveQ()
     {
-        execute("moveq #$70,d0").expectD0(0x70).notCarry().noOverflow().notExtended().notNegative().notZero();
-        execute("moveq #$0,d0").expectD0(0x0).notCarry().noOverflow().notExtended().notNegative().zero();
-        execute("moveq #$ff,d0").expectD0(0xffffffff).notCarry().noOverflow().notExtended().negative().notZero();
+        execute("moveq #$70,d0").expectD0(0x70).notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
+        execute("moveq #$0,d0").expectD0(0x0).notCarry().noOverflow().notExtended().notNegative().zero().notSupervisor();
+        execute("moveq #$ff,d0").expectD0(0xffffffff).notCarry().noOverflow().notExtended().negative().notZero().notSupervisor();
     }
 
     public void testBranchTaken()
@@ -137,39 +154,39 @@ BLT Less Than        1101 = (N & !V) | (!N & V) (ok)
 BGT Greater Than     1110 = ((N & V) | (!N & !V)) & !Z; // (ok)
 BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
          */
-        execute(cpu -> {},"BRA next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> {},"BRA next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
 
-        execute(cpu -> {},"BHI next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> {},"BHI next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
 
-        execute(cpu -> cpu.carry(),"BLS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> cpu.zero(),"BLS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.carry(),"BLS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> cpu.zero(),"BLS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
 
-        execute(cpu -> {},"BCC next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> {},"BNE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> {},"BVC next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> {},"BPL next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> {},"BCC next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> {},"BNE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> {},"BVC next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> {},"BPL next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
 
-        execute(cpu -> cpu.carry(),"BCS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> cpu.zero(),"BEQ next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> cpu.overflow(),"BVS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> cpu.negative(),"BMI next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.carry(),"BCS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> cpu.zero(),"BEQ next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> cpu.overflow(),"BVS next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> cpu.negative(),"BMI next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
 
         // >=
-        execute(cpu -> cpu.negative().overflow(),"BGE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> {},"BGE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.negative().overflow(),"BGE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> {},"BGE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
 
         // <
-        execute(cpu -> cpu.negative(),"BLT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> cpu.overflow(),"BLT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.negative(),"BLT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> cpu.overflow(),"BLT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
 
         // >
-        execute(cpu -> cpu.negative().overflow(),"BGT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> {} ,"BGT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.negative().overflow(),"BGT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> {} ,"BGT next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
 
         // <=
-        execute(cpu -> cpu.zero() ,"BLE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> cpu.negative() ,"BLE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
-        execute(cpu -> cpu.overflow() ,"BLE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4);
+        execute(cpu -> cpu.zero() ,"BLE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> cpu.negative() ,"BLE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+        execute(cpu -> cpu.overflow() ,"BLE next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
     }
 
     public void testNOP() {
@@ -184,30 +201,30 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 Mnemonic Condition Encoding Test
 BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
          */
-        execute(cpu -> cpu.carry(),"BHI next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> cpu.zero(),"BHI next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.carry(),"BHI next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> cpu.zero(),"BHI next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
 
-        execute(cpu -> {},"BLS next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> cpu.carry(),"BCC next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> {},"BCS next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> cpu.zero(),"BNE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> {},"BEQ next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> cpu.overflow(),"BVC next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> {},"BVS next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> cpu.negative(),"BPL next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> {},"BMI next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> {},"BLS next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> cpu.carry(),"BCC next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> {},"BCS next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> cpu.zero(),"BNE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> {},"BEQ next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> cpu.overflow(),"BVC next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> {},"BVS next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> cpu.negative(),"BPL next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> {},"BMI next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
 
-        execute(cpu -> cpu.negative(),"BGE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> cpu.overflow(),"BGE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.negative(),"BGE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> cpu.overflow(),"BGE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
 
-        execute(cpu -> cpu.negative().overflow(),"BLT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.negative().overflow(),"BLT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
 
-        execute(cpu -> cpu.negative() ,"BGT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> cpu.overflow(),"BGT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> cpu.zero(),"BGT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> cpu.negative() ,"BGT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> cpu.overflow(),"BGT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> cpu.zero(),"BGT next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
 
-        execute(cpu -> {},"BLE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
-        execute(cpu -> cpu.negative().overflow(),"BLE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2);
+        execute(cpu -> {},"BLE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
+        execute(cpu -> cpu.negative().overflow(),"BLE next\nNOP\nnext: ILLEGAL").expectPC( PROGRAM_START_ADDRESS + 2).notSupervisor();
     }
 
     public void testExgDataData() {
@@ -218,7 +235,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                        "exg d1,d3")
             .expectD1(0x76543210)
             .expectD3(0x12345678)
-            .carry().overflow().extended().negative().zero();
+            .carry().overflow().extended().negative().zero().notSupervisor();
     }
 
     public void testExgAdrAdr() {
@@ -229,7 +246,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             "exg a1,a3")
             .expectA1(0x76543210)
             .expectA3(0x12345678)
-            .carry().overflow().extended().negative().zero();
+            .carry().overflow().extended().negative().zero().notSupervisor();
     }
 
     public void testExgAdrData() {
@@ -240,7 +257,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             "exg a1,d3")
             .expectA1(0x76543210)
             .expectD3(0x12345678)
-            .carry().overflow().extended().negative().zero();
+            .carry().overflow().extended().negative().zero().notSupervisor();
     }
 
     private ExpectionBuilder execute(String program)
@@ -253,7 +270,14 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         return execute(cpuSetup,program);
     }
 
-    private ExpectionBuilder execute(Consumer<CPU> cpuSetup,String program1,
+    private ExpectionBuilder execute(Consumer<CPU> cpuSetup,String program1,String... additional)
+    {
+        int insCount = 1 + ( ( additional == null ) ? 0 : additional.length);
+        return execute(cpuSetup,insCount,program1,additional);
+    }
+
+    private ExpectionBuilder execute(Consumer<CPU> cpuSetup,int insToExecute,
+                                     String program1,
                                      String... additional)
     {
         final List<String> lines = new ArrayList<>();
@@ -262,22 +286,38 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             Arrays.stream(additional).forEach(lines::add );
         }
 
-        int insCount = lines.size();
+        memory.writeLong(0, memory.getEndAddress() ); // Supervisor mode stack pointer
 
-        memory.writeLong(0, MEM_SIZE ); // Supervisor mode stack pointer
-        memory.writeLong(4, PROGRAM_START_ADDRESS); // PC starting value
+        // write reset handler
+        // that sets the usermode stack ptr
+        // and exits supervisor mode
+        final int exceptionHandlerAddress = PROGRAM_START_ADDRESS-128;
+        memory.writeLong(4, exceptionHandlerAddress); // PC starting value
 
+        insToExecute += 4; // +4 instructions in reset handler
+
+        final int mask = ~CPU.FLAG_SUPERVISOR_MODE;
+        final String resetHandler = "MOVE.L #"+Misc.hex(memory.getEndAddress()-128)+",A0\n" +
+                "MOVE.L A0,USP\n" +
+                "AND #"+ Misc.binary16Bit(mask)+",SR\n" +
+                "JMP "+Misc.hex(PROGRAM_START_ADDRESS); // clear super visor bit
+
+        final byte[] exceptionHandler = compile(resetHandler);
+        memory.writeBytes(exceptionHandlerAddress, exceptionHandler );
+
+        // write the actual program
         final String program = lines.stream().collect(Collectors.joining("\n"));
         final byte[] executable = compile(program);
-        System.out.println( Memory.hexdump(1024,executable,0,executable.length) );
-        memory.writeBytes(1024,executable );
+        System.out.println( Memory.hexdump(PROGRAM_START_ADDRESS,executable,0,executable.length) );
+        memory.writeBytes(PROGRAM_START_ADDRESS,executable );
 
         cpu.reset();
-        for ( ; insCount > 0 ; insCount--)
+
+        for ( ; insToExecute > 0 ; insToExecute--)
         {
             // assumption is that we want to test the
             // very last instruction so we'll invoke the callback here
-            if ( (insCount-1) == 0 ) {
+            if ( (insToExecute-1) == 0 ) {
                 cpuSetup.accept(cpu);
             }
             cpu.executeOneInstruction();
@@ -330,6 +370,11 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 
         public ExpectionBuilder extended() { assertTrue( "X flag not set ?" , cpu.isExtended() ); return this; };
         public ExpectionBuilder notExtended() { assertTrue( "X flag set ?" , cpu.isNotExtended() ); return this; };
+
+        public ExpectionBuilder supervisor() { assertTrue( "S flag not set ?" , cpu.isSupervisorMode() ); return this; };
+        public ExpectionBuilder notSupervisor() { assertTrue( "S flag set ?" , ! cpu.isSupervisorMode()); return this; };
+
+        public ExpectionBuilder irqActive(CPU.IRQ irq) { assertEquals("Expected "+irq+" but active IRQ was "+cpu.activeIrq,irq,cpu.activeIrq); return this; }
 
         private ExpectionBuilder assertHexEquals(String msg,int expected,int actual)
         {

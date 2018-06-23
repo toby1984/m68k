@@ -3,7 +3,6 @@ package de.codersourcery.m68k.assembler.phases;
 import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.ICompilationPhase;
 import de.codersourcery.m68k.assembler.Symbol;
-import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.parser.ast.ASTNode;
 import de.codersourcery.m68k.parser.ast.IValueNode;
 import de.codersourcery.m68k.parser.ast.IdentifierNode;
@@ -46,7 +45,7 @@ public class ValidationPhase implements ICompilationPhase
             if ( node.is(NodeType.INSTRUCTION) )
             {
                 final InstructionNode insn = node.asInstruction();
-                insn.getInstructionType().checkSupports(insn);
+                insn.getInstructionType().checkSupports(insn,ctx);
                 if (insn.hasSource())
                 {
                     checkValueSize(insn.source(), ctx);

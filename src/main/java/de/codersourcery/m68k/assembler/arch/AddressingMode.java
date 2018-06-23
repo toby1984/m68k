@@ -144,9 +144,9 @@ public enum AddressingMode
     // 1,2,4, OR 6, EXCEPT FOR PACKED DECIMAL REAL OPERANDS
     IMMEDIATE_VALUE(0b111,fixedValue(100), 6),   // move #XXXX
     /**
-     * NO OPERAND.
+     * no or implied operand.
      */
-    NO_OPERAND(0b000,fixedValue(0b000),0);
+    IMPLIED(0b000,fixedValue(0b000),0);
 
     public final FieldContent eaRegisterField;
     public final int eaModeField;

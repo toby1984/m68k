@@ -102,7 +102,7 @@ public class InstructionEncodingTest extends TestCase
     {
         final Function<Field,Integer> valueSource = field ->
                 {
-                    if ( field != Field.SRC_VALUE) {
+                    if ( field != Field.SRC_BASE_REGISTER) {
                         fail("Unexpected field: "+field);
                     }
                     return 0b101;

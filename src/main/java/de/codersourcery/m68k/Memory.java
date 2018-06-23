@@ -5,6 +5,8 @@ import de.codersourcery.m68k.emulator.cpu.MemoryAccessException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.core.config.plugins.convert.HexConverter;
 
+import java.util.Arrays;
+
 public class Memory {
 
     private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
@@ -58,6 +60,19 @@ public class Memory {
     public Memory(int sizeInBytes)
     {
         this.data = new byte[ sizeInBytes ];
+    }
+
+    /**
+     * Returns this memory's end address (exclusive).
+     *
+     * @return
+     */
+    public int getEndAddress() {
+        return data.length;
+    }
+
+    public void reset() {
+        Arrays.fill(data,(byte) 0);
     }
 
     public short readWord(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits when assigned to int later on

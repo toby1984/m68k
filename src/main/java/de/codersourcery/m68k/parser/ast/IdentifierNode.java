@@ -7,7 +7,7 @@ import de.codersourcery.m68k.parser.TextRegion;
 
 public class IdentifierNode extends ASTNode implements IValueNode
 {
-    private final Identifier value;
+    public final Identifier value;
 
     public IdentifierNode(Identifier value,TextRegion region)
     {
