@@ -15,7 +15,7 @@ public class CPU
     /*
      * Interrupt vectors.
      */
-    public static enum IRQGroup
+    public enum IRQGroup
     {
         GROUP0(120),
         GROUP1(80),
@@ -23,7 +23,7 @@ public class CPU
 
         public final int priority;
 
-        private IRQGroup(int prio) {
+        IRQGroup(int prio) {
             this.priority = prio;
         }
     }
@@ -90,12 +90,12 @@ public class CPU
         public final IRQGroup group;
         public final int priority;
 
-        private IRQ(int irqNumber,IRQGroup group)
+        IRQ(int irqNumber,IRQGroup group)
         {
             this(irqNumber, group, group.priority);
         }
 
-        private IRQ(int irqNumber,IRQGroup group,int priority)
+        IRQ(int irqNumber,IRQGroup group,int priority)
         {
             this.irqNumber = irqNumber;
             this.group = group;
@@ -110,8 +110,8 @@ public class CPU
          * Turns a user trap number (used in TRAP #xx instruction)
          * into the corresponding IRQ.
          *
-         * @param trapNo
-         * @return
+         * @param trapNo trap number (0-15)
+         * @return IRQ
          */
         public static IRQ userTrapToIRQ(int trapNo)
         {
@@ -133,70 +133,6 @@ public class CPU
                 case 14: return IRQ.TRAP0_14;
                 case 15: return IRQ.TRAP0_15;
                 default: throw new RuntimeException("Unreachable code reached");
-            }
-        }
-
-        public static IRQ valueOf(int irqNumber)
-        {
-            switch( irqNumber )
-            {
-                case 0: return IRQ.RESET;
-                case 1: return IRQ.BUS_ERROR;
-                case 2: return IRQ.ADDRESS_ERROR;
-                case 3: return IRQ.ILLEGAL_INSTRUCTION;
-                case 4: return IRQ.INTEGER_DIVIDE_BY_ZERO;
-                case 5: return IRQ.CHK_CHK2;
-                case 6: return IRQ.FTRAP_TRAP_TRAPV;
-                case 7: return IRQ.PRIVILEGE_VIOLATION;
-                case 8: return IRQ.TRACE;
-                case 9: return IRQ.LINE_1010_EMULATOR;
-                case 10: return IRQ.LINE_1111_EMULATOR;
-
-                case 12: return IRQ.COPROCESSOR_VIOLATION;
-                case 13: return IRQ.FORMAT_ERROR;
-                case 14: return IRQ.UNINITIALIZED_INTERRUPT;
-
-                case 23: return IRQ.SPURIOUS;
-
-                case 24: return IRQ.AUTOVECTOR_LVL1;
-                case 25: return IRQ.AUTOVECTOR_LVL2;
-                case 26: return IRQ.AUTOVECTOR_LVL3;
-                case 27: return IRQ.AUTOVECTOR_LVL4;
-                case 28: return IRQ.AUTOVECTOR_LVL5;
-                case 29: return IRQ.AUTOVECTOR_LVL6;
-                case 30: return IRQ.AUTOVECTOR_LVL7;
-
-                case 31: return IRQ.TRAP0_0;
-                case 32: return IRQ.TRAP0_1;
-                case 33: return IRQ.TRAP0_2;
-                case 34: return IRQ.TRAP0_3;
-                case 35: return IRQ.TRAP0_4;
-                case 36: return IRQ.TRAP0_5;
-                case 37: return IRQ.TRAP0_6;
-                case 38: return IRQ.TRAP0_7;
-                case 39: return IRQ.TRAP0_8;
-                case 40: return IRQ.TRAP0_9;
-                case 41: return IRQ.TRAP0_10;
-                case 42: return IRQ.TRAP0_11;
-                case 43: return IRQ.TRAP0_12;
-                case 44: return IRQ.TRAP0_13;
-                case 45: return IRQ.TRAP0_14;
-                case 46: return IRQ.TRAP0_15;
-
-                case 47: return IRQ.FP_BRANCH_UNORDERED;
-                case 48: return IRQ.FP_INEXACT_RESULT;
-                case 49: return IRQ.FP_DIVIDE_BY_ZERO;
-                case 50: return IRQ.FP_UNDERFLOW;
-                case 51: return IRQ.FP_OPERAND_ERROR;
-                case 52: return IRQ.FP_OVERFLOW;
-                case 53: return IRQ.FP_SIGNALING_NAN;
-                case 54: return IRQ.FP_UNIMPLEMENTED_DATA_TYPE;
-
-                case 55: return IRQ.MMU_CONFIGURATION_ERROR;
-                case 56: return IRQ.MMU_ILLEGAL_OPERATION_ERROR;
-                case 57: return IRQ.MMU_ACCESS_LEVEL_VIOLATION;
-                default:
-                    return null;
             }
         }
     }
@@ -290,7 +226,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
      */
     private int memLoad(int address,int size)
     {
-        int value;
         switch(size) {
             case 1: return memory.readByte(address);
             case 2: return memory.readWord(address);
@@ -536,6 +471,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          * // 1,2,4, OR 6, EXCEPT FOR PACKED DECIMAL REAL OPERANDS
                          * IMMEDIATE_VALUE(0b111,fixedValue(100), 6),   // move #XXXX
                          */
+//                        ea = memLoad( pc,operandSize );
                         ea = pc;
                         pc += operandSize;
                         return true;
@@ -902,6 +838,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
      * Sets all bits in the status register where the bit bitMask has a '1' bit.
      *
      * @param bitMask
+     * @return
      */
     // unit-testing helper method
     public CPU setFlags(int bitMask) {
@@ -937,6 +874,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         } else {
             clearMask &= ~FLAG_ZERO;
         }
+
         if ( ( value & 1<<31 ) != 0 ) {
             setMask |= FLAG_NEGATIVE;
         } else {
@@ -1086,7 +1024,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         int formatWord = (operation.isRead ? 1<<4 : 0 ) | ( isInstruction ? 1<<3:0 ) | functionCode;
         final int instructionWord = memory.readWordNoCheck(pcAtStartOfLastInstruction );
 
-        final long irqData = ( formatWord << (64-16) | address << (64-48) | (instructionWord & 0xffff) );
+        final long irqData = ( (long) formatWord << (64-16) | address << (64-48) | (instructionWord & 0xffff) );
 
         triggerIRQ(IRQ.ADDRESS_ERROR,irqData );
     }
