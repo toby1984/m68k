@@ -28,9 +28,34 @@ public enum Condition
     BLE(0b1111);
 
     public final int bits;
+    public final String suffix;
 
     Condition(int cc) {
         this.bits = cc;
+        suffix = name().substring( 1,name().length() );
+    }
+
+    public static Condition fromBits(int bits)
+    {
+        switch(bits) {
+            case 0b0000: return BRT;
+            case 0b0001: return BRF;
+            case 0b0010: return BHI;
+            case 0b0011: return BLS;
+            case 0b0100: return BCC;
+            case 0b0101: return BCS;
+            case 0b0110: return BNE;
+            case 0b0111: return BEQ;
+            case 0b1000: return BVC;
+            case 0b1001: return BVS;
+            case 0b1010: return BPL;
+            case 0b1011: return BMI;
+            case 0b1100: return BGE;
+            case 0b1101: return BLT;
+            case 0b1110: return BGT;
+            case 0b1111: return BLE;
+        }
+        throw new RuntimeException("Unhandled value: "+bits);
     }
 
     public static boolean isTrue(CPU cpu,int cc)

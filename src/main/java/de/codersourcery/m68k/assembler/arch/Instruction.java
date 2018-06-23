@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.assembler.arch;
 
+import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.parser.ast.IValueNode;
 import de.codersourcery.m68k.parser.ast.InstructionNode;
@@ -9,6 +10,8 @@ import de.codersourcery.m68k.parser.ast.OperandNode;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Function;
 
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.ABSOLUTE_SHORT_ADDRESSING;
@@ -763,48 +766,71 @@ D/A   |     |   |           |
         return false;
     }
 
-    private static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
-    private static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
+    public static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
+    public static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
 
-    private static final InstructionEncoding ANDI_TO_SR_ENCODING =
+    public static final InstructionEncoding ANDI_TO_SR_ENCODING =
             InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
-    private static final InstructionEncoding JMP_INDIRECT_ENCODING = InstructionEncoding.of( "0100111011mmmsss");
-    private static final InstructionEncoding JMP_SHORT_ENCODING = InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
-    private static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding JMP_INDIRECT_ENCODING = InstructionEncoding.of( "0100111011mmmsss");
+    public static final InstructionEncoding JMP_SHORT_ENCODING = InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
-    private static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
+    public static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
 
-    private static final InstructionEncoding RTE_ENCODING = InstructionEncoding.of( "0100111001110011");
+    public static final InstructionEncoding RTE_ENCODING = InstructionEncoding.of( "0100111001110011");
 
-    private static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
+    public static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
 
-    private static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
+    public static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
 
-    private static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
+    public static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
             "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
-    private static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
+    public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
             "vvvvvvvv_vvvvvvvv");
 
-    private static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
+    public static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
 
-    private static final InstructionEncoding MOVE_USP_TO_AX_ENCODING = InstructionEncoding.of("0100111001101DDD");
+    public static final InstructionEncoding MOVE_USP_TO_AX_ENCODING = InstructionEncoding.of("0100111001101DDD");
 
-    private static final InstructionEncoding ILLEGAL_ENCODING = InstructionEncoding.of( "0100101011111100");
+    public static final InstructionEncoding ILLEGAL_ENCODING = InstructionEncoding.of( "0100101011111100");
 
-    private static final InstructionEncoding EXG_ENCODING = InstructionEncoding.of("1100kkk1ooooolll");
+    public static final InstructionEncoding EXG_ENCODING = InstructionEncoding.of("1100kkk1ooooolll");
 
-    private static final InstructionEncoding NOP_ENCODING = InstructionEncoding.of("0100111001110001");
+    public static final InstructionEncoding NOP_ENCODING = InstructionEncoding.of("0100111001110001");
 
-    private static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss","CCCCCCCC_CCCCCCCC");
+    public static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss","CCCCCCCC_CCCCCCCC");
 
-    private static final InstructionEncoding BCC_8BIT_ENCODING = InstructionEncoding.of(  "0110ccccCCCCCCCC");
+    public static final InstructionEncoding BCC_8BIT_ENCODING = InstructionEncoding.of(  "0110ccccCCCCCCCC");
 
-    private static final InstructionEncoding BCC_16BIT_ENCODING = InstructionEncoding.of( "0110cccc00000000","CCCCCCCC_CCCCCCCC");
+    public static final InstructionEncoding BCC_16BIT_ENCODING = InstructionEncoding.of( "0110cccc00000000","CCCCCCCC_CCCCCCCC");
 
-    private static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111",
+    public static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111",
             "CCCCCCCC_CCCCCCCC_CCCCCCCC_CCCCCCCC");
+
+    public static final Map<InstructionEncoding,Instruction> ALL_ENCODINGS = new HashMap<>()
+    {{
+             put(ANDI_TO_SR_ENCODING,AND);
+             put(JMP_INDIRECT_ENCODING,JMP);
+             put(JMP_SHORT_ENCODING,JMP);
+             put(JMP_LONG_ENCODING,JMP);
+             put(TRAP_ENCODING,TRAP);
+             put(RTE_ENCODING,RTE);
+             put(MOVE_ENCODING,MOVE);
+             put(MOVEQ_ENCODING,MOVEQ);
+             put(LEA_ENCODING,LEA);
+             put(LEA_WORD_ENCODING,LEA);
+             put(MOVE_AX_TO_USP_ENCODING,MOVE);
+             put(MOVE_USP_TO_AX_ENCODING,MOVE);
+             put(ILLEGAL_ENCODING,ILLEGAL);
+             put(EXG_ENCODING,EXG);
+             put(NOP_ENCODING,NOP);
+             put(DBCC_ENCODING,DBCC);
+             put(BCC_8BIT_ENCODING,BCC);
+             put(BCC_16BIT_ENCODING,BCC);
+             put(BCC_32BIT_ENCODING,BCC);
+    }};
 
     private static final void checkDBccInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
@@ -824,14 +850,14 @@ D/A   |     |   |           |
 
     private static final void checkBranchInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
-        switch( node.source().addressingMode )
+        switch (node.source().addressingMode)
         {
             case ABSOLUTE_LONG_ADDRESSING:
             case ABSOLUTE_SHORT_ADDRESSING:
                 break;
             default:
-                throw new RuntimeException("Unsupported addressing mode: "+node.source().addressingMode );
+                throw new RuntimeException("Unsupported addressing mode: " + node.source().addressingMode);
         }
-        checkOperandSizeSigned(node.source().getValue(),Operand.DESTINATION,32,ctx);
+        checkOperandSizeSigned(node.source().getValue(), Operand.DESTINATION, 32, ctx);
     }
 }

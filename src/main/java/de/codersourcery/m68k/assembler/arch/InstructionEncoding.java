@@ -38,15 +38,64 @@ public class InstructionEncoding
     private final Map<Field,List<IBitMapping>>[] bitMappings;
     private final int sizeInBytes;
 
+    /*
+     * Mask that has '1' bits wherever the first 16 bits
+     * (=instruction word) of this encoding have a fixed
+     * '0' or '1' value.
+     */
+    private int instructionWordAndMask;
+    /*
+     * Bits that had either a fixed '1' or '0' value
+     * in the first 16 bits of this encoding. Non-fixed
+     * bits will appear as '0'
+     */
+    private int instructionWordMask;
+
     private InstructionEncoding(String[] newPatterns, Map<Field,List<IBitMapping>>[] newMappings)
     {
         this.patterns = newPatterns;
         this.bitMappings = newMappings;
         int size = 0;
-        for ( String pattern : newPatterns ) {
-            size += pattern.length()/8;
+        for (String pattern : newPatterns)
+        {
+            size += pattern.length() / 8;
         }
         this.sizeInBytes = size;
+        populateInstructionMask(newPatterns[0]);
+    }
+
+    private void populateInstructionMask(String pattern)
+    {
+        int andMask = 0;
+        int mask = 0;
+        for (int i = 0, len = pattern.length() ; i < len ; i++)
+        {
+            final char c = pattern.charAt(i);
+            if (c != '_')
+            {
+                andMask <<= 1;
+                mask <<= 1;
+                if (c == '1' || c == '0')
+                {
+                    andMask |= 1;
+                    if ( c == '1' ) {
+                        mask |= 1;
+                    }
+                }
+            }
+        }
+        this.instructionWordAndMask = andMask;
+        this.instructionWordMask = mask;
+    }
+
+    public int getInstructionWordAndMask()
+    {
+        return instructionWordAndMask;
+    }
+
+    public int getInstructionWordMask()
+    {
+        return instructionWordMask;
     }
 
     public String toString()
@@ -275,6 +324,7 @@ public class InstructionEncoding
             }
         }
         this.sizeInBytes = sizeInBytes;
+        populateInstructionMask(pattern1 );
     }
 
     private static String stripUnderscores(String s) {

@@ -2,7 +2,6 @@ package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.arch.Condition;
-import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
@@ -319,13 +318,12 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
     /**
      *
-     * @param instruction
      * @param operandSize
      * @param eaMode
      * @param eaRegister
      * @return true on success, false on failure (invalid instruction,misaligned memory access)
      */
-    private boolean decodeOperand(int instruction, int operandSize,int eaMode,int eaRegister)
+    private boolean decodeOperand(int operandSize, int eaMode, int eaRegister)
     {
         switch( eaMode )
         {
@@ -386,7 +384,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 boolean isFullExtensionWord = (extensionWord & 0b0000_0001_0000_1000) == 0b0000_0001_0000_0000;
 
                 int baseRegisterValue = 0;
-                int baseDisplacement = 0;
+                int baseDisplacement;
                 if ( isFullExtensionWord )
                 {
                     /*
@@ -636,7 +634,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b0000001001111100: // ANDI to SR
                 if ( assertSupervisorMode() )
                 {
-                    loadValue(instruction, 2);
+                    decodeSourceOperand(instruction, 2);
                     setStatusRegister( statusRegister & value );
                 }
                 return;
@@ -667,7 +665,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0001_0000_0000_0000:
-                loadValue(instruction,2); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
+                decodeSourceOperand(instruction,2); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
                 value = (value<<24)>>24; // sign-extend
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
@@ -678,7 +676,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0010_0000_0000_0000:
-                loadValue(instruction,4);
+                decodeSourceOperand(instruction,4);
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 storeValue(instruction,4 );
@@ -688,7 +686,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0011_0000_0000_0000:
-                loadValue(instruction,2);
+                decodeSourceOperand(instruction,2);
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
                 storeValue(instruction,2 );
@@ -702,7 +700,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( (instruction & 0b0100111011000000) == 0b0100111011000000)
                 {
                     // JMP
-                    loadValue(instruction,4);
+                    decodeSourceOperand(instruction,4);
                     pc = value;
                     return;
                 }
@@ -732,7 +730,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( (instruction & 0b1111000111000000) == 0b0100000111000000 )
                 {
                     // LEA
-                    loadValue(instruction,4);
+                    decodeSourceOperand(instruction,4);
                     final int dstAdrReg = (instruction & 0b1110_0000_0000) >> 9;
 
                     addressRegisters[dstAdrReg] = value;
@@ -947,7 +945,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         this.statusRegister = (this.statusRegister & clearMask ) | setMask;
     }
 
-    private void loadValue(int instruction,int operandSize)
+    private void decodeSourceOperand(int instruction, int operandSize)
     {
         // InstructionEncoding.of("ooooDDDMMMmmmsss");
         int eaMode     = (instruction & 0b111000) >> 3;
@@ -985,7 +983,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 }
                 // $$FALL-THROUGH$$
             default:
-                if ( decodeOperand(instruction, operandSize, eaMode, eaRegister) )
+                if ( decodeOperand(operandSize, eaMode, eaRegister) )
                 {
                     value = memLoad(ea, operandSize);
                 }
@@ -1048,7 +1046,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
                 return;
             default:
-                if (  decodeOperand(instruction, operandSize, eaMode, eaRegister) )
+                if (  decodeOperand(operandSize, eaMode, eaRegister) )
                 {
                     switch (operandSize)
                     {

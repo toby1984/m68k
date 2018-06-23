@@ -9,6 +9,28 @@ import java.util.function.Function;
 
 public class InstructionEncodingTest extends TestCase
 {
+
+    public void testInstructionWordMasks() {
+
+        InstructionEncoding encoding =
+                InstructionEncoding.of("1111_1111_1111_1111");
+
+        assertEquals(0xffff, encoding.getInstructionWordAndMask() );
+        assertEquals(0xffff, encoding.getInstructionWordMask() );
+
+        encoding =
+                InstructionEncoding.of("0000_0000_0000_0000");
+
+        assertEquals(0xffff, encoding.getInstructionWordAndMask() );
+        assertEquals(0x0000, encoding.getInstructionWordMask() );
+
+        encoding =
+                InstructionEncoding.of("1001_x110_0ccc_0000");
+
+        assertEquals(0b1111_0111_1000_1111, encoding.getInstructionWordAndMask() );
+        assertEquals(0b1001_0110_0000_0000, encoding.getInstructionWordMask() );
+    }
+
     public void testNullPatternFails()
     {
         try
