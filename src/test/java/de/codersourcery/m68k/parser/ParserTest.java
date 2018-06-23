@@ -815,14 +815,14 @@ public class ParserTest extends TestCase
             throw new RuntimeException("Compilation failed with errors");
         }
         final byte[] data = asm.getBytes();
-        try ( FileOutputStream binOut = new FileOutputStream("/home/tgierke/tmp/binout") )
-        {
-            binOut.write(data);
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException(e);
-        }
+//        try ( FileOutputStream binOut = new FileOutputStream("/home/tgierke/tmp/binout") )
+//        {
+//            binOut.write(data);
+//        }
+//        catch (IOException e)
+//        {
+//            throw new RuntimeException(e);
+//        }
         this.ast = unit.getAST();
         return unit.getAST();
     }
