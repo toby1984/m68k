@@ -8,6 +8,14 @@ import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 public class Disassembler
 {
     private final Memory memory;
@@ -41,24 +49,92 @@ public class Disassembler
 
     private void disassemble() throws EndOfMemoryAccess
     {
-        while ( true )
+        Map<Integer,InstructionEncoding> existing = new HashMap<>();
+        for ( var entry : Instruction.ALL_ENCODINGS.entrySet() )
+        {
+            Integer andMask = entry.getKey().getInstructionWordAndMask();
+            final InstructionEncoding otherEncoding = existing.get(andMask);
+            if ( otherEncoding != null ) {
+                if ( otherEncoding.getInstructionWordMask() == entry.getKey().getInstructionWordMask() ) {
+                   System.err.println("Cannot distinguish "+otherEncoding+" from "+entry.getKey()+" - "+entry.getValue());
+                }
+            } else {
+                existing.put( andMask, entry.getKey() );
+            }
+        }
+
+        while ( pc < endAddress )
         {
             pcAtStartOfInstruction = pc;
             final int insnWord = readWord();
 
             // TODO: Performance...maybe using a prefix tree
             // TODO: would be faster than linear search ?
+            final Map<InstructionEncoding,Instruction> candidates = new HashMap<>();
             for ( var entry : Instruction.ALL_ENCODINGS.entrySet() )
             {
                 var encoding = entry.getKey();
-                if ( ( insnWord & encoding.getInstructionWordAndMask() ) ==
-                        encoding.getInstructionWordMask() )
+                if ( ( insnWord & encoding.getInstructionWordAndMask() ) == encoding.getInstructionWordMask() )
                 {
-                  var instruction = entry.getValue();
-                  disassemble(instruction,encoding,insnWord);
+                    candidates.put(encoding, entry.getValue());
                 }
             }
+            if ( candidates.isEmpty() ) {
+                illegalOperation(insnWord);
+                continue;
+
+            }
+
+            InstructionEncoding encoding;
+            Instruction instruction;
+            if ( candidates.size() > 1 )
+            {
+                List<InstructionEncoding> sortedByMaskLength = new ArrayList<>( candidates.keySet() );
+                sortedByMaskLength.sort( (b,a) -> Integer.compare( getMaskLength(a), getMaskLength(b) ) );
+
+                final InstructionEncoding shortest = sortedByMaskLength.get(0);
+                final Set<Instruction> instructions = new HashSet<>();
+                final List<InstructionEncoding> clashes = new ArrayList<>();
+                for ( var entry : sortedByMaskLength ) {
+                    if ( getMaskLength(entry ) == getMaskLength(shortest ) ) {
+                        instructions.add( candidates.get( entry ) );
+                        clashes.add( entry );
+                    }
+                }
+                if ( clashes.size() > 1 )
+                {
+                    if ( instructions.size() > 1 )
+                    {
+                        throw new RuntimeException("Same mask len: " + shortest + " <-> " + sortedByMaskLength.get(1));
+                    }
+                    System.err.println("WARNING: Found multiple matching encodings for "+instructions);
+                }
+                // same instruction
+                encoding = shortest;
+                instruction = candidates.get(shortest);
+            } else {
+                encoding = candidates.keySet().iterator().next();
+                instruction = candidates.values().iterator().next();
+            }
+
+            System.out.println("Using: "+encoding+" => "+instruction);
+            disassemble(instruction,encoding,insnWord);
         }
+    }
+
+    private static int getMaskLength(InstructionEncoding encoding) {
+
+        int i = 0;
+        final int mask = encoding.getInstructionWordAndMask();
+        int bit = 1;
+        for ( ; i < 32 ; i++ )
+        {
+            if ( (mask & bit) !=  0) {
+                return 32-i;
+            }
+            bit <<= 1;
+        }
+        return 0;
     }
 
     private void disassemble(Instruction insn,
@@ -71,16 +147,22 @@ public class Disassembler
                 int eaMode     = (insnWord & 0b111000) >> 3;
                 int eaRegister = (insnWord & 0b000111);
                 appendln( "jmp " );
-                if ( encoding == Instruction.JMP_INDIRECT_ENCODING ) {
-                    decodeOperand(0,eaMode,eaRegister);
-                }
-                else if ( encoding == Instruction.JMP_LONG_ENCODING) {
-                    int adr = readLong();
-                    append( Misc.hex(adr) );
-                }
-                else if ( encoding == Instruction.JMP_SHORT_ENCODING) {
+                // JMP encodings only differ in their eaRegister and eaMode values
+
+                if ( eaMode == 0b111 && eaRegister == 0b000 )
+                {
+                    // JMP_SHORT_ENCODING
                     int adr = readWord();
                     append( Misc.hex(adr) );
+                }
+                else if ( eaMode == 0b111 && eaRegister == 0b001 )
+                {
+                    // JMP_LONG_ENCODING
+                    int adr = readLong();
+                    append( Misc.hex(adr) );
+                } else {
+                    // JMP_INDIRECT_ENCODING
+                    decodeOperand(0,eaMode,eaRegister);
                 }
                 return;
             case AND:
@@ -211,6 +293,10 @@ public class Disassembler
                 decodeOperand( operandSize,(insnWord & 0b111000000)>>6,(insnWord & 0b111000000000) >> 9 );
                 return;
             case LEA:
+                /*
+    public static final InstructionEncoding LEA_LONG_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv");
+                 */
                 appendln("lea ");
                 decodeOperand( 4,(insnWord&0b111000)>>3,insnWord&0b111 );
                 register = (insnWord & 0b0000111000000000) >> 9;
@@ -226,7 +312,7 @@ public class Disassembler
 
     private int readLong()
     {
-        if ( (pc + 4 ) >= endAddress ) {
+        if ( (pc + 4 ) > endAddress ) {
             throw new EndOfMemoryAccess();
         }
         int result = memory.readLong( pc );
@@ -235,7 +321,7 @@ public class Disassembler
     }
 
     private int readWord() {
-        if ( (pc + 2 ) >= endAddress ) {
+        if ( (pc + 2 ) > endAddress ) {
             throw new EndOfMemoryAccess();
         }
         int result = memory.readWord( pc );

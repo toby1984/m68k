@@ -1,6 +1,5 @@
 package de.codersourcery.m68k.assembler.arch;
 
-import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.parser.ast.IValueNode;
 import de.codersourcery.m68k.parser.ast.InstructionNode;
@@ -584,7 +583,7 @@ Bits 15 – 12 Operation
                 if ( insn.source().addressingMode == ABSOLUTE_SHORT_ADDRESSING ) {
                     return LEA_WORD_ENCODING;
                 }
-                return LEA_ENCODING;
+                return LEA_LONG_ENCODING;
             case MOVE:
 
                 // check for MOVE USP
@@ -630,19 +629,33 @@ Bits 15 – 12 Operation
                 final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 final String[] extraDstWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
 
+                InstructionEncoding encoding;
+                switch( insn.getOperandSize() ) {
+                    case BYTE:
+                        encoding = MOVE_BYTE_ENCODING;
+                        break;
+                    case WORD:
+                        encoding = MOVE_WORD_ENCODING;
+                        break;
+                    case LONG:
+                        encoding = MOVE_LONG_ENCODING;
+                        break;
+                    default:
+                        throw new RuntimeException("MOVE without operand size?");
+                }
                 if (extraSrcWords != null && extraDstWords == null)
                 {
-                    return MOVE_ENCODING.append(extraSrcWords);
+                    return encoding.append(extraSrcWords);
                 }
                 if (extraSrcWords == null && extraDstWords != null)
                 {
-                    return MOVE_ENCODING.append(extraDstWords);
+                    return encoding.append(extraDstWords);
                 }
                 if (extraSrcWords != null && extraDstWords != null)
                 {
-                    return MOVE_ENCODING.append(extraSrcWords).append(extraDstWords);
+                    return encoding.append(extraSrcWords).append(extraDstWords);
                 }
-                return MOVE_ENCODING;
+                return encoding;
             default:
                 throw new RuntimeException("Internal error,unhandled instruction type " + type);
         }
@@ -772,23 +785,22 @@ D/A   |     |   |           |
     public static final InstructionEncoding ANDI_TO_SR_ENCODING =
             InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
-    public static final InstructionEncoding JMP_INDIRECT_ENCODING = InstructionEncoding.of( "0100111011mmmsss");
-    public static final InstructionEncoding JMP_SHORT_ENCODING = InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
-
     public static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
 
     public static final InstructionEncoding RTE_ENCODING = InstructionEncoding.of( "0100111001110011");
 
-    public static final InstructionEncoding MOVE_ENCODING = InstructionEncoding.of("ooooDDDMMMmmmsss");
+    public static final InstructionEncoding JMP_INDIRECT_ENCODING = InstructionEncoding.of( "0100111011mmmsss");
+    public static final InstructionEncoding JMP_SHORT_ENCODING = InstructionEncoding.of(    "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of(     "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding MOVE_BYTE_ENCODING = InstructionEncoding.of("0001DDDMMMmmmsss");
+    public static final InstructionEncoding MOVE_WORD_ENCODING = InstructionEncoding.of("0011DDDMMMmmmsss");
+    public static final InstructionEncoding MOVE_LONG_ENCODING = InstructionEncoding.of("0010DDDMMMmmmsss");
 
     public static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
 
-    public static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
-            "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
-
-    public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss",
-            "vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding LEA_LONG_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv");
 
     public static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
 
@@ -817,9 +829,11 @@ D/A   |     |   |           |
              put(JMP_LONG_ENCODING,JMP);
              put(TRAP_ENCODING,TRAP);
              put(RTE_ENCODING,RTE);
-             put(MOVE_ENCODING,MOVE);
+             put(MOVE_BYTE_ENCODING,MOVE);
+             put(MOVE_WORD_ENCODING,MOVE);
+             put(MOVE_LONG_ENCODING,MOVE);
              put(MOVEQ_ENCODING,MOVEQ);
-             put(LEA_ENCODING,LEA);
+             put(LEA_LONG_ENCODING,LEA);
              put(LEA_WORD_ENCODING,LEA);
              put(MOVE_AX_TO_USP_ENCODING,MOVE);
              put(MOVE_USP_TO_AX_ENCODING,MOVE);

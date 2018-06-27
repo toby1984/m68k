@@ -76,6 +76,11 @@ public class DisassemblerTest extends TestCase
         compile("rte");
     }
 
+    public void testLEA() {
+        compile("lea $1234,a3");
+        compile("lea $12345678,a3");
+    }
+
     public void testJMP() {
         compile("jmp $1234");
         compile("jmp $12345678");
@@ -119,7 +124,7 @@ public class DisassemblerTest extends TestCase
     }
 
     private void compile(String s) {
-        compile(s,s);
+        compile(s,"00000000: "+s);
     }
 
     private void compile(String s,String expectedSource)
@@ -139,7 +144,7 @@ public class DisassemblerTest extends TestCase
         final Memory memory = new Memory(2048);
         memory.writeBytes( 0,executable );
         Disassembler asm = new Disassembler( memory );
-        final String disasm = asm.disassemble( 0, executable.length );
-        assertEquals(expectedSource,disasm);
+        final String disassembled = asm.disassemble( 0, executable.length );
+        assertEquals(expectedSource,disassembled);
     }
 }
