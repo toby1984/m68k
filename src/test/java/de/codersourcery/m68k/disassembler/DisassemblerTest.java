@@ -96,7 +96,7 @@ public class DisassemblerTest extends TestCase
     {
         compile("move.b #$12,d1","00000000: move.b #$12,d1");
         compile("move   $123(pc),d1","00000000: move.w $123(pc),d1");
-        compile("move.l #$12345678,a0","00000000: move.l #$12345678,a0");
+        compile("move.l #$12345678,a0","00000000: movea.l #$12345678,a0");
         compile("move   #$1234,d1","00000000: move.w #$1234,d1");
         compile("move.b d0,d1","00000000: move.b d0,d1");
         compile("move   d0,d1","00000000: move.w d0,d1");
