@@ -646,11 +646,9 @@ Bits 15 – 12 Operation
                 final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( insn.instruction == MOVEA )
                 {
-                    if ( extraSrcWords != null )
-                    {
-                        return MOVEA_ENCODING.append( extraSrcWords );
-                    }
-                    return MOVEA_ENCODING;
+                    final InstructionEncoding encoding =
+                            insn.getOperandSize() == OperandSize.WORD ? MOVEA_WORD_ENCODING : MOVEA_LONG_ENCODING;
+                    return extraSrcWords != null ? encoding.append( extraSrcWords ) : encoding;
                 }
                 final String[] extraDstWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
 
@@ -846,7 +844,8 @@ D/A   |     |   |           |
     public static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111",
             "CCCCCCCC_CCCCCCCC_CCCCCCCC_CCCCCCCC");
 
-    public static final InstructionEncoding MOVEA_ENCODING = InstructionEncoding.of(  "00SSDDD001mmmsss");
+    public static final InstructionEncoding MOVEA_WORD_ENCODING = InstructionEncoding.of(  "0011DDD001mmmsss");
+    public static final InstructionEncoding MOVEA_LONG_ENCODING = InstructionEncoding.of(  "0010DDD001mmmsss");
 
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
@@ -871,7 +870,8 @@ D/A   |     |   |           |
         put(BCC_8BIT_ENCODING,BCC);
         put(BCC_16BIT_ENCODING,BCC);
         put(BCC_32BIT_ENCODING,BCC);
-        put(MOVEA_ENCODING,MOVEA);
+        put(MOVEA_LONG_ENCODING,MOVEA);
+        put(MOVEA_WORD_ENCODING,MOVEA);
     }};
 
 
