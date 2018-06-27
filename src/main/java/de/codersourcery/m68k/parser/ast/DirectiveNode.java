@@ -37,13 +37,6 @@ public class DirectiveNode extends ASTNode implements ICodeGeneratingNode
         return (int) ((NumberNode) child(0)).getValue();
     }
 
-    @Override
-    public int getValueFor(Field field, ICompilationContext ctx)
-    {
-        // TODO: Implement me
-        throw new UnsupportedOperationException("Method getValueFor not implemented");
-    }
-
     public DirectiveNode(Directive directive,TextRegion region)
     {
         super(NodeType.DIRECTIVE,region);

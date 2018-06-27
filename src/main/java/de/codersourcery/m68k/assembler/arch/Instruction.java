@@ -6,12 +6,11 @@ import de.codersourcery.m68k.parser.ast.InstructionNode;
 import de.codersourcery.m68k.parser.ast.NodeType;
 import de.codersourcery.m68k.parser.ast.NumberNode;
 import de.codersourcery.m68k.parser.ast.OperandNode;
+import de.codersourcery.m68k.parser.ast.RegisterNode;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.HashMap;
 import java.util.IdentityHashMap;
-import java.util.Map;
 import java.util.function.Function;
 
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.ABSOLUTE_SHORT_ADDRESSING;
@@ -44,39 +43,39 @@ Bits 15 – 12 Operation
 1111 Coprocessor Interface/MC68040 and CPU32 Extensions
      */
     JMP("JMP",1, 0b0000)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
-        {
-        }
-    },
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                {
+                }
+            },
     AND("AND",2, 0b0000)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
-        {
-        }
-    },
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                {
+                }
+            },
     TRAP("TRAP",1, 0b0100)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
-        {
-            if ( node.hasDestination() ) {
-                throw new RuntimeException("TRAP only supports one operand");
-            }
-            if ( node.source().addressingMode != IMMEDIATE_VALUE ) {
-                throw new RuntimeException("TRAP requires an immediate mode value as operand");
-            }
-        }
-    },
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                {
+                    if ( node.hasDestination() ) {
+                        throw new RuntimeException("TRAP only supports one operand");
+                    }
+                    if ( node.source().addressingMode != IMMEDIATE_VALUE ) {
+                        throw new RuntimeException("TRAP requires an immediate mode value as operand");
+                    }
+                }
+            },
     RTE("RTE",0, 0b0000)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
-        {
-        }
-    },
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                {
+                }
+            },
     ILLEGAL("ILLEGAL",0, 0b0000) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -187,15 +186,15 @@ Bits 15 – 12 Operation
     },
     // Misc
     NOP("nop",0, 0b0100)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
-        {
-            if ( node.hasChildren() ) {
-                throw new RuntimeException("NOP does not accept operands");
-            }
-        }
-    },
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                {
+                    if ( node.hasChildren() ) {
+                        throw new RuntimeException("NOP does not accept operands");
+                    }
+                }
+            },
     EXG("exg",2, 0b1100)
             {
                 @Override
@@ -234,9 +233,26 @@ Bits 15 – 12 Operation
                     }
                 }
             },
+    MOVEA("movea", 2, 0b0000) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            if ( ! node.destination().getValue().isAddressRegister() ) {
+                throw new RuntimeException("MOVEA requires an address register as destination");
+            }
+            if ( ! node.useImpliedOperandSize && node.getOperandSize() == OperandSize.BYTE) {
+                throw new RuntimeException("MOVEA only supports .w or .l");
+            }
+        }
+
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+    },
     MOVEQ("moveq", 2, 0b0111)
             {
-
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
@@ -423,7 +439,7 @@ Bits 15 – 12 Operation
                     throw new RuntimeException("Internal error,unhandled field "+field);
                 };
             } else {
-                func = field -> insn.getValueFor(field, context);
+                func = field -> getValueFor(insn, field, context);
             }
             data = encoding.apply(func);
             context.getCodeWriter().writeBytes(data);
@@ -467,7 +483,7 @@ Bits 15 – 12 Operation
                 }
             case AND:
                 if ( insn.source().addressingMode == IMMEDIATE_VALUE &&
-                     insn.destination().getValue().isRegister(Register.SR) )
+                        insn.destination().getValue().isRegister(Register.SR) )
                 {
                     // ANDI #xx,SR
                     if ( insn.useImpliedOperandSize )
@@ -502,7 +518,7 @@ Bits 15 – 12 Operation
                 return RTE_ENCODING;
             case ILLEGAL:
                 return ILLEGAL_ENCODING;
-                // DBcc instructions
+            // DBcc instructions
             case DBRA:
             case DBT:
             case DBHI:
@@ -522,7 +538,7 @@ Bits 15 – 12 Operation
                 return DBCC_ENCODING;
             // Bcc branch instructions
             case BRA:
-              // case BRF:
+                // case BRF:
             case BHI:
             case BLS:
             case BCC:
@@ -585,8 +601,8 @@ Bits 15 – 12 Operation
                     return LEA_WORD_ENCODING;
                 }
                 return LEA_LONG_ENCODING;
+            case MOVEA:
             case MOVE:
-
                 // check for MOVE USP
                 final int srcIsUSP = insn.source().getValue().isRegister(Register.USP)      ? 0b01 : 0b00;
                 final int dstIsUSP = insn.destination().getValue().isRegister(Register.USP) ? 0b10 : 0b00;
@@ -628,6 +644,14 @@ Bits 15 – 12 Operation
 
                 // regular move instruction
                 final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( insn.instruction == MOVEA )
+                {
+                    if ( extraSrcWords != null )
+                    {
+                        return MOVEA_ENCODING.append( extraSrcWords );
+                    }
+                    return MOVEA_ENCODING;
+                }
                 final String[] extraDstWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
 
                 InstructionEncoding encoding;
@@ -822,30 +846,34 @@ D/A   |     |   |           |
     public static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111",
             "CCCCCCCC_CCCCCCCC_CCCCCCCC_CCCCCCCC");
 
+    public static final InstructionEncoding MOVEA_ENCODING = InstructionEncoding.of(  "00SSDDD001mmmsss");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
-             put(ANDI_TO_SR_ENCODING,AND);
-             put(JMP_INDIRECT_ENCODING,JMP);
-             put(JMP_SHORT_ENCODING,JMP);
-             put(JMP_LONG_ENCODING,JMP);
-             put(TRAP_ENCODING,TRAP);
-             put(RTE_ENCODING,RTE);
-             put(MOVE_BYTE_ENCODING,MOVE);
-             put(MOVE_WORD_ENCODING,MOVE);
-             put(MOVE_LONG_ENCODING,MOVE);
-             put(MOVEQ_ENCODING,MOVEQ);
-             put(LEA_LONG_ENCODING,LEA);
-             put(LEA_WORD_ENCODING,LEA);
-             put(MOVE_AX_TO_USP_ENCODING,MOVE);
-             put(MOVE_USP_TO_AX_ENCODING,MOVE);
-             put(ILLEGAL_ENCODING,ILLEGAL);
-             put(EXG_ENCODING,EXG);
-             put(NOP_ENCODING,NOP);
-             put(DBCC_ENCODING,DBCC);
-             put(BCC_8BIT_ENCODING,BCC);
-             put(BCC_16BIT_ENCODING,BCC);
-             put(BCC_32BIT_ENCODING,BCC);
+        put(ANDI_TO_SR_ENCODING,AND);
+        put(JMP_INDIRECT_ENCODING,JMP);
+        put(JMP_SHORT_ENCODING,JMP);
+        put(JMP_LONG_ENCODING,JMP);
+        put(TRAP_ENCODING,TRAP);
+        put(RTE_ENCODING,RTE);
+        put(MOVE_BYTE_ENCODING,MOVE);
+        put(MOVE_WORD_ENCODING,MOVE);
+        put(MOVE_LONG_ENCODING,MOVE);
+        put(MOVEQ_ENCODING,MOVEQ);
+        put(LEA_LONG_ENCODING,LEA);
+        put(LEA_WORD_ENCODING,LEA);
+        put(MOVE_AX_TO_USP_ENCODING,MOVE);
+        put(MOVE_USP_TO_AX_ENCODING,MOVE);
+        put(ILLEGAL_ENCODING,ILLEGAL);
+        put(EXG_ENCODING,EXG);
+        put(NOP_ENCODING,NOP);
+        put(DBCC_ENCODING,DBCC);
+        put(BCC_8BIT_ENCODING,BCC);
+        put(BCC_16BIT_ENCODING,BCC);
+        put(BCC_32BIT_ENCODING,BCC);
+        put(MOVEA_ENCODING,MOVEA);
     }};
+
 
     private static final void checkDBccInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
@@ -874,5 +902,114 @@ D/A   |     |   |           |
                 throw new RuntimeException("Unsupported addressing mode: " + node.source().addressingMode);
         }
         checkOperandSizeSigned(node.source().getValue(), Operand.DESTINATION, 32, ctx);
+    }
+
+    private int getValueFor(InstructionNode insn,Field field, ICompilationContext ctx)
+    {
+        switch(field)
+        {
+            case SRC_REGISTER_KIND:
+                return insn.source().getIndexRegister().isDataRegister() ? 0 : 1;
+            case SRC_INDEX_SIZE:
+                return getIndexRegisterSizeBit( insn.source().getIndexRegister() );
+            case SRC_SCALE:
+                return insn.source().getIndexRegister().scaling.bits;
+            case SRC_8_BIT_DISPLACEMENT:
+                return insn.source().getBaseDisplacement().getBits(ctx);
+            case DST_REGISTER_KIND:
+                return insn.destination().getIndexRegister().isDataRegister() ? 0 : 1;
+            case DST_INDEX_SIZE:
+                return getIndexRegisterSizeBit( insn.destination().getIndexRegister() );
+            case DST_SCALE:
+                return insn.destination().getIndexRegister().scaling.bits;
+            case DST_8_BIT_DISPLACEMENT:
+                return insn.destination().getBaseDisplacement().getBits(ctx);
+            case OP_CODE:
+                return insn.getInstructionType().getOperationCode(insn );
+            case SRC_VALUE:
+                return insn.source().getValue().getBits(ctx);
+            case SRC_BASE_REGISTER:
+                if ( insn.source().addressingMode.eaRegisterField.isFixedValue() ) {
+                    return insn.source().addressingMode.eaRegisterField.value();
+                }
+                return insn.source().getValue().asRegister().getBits(ctx);
+            case SRC_INDEX_REGISTER:
+                return insn.source().getIndexRegister().getBits(ctx);
+            case SRC_BASE_DISPLACEMENT:
+                return insn.source().getBaseDisplacement().getBits(ctx);
+            case SRC_OUTER_DISPLACEMENT:
+                return insn.source().getOuterDisplacement().getBits(ctx);
+            case SRC_MODE:
+                return insn.source().addressingMode.eaModeField;
+            case DST_VALUE:
+                return insn.destination().getValue().getBits(ctx);
+            case DST_BASE_REGISTER:
+                if ( insn.destination().addressingMode.eaRegisterField.isFixedValue() ) {
+                    return insn.destination().addressingMode.eaRegisterField.value();
+                }
+                return insn.destination().getValue().asRegister().getBits(ctx);
+            case DST_INDEX_REGISTER:
+                return insn.destination().getIndexRegister().getBits(ctx);
+            case DST_BASE_DISPLACEMENT:
+                return insn.destination().getBaseDisplacement().getBits(ctx);
+            case DST_OUTER_DISPLACEMENT:
+                return insn.destination().getOuterDisplacement().getBits(ctx);
+            case DST_MODE:
+                return insn.destination().addressingMode.eaModeField;
+            case SIZE:
+                if ( insn.getOperandSize() == OperandSize.UNSPECIFIED ) {
+                    throw new RuntimeException("Operand size not specified");
+                }
+                if ( insn.instruction == MOVEA ) {
+                    // MOVEA uses non-standard encoding....
+                    switch(insn.getOperandSize()) {
+                        case WORD: return 0b11;
+                        case LONG: return 0b10;
+                    }
+                    throw new RuntimeException("Unhandled operand size for MOVEA: "+insn.getOperandSize());
+                }
+                return insn.getOperandSize().bits;
+            case EXG_DATA_REGISTER:
+            case EXG_ADDRESS_REGISTER:
+                final Register srcReg = insn.source().getValue().asRegister().register;
+                final Register dstReg = insn.destination().getValue().asRegister().register;
+                // data register if EXG used with registers of different types, otherwise either the src data or src address register
+                if ( field == Field.EXG_DATA_REGISTER )
+                {
+                    if ( srcReg.isData() != dstReg.isData() )
+                    {
+                        return srcReg.isData() ? srcReg.bits : dstReg.bits;
+                    }
+                    return srcReg.bits;
+                }
+                // field == Field.EXG_ADDRESS_REGISTER;
+                // address register if EXG used with registers of different types, otherwise either the dst data or dst address register
+                if ( srcReg.isAddress() != dstReg.isAddress() )
+                {
+                    return dstReg.isAddress() ? dstReg.bits : srcReg.bits;
+                }
+                return dstReg.bits;
+            case NONE:
+                return 0;
+            case CONDITION_CODE: // encoded branch condition,stored as operationMode on Instruction
+                return insn.getInstructionType().getOperationMode();
+            default:
+                throw new RuntimeException("Internal error,unhandled field "+field);
+        }
+    }
+
+    public static int getIndexRegisterSizeBit(RegisterNode register)
+    {
+        OperandSize size = register.operandSize;
+        if ( size == null )  {
+            size = OperandSize.WORD;
+        }
+        switch(size) {
+            case WORD:
+                return 0;
+            case LONG:
+                return 1;
+        }
+        throw new RuntimeException("Invalid index register operand size "+size);
     }
 }

@@ -119,6 +119,19 @@ public class ParserTest extends TestCase
         assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.destination().addressingMode );
     }
 
+    public void testParseMovea()
+    {
+        final AST ast = parseAST("movea #$1234,a3");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.MOVEA, insn.getInstructionType() );
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
+        assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.destination().addressingMode );
+        assertEquals( Register.A3, insn.destination().getValue().asRegister().register );
+    }
+
     public void testParseShortJMP()
     {
         final AST ast = parseAST("JMP $1234");

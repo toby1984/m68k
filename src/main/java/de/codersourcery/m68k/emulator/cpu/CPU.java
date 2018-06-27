@@ -612,6 +612,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0010_0000_0000_0000:
+                // 00SSDDD001mmmsss => MOVEA
+                // 1111000111000000 => MOVEA
+                if ( (instruction & 0b0010000111000000) == 0b0010000001000000 ) {
+                    decodeSourceOperand(instruction,4);
+                    // MOVEA does not change any flags
+                    storeValue(instruction,4 );
+                    return;
+                }
                 decodeSourceOperand(instruction,4);
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
@@ -622,6 +630,13 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0011_0000_0000_0000:
+                // 00SSDDD001mmmsss => MOVEA
+                if ( (instruction & 0b0011000111000000) == 0b0011000001000000 ) {
+                    decodeSourceOperand(instruction,2);
+                    // MOVEA does not change any flags
+                    storeValue(instruction,4 );
+                    return;
+                }
                 decodeSourceOperand(instruction,2);
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );

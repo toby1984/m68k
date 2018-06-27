@@ -238,6 +238,22 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             .carry().overflow().extended().negative().zero().notSupervisor();
     }
 
+    public void testMoveaWord()
+    {
+        execute(cpu -> {} ,
+                "movea #$ffff,a3")
+                .expectA3(0xffffffff)
+                .notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
+    }
+
+    public void testMoveaLong()
+    {
+        execute(cpu -> {} ,
+                "move.l #$123456,a3")
+                .expectA3(0x123456)
+                .notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
+    }
+
     public void testExgAdrAdr() {
 
         execute(cpu -> cpu.setFlags(ALL_USR_FLAGS),

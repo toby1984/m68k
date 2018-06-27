@@ -143,11 +143,24 @@ public class Disassembler
                              InstructionEncoding encoding,
                              int insnWord)
     {
-        switch( insn ) {
-
-            case JMP:
+        switch( insn )
+        {
+            case MOVEA:
+                int operandSize = 2;
+                if ( (insnWord & 0b0011_0000_0000_0000) == 0b0010_0000_0000_0000) {
+                    operandSize = 4;
+                }
+                appendln("movea").append( operandSize == 2 ? ".w" : ".l" ).append(" ");
                 int eaMode     = (insnWord & 0b111000) >> 3;
                 int eaRegister = (insnWord & 0b000111);
+
+                decodeOperand(operandSize,eaMode,eaRegister);
+                int regNum = (insnWord & 0b0000111000000000) >> 9;
+                append(",a").append( regNum );
+                return;
+            case JMP:
+                eaMode     = (insnWord & 0b111000) >> 3;
+                eaRegister = (insnWord & 0b000111);
                 appendln( "jmp " );
                 // JMP encodings only differ in their eaRegister and eaMode values
 
@@ -272,7 +285,7 @@ public class Disassembler
             case MOVEQ:
                 int value = insnWord & 0xff;
                 value = (value <<24) >> 24;
-                int regNum = (insnWord & 0b0000111000000000) >> 9;
+                regNum = (insnWord & 0b0000111000000000) >> 9;
                 appendln("moveq #").append( value ).append(",d").append(regNum);
                 return;
             case MOVE:
@@ -287,7 +300,6 @@ public class Disassembler
                     appendln("move usp,a"+regNum);
                     return;
                 }
-                int operandSize;
                 switch( (insnWord & 0b1111000000000000) >> 12 ) {
                     case 0b0001:
                         appendln("move.b ");

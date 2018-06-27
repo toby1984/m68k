@@ -77,6 +77,11 @@ public class DisassemblerTest extends TestCase
         compile("rte");
     }
 
+    public void testMovea() {
+        compile("movea #$1234,a3","00000000: movea.w #$1234,a3");
+        compile("movea.l #$123456,a3","00000000: movea.l #$123456,a3");
+    }
+
     public void testLEA() {
         compile("lea $1234,a3","00000000: lea ($1234),a3");
         compile("lea $12345678,a3","00000000: lea ($12345678),a3");
