@@ -56,7 +56,7 @@ public class Disassembler
             final InstructionEncoding otherEncoding = existing.get(andMask);
             if ( otherEncoding != null ) {
                 if ( otherEncoding.getInstructionWordMask() == entry.getKey().getInstructionWordMask() ) {
-                   System.err.println("Cannot distinguish "+otherEncoding+" from "+entry.getKey()+" - "+entry.getValue());
+                    System.err.println("Cannot distinguish "+otherEncoding+" from "+entry.getKey()+" - "+entry.getValue());
                 }
             } else {
                 existing.put( andMask, entry.getKey() );
@@ -74,7 +74,9 @@ public class Disassembler
             for ( var entry : Instruction.ALL_ENCODINGS.entrySet() )
             {
                 var encoding = entry.getKey();
-                if ( ( insnWord & encoding.getInstructionWordAndMask() ) == encoding.getInstructionWordMask() )
+                boolean matches = matches( insnWord, encoding );
+                System.out.println( entry.getValue()+" => "+matches+" (mask: "+Misc.hex(encoding.getInstructionWordAndMask() )+", expected: "+encoding.getInstructionWordMask() );
+                if ( matches )
                 {
                     candidates.put(encoding, entry.getValue());
                 }
@@ -167,7 +169,7 @@ public class Disassembler
                 return;
             case AND:
                 if ( encoding == Instruction.ANDI_TO_SR_ENCODING) {
-                  //     public static final InstructionEncoding ANDI_TO_SR_ENCODING =
+                    //     public static final InstructionEncoding ANDI_TO_SR_ENCODING =
                     //            InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
                     final int word = readWord();
                     appendln("andi #").append( Misc.hex(word) ).append(",sr");
@@ -208,7 +210,7 @@ public class Disassembler
                 int register = insnWord & 0b111;
                 int offset = readWord();
                 int destinationAdress = pcAtStartOfInstruction + offset;
-                appendln("d").append(cond.suffix).append(" d").append( register ).append(",").append(
+                appendln("db").append(cond.suffix.toLowerCase()).append(" d").append( register ).append(",").append(
                         Misc.hex(destinationAdress));
                 return;
             // Bcc
@@ -229,7 +231,11 @@ public class Disassembler
             case BGT:
             case BLE:
                 cond = Condition.fromBits( (insnWord & 0b0000111100000000 ) >> 8 );
-                appendln("b").append( cond.suffix ).append(" ");
+                String suffix = cond.suffix.toLowerCase();
+                if ( cond == Condition.BRT) {
+                    suffix = "ra";
+                }
+                appendln("b").append( suffix ).append(" ");
                 if ( encoding == Instruction.BCC_8BIT_ENCODING ) {
                     offset = insnWord & 0xff;
                     offset = (offset<<24) >> 24;
@@ -270,17 +276,28 @@ public class Disassembler
                 appendln("moveq #").append( value ).append(",d").append(regNum);
                 return;
             case MOVE:
+                if ( matches(insnWord,Instruction.MOVE_AX_TO_USP_ENCODING ) )
+                {
+                    regNum = insnWord & 0b111;
+                    appendln("move a"+regNum+",usp");
+                    return;
+                }
+                if ( matches(insnWord,Instruction.MOVE_USP_TO_AX_ENCODING) ) {
+                    regNum = insnWord & 0b111;
+                    appendln("move usp,a"+regNum);
+                    return;
+                }
                 int operandSize;
                 switch( (insnWord & 0b1111000000000000) >> 12 ) {
                     case 0b0001:
                         appendln("move.b ");
                         operandSize = 1;
                         break;
-                    case 0b0010:
+                    case 0b0011:
                         appendln("move.w ");
                         operandSize = 2;
                         break;
-                    case 0b0011:
+                    case 0b0010:
                         appendln("move.l ");
                         operandSize = 4;
                         break;
@@ -370,7 +387,7 @@ public class Disassembler
                          */
                         int adr = memLoadWord(pc);
                         pc += 2;
-                        append( Misc.hex(adr) );
+                        append( "(").append( Misc.hex(adr) ).append(")");
                         return;
                     case 0b001:
                         /*
@@ -379,7 +396,7 @@ public class Disassembler
                          */
                         adr = memLoadLong(pc);
                         pc += 4;
-                        append( Misc.hex(adr) );
+                        append( "(").append( Misc.hex(adr) ).append(")");
                         return;
                 }
                 // $$FALL-THROUGH$$
@@ -621,19 +638,19 @@ public class Disassembler
                          */
                         append("#");
                         switch(operandSize) {
-                            case 1:
-                                append(Misc.hex(memory.readByte( pc ) ) );
-                                break;
+                            case 1: // instruction words always need to be word aligned,
+                                // byte values are still stored as words
                             case 2:
                                 append(Misc.hex( memory.readWord( pc ) ) );
+                                pc += 2;
                                 break;
                             case 4:
                                 append(Misc.hex( memory.readLong( pc ) ) );
+                                pc += operandSize;
                                 break;
                             default:
                                 throw new RuntimeException( "Unreachable code reached" );
                         }
-                        pc += operandSize;
                         return;
                 }
         }
@@ -700,5 +717,10 @@ public class Disassembler
 
     private void illegalOperand() {
         append("???");
+    }
+
+    private static boolean matches(int instructionWord,InstructionEncoding insn)
+    {
+        return (instructionWord & insn.getInstructionWordAndMask()) == insn.getInstructionWordMask();
     }
 }

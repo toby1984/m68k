@@ -34,7 +34,7 @@ public class DisassemblerTest extends TestCase
     }
 
     public void testANDISR() {
-        compile("AND #$1234,sr");
+        compile("AND #$1234,sr","00000000: andi #$1234,sr");
     }
 
     public void testDBRA()
@@ -44,26 +44,27 @@ public class DisassemblerTest extends TestCase
 
     private void testDBcc(Instruction instruction)
     {
-        compile("loop: "+instruction.getMnemonic()+" d1,loop");
+        final String expected = "00000000: "+instruction.getMnemonic()+" d1,$fffffffe";
+        compile("loop: "+instruction.getMnemonic()+" d1,loop", expected );
     }
 
     public void testRelativeBranching()
     {
-        compile("BRA loop\nloop:","BRA $2");
-        compile("BHI loop\nloop:","BHI $2");
-        compile("BLS loop\nloop:","BLS $2");
-        compile("BCC loop\nloop:","BCC $2");
-        compile("BCS loop\nloop:","BCS $2");
-        compile("BNE loop\nloop:","BNE $2");
-        compile("BEQ loop\nloop:","BEQ $2");
-        compile("BVC loop\nloop:","BVC $2");
-        compile("BVS loop\nloop:","BVS $2");
-        compile("BPL loop\nloop:","BPL $2");
-        compile("BMI loop\nloop:","BMI $2");
-        compile("BGE loop\nloop:","BGE $2");
-        compile("BLT loop\nloop:","BLT $2");
-        compile("BGT loop\nloop:","BGT $2");
-        compile("BLE loop\nloop:","BLE $2");
+        compile("BRA loop\nloop:","00000000: bra $2");
+        compile("BHI loop\nloop:","00000000: bhi $2");
+        compile("BLS loop\nloop:","00000000: bls $2");
+        compile("BCC loop\nloop:","00000000: bcc $2");
+        compile("BCS loop\nloop:","00000000: bcs $2");
+        compile("BNE loop\nloop:","00000000: bne $2");
+        compile("BEQ loop\nloop:","00000000: beq $2");
+        compile("BVC loop\nloop:","00000000: bvc $2");
+        compile("BVS loop\nloop:","00000000: bvs $2");
+        compile("BPL loop\nloop:","00000000: bpl $2");
+        compile("BMI loop\nloop:","00000000: bmi $2");
+        compile("BGE loop\nloop:","00000000: bge $2");
+        compile("BLT loop\nloop:","00000000: blt $2");
+        compile("BGT loop\nloop:","00000000: bgt $2");
+        compile("BLE loop\nloop:","00000000: ble $2");
     }
 
     public void testTrap()
@@ -77,8 +78,8 @@ public class DisassemblerTest extends TestCase
     }
 
     public void testLEA() {
-        compile("lea $1234,a3");
-        compile("lea $12345678,a3");
+        compile("lea $1234,a3","00000000: lea ($1234),a3");
+        compile("lea $12345678,a3","00000000: lea ($12345678),a3");
     }
 
     public void testJMP() {
@@ -88,37 +89,43 @@ public class DisassemblerTest extends TestCase
 
     public void testMove()
     {
-        compile("move   $1234(pc),d1");
-        compile("move.l #$12345678,a0");
-        compile("move   #$1234,d1");
-        compile("move.b d0,d1");
-        compile("move   d0,d1");
-        compile("move.w d0,d1");
-        compile("move.l d0,d1");
-        compile("move.b (a0),d1");
-        compile("move   (a0),d1");
-        compile("move.w (a0),d1");
-        compile("move.l (a0),d1");
-        compile("move.b (a0)+,d1");
-        compile("move   (a0)+,d1");
-        compile("move.w (a0)+,d1");
-        compile("move.l (a0)+,d1");
-        compile("move.b -(a0),d1");
-        compile("move   -(a0),d1");
-        compile("move.w -(a0),d1");
-        compile("move.l -(a0),d1");
-        compile("move.b ($1234),d1");
-        compile("move.b ($1234),d1");
-        compile("move   ($1234),d1");
-        compile("move.w ($1234),d1");
-        compile("move.l ($1234),d1");
-        compile("move   $10(a0),d1");
-        compile("move.b $10(a0),d1");
-        compile("move.w $10(a0),d1");
-        compile("move.l $10(a0),d1");
-        compile("move.b #$12,d1");
-        compile("move.w #$1234,d1");
-        compile("move.l #$12345678,d1");
+        compile("move.b #$12,d1","00000000: move.b #$12,d1");
+        compile("move   $123(pc),d1","00000000: move.w $123(pc),d1");
+        compile("move.l #$12345678,a0","00000000: move.l #$12345678,a0");
+        compile("move   #$1234,d1","00000000: move.w #$1234,d1");
+        compile("move.b d0,d1","00000000: move.b d0,d1");
+        compile("move   d0,d1","00000000: move.w d0,d1");
+        compile("move.w d0,d1","00000000: move.w d0,d1");
+        compile("move.l d0,d1","00000000: move.l d0,d1");
+        compile("move.b (a0),d1","00000000: move.b (a0),d1");
+        compile("move   (a0),d1","00000000: move.w (a0),d1");
+        compile("move.w (a0),d1","00000000: move.w (a0),d1");
+        compile("move.l (a0),d1","00000000: move.l (a0),d1");
+        compile("move.b (a0)+,d1","00000000: move.b (a0)+,d1");
+        compile("move   (a0)+,d1","00000000: move.w (a0)+,d1");
+        compile("move.w (a0)+,d1","00000000: move.w (a0)+,d1");
+        compile("move.l (a0)+,d1","00000000: move.l (a0)+,d1");
+        compile("move.b -(a0),d1","00000000: move.b -(a0),d1");
+        compile("move   -(a0),d1","00000000: move.w -(a0),d1");
+        compile("move.w -(a0),d1","00000000: move.w -(a0),d1");
+        compile("move.l -(a0),d1","00000000: move.l -(a0),d1");
+
+        compile("move.b ($1234),d1","00000000: move.b ($1234),d1");
+        compile("move   ($1234),d1","00000000: move.w ($1234),d1");
+        compile("move.w ($1234),d1","00000000: move.w ($1234),d1");
+        compile("move.l ($1234),d1","00000000: move.l ($1234),d1");
+
+        compile("move.b ($123456),d1","00000000: move.b ($123456),d1");
+        compile("move   ($123456),d1","00000000: move.w ($123456),d1");
+        compile("move.w ($123456),d1","00000000: move.w ($123456),d1");
+        compile("move.l ($123456),d1","00000000: move.l ($123456),d1");
+
+        compile("move   $10(a0),d1","00000000: move.w $10(a0),d1");
+        compile("move.b $10(a0),d1","00000000: move.b $10(a0),d1");
+        compile("move.w $10(a0),d1","00000000: move.w $10(a0),d1");
+        compile("move.l $10(a0),d1","00000000: move.l $10(a0),d1");
+        compile("move.w #$1234,d1","00000000: move.w #$1234,d1");
+        compile("move.l #$12345678,d1","00000000: move.l #$12345678,d1");
 
         // FIXME: Test PC-relative modes
     }
@@ -138,8 +145,8 @@ public class DisassemblerTest extends TestCase
             messages.getMessages().stream().forEach(System.out::println );
             throw new RuntimeException("Compilation failed with errors");
         }
-        // System.out.println("RESULT: "+Memory.hexdump(0,data,0,data.length));
         final byte[] executable = this.asm.getBytes();
+        System.out.println("COMPILED: "+Memory.hexdump(0,executable,0,executable.length));
 
         final Memory memory = new Memory(2048);
         memory.writeBytes( 0,executable );

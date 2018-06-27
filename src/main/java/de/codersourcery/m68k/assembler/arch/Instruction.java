@@ -10,6 +10,7 @@ import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -821,7 +822,7 @@ D/A   |     |   |           |
     public static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111",
             "CCCCCCCC_CCCCCCCC_CCCCCCCC_CCCCCCCC");
 
-    public static final Map<InstructionEncoding,Instruction> ALL_ENCODINGS = new HashMap<>()
+    public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
              put(ANDI_TO_SR_ENCODING,AND);
              put(JMP_INDIRECT_ENCODING,JMP);
