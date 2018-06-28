@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.ConditionalInstructionType;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.Register;
@@ -146,6 +147,20 @@ public class AssemblerTest extends TestCase
         check.accept(bytes );
     }
 
+    public void testJSR() {
+        assertArrayEquals(compile("jsr next\nnext:")    ,0x4e,0xb8,0x00,0x06);
+        assertArrayEquals(compile("jsr $2(pc)")    ,0x4e,0xba,0x00,0x02);
+    }
+
+    public void testSwap()
+    {
+        assertArrayEquals(compile("swap d3")    ,0x48,0x43);
+        assertArrayEquals(compile("swap.w d3")    ,0x48,0x43);
+        assertFailsToCompile("swap a3");
+        assertFailsToCompile("swap.b d3");
+        assertFailsToCompile("swap.l d3");
+    }
+
     public void testTrap()
     {
         assertArrayEquals(compile("trap #10")    ,0x4e,0x4a);
@@ -161,6 +176,11 @@ public class AssemblerTest extends TestCase
     public void testRTE()
     {
         assertArrayEquals(compile("rte")    ,0x4e,0x73);
+    }
+
+    public void testRTS()
+    {
+        assertArrayEquals(compile("rts")    ,0x4e,0x75);
     }
 
     public void testJMP() {

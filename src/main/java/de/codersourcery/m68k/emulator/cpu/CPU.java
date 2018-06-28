@@ -583,6 +583,9 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 return;
             case 0b0100111001110001:  // NOP
                 return;
+            case 0b0100111001110101:  // RTS
+                pc = popLong();
+                return;
             case 0b0100101011111100: // ILLEGAL
                 triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
                 return;
@@ -647,6 +650,35 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0100_0000_0000_0000:
+
+                if ( (instruction & 0b1111111111000000) == 0b0100111010000000)
+                {
+                    // JSR
+                    decodeSourceOperand(instruction,4);
+                    pushLong(pc);
+                    pc = value;
+                    return;
+                }
+
+                if ( (instruction & 0b1111111111111000) == 0b0100100001000000) {
+                    // SWAP
+                    final int regNum = (instruction & 0b111);
+                    int result = (dataRegisters[regNum] << 16) | (dataRegisters[regNum] >>> 16);
+                    dataRegisters[regNum] = result;
+                    /* N — Set if the most significant bit of the 32-bit result is set; cleared otherwise.
+                     * Z — Set if the 32-bit result is zero; cleared otherwise.
+                     * V — Always cleared.
+                     * C — Always cleared. */
+                    int flagsToSet = 0;
+                    if ( result == 0 ) {
+                        flagsToSet |= FLAG_ZERO;
+                    }
+                    if ( (result & 1<<31) != 0 ) {
+                        flagsToSet |= FLAG_NEGATIVE;
+                    }
+                    this.statusRegister = (statusRegister & ~(FLAG_OVERFLOW | FLAG_CARRY | FLAG_ZERO | FLAG_NEGATIVE) ) | flagsToSet;
+                    return;
+                }
 
                 if ( (instruction & 0b0100111011000000) == 0b0100111011000000)
                 {

@@ -5,8 +5,10 @@ import de.codersourcery.m68k.assembler.Assembler;
 import de.codersourcery.m68k.assembler.CompilationMessages;
 import de.codersourcery.m68k.assembler.CompilationUnit;
 import de.codersourcery.m68k.assembler.IResource;
+import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.emulator.cpu.CPU;
 import de.codersourcery.m68k.emulator.cpu.IllegalInstructionException;
+import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
@@ -15,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class CPUTest extends TestCase
@@ -28,6 +31,7 @@ public class CPUTest extends TestCase
 
     private Memory memory;
     private CPU cpu;
+    private CompilationUnit compilationUnit;
 
     @Override
     protected void setUp() throws Exception
@@ -80,6 +84,62 @@ public class CPUTest extends TestCase
         execute("TRAP #13").supervisor().irqActive(CPU.IRQ.TRAP0_13);
         execute("TRAP #14").supervisor().irqActive(CPU.IRQ.TRAP0_14);
         execute("TRAP #15").supervisor().irqActive(CPU.IRQ.TRAP0_15);
+    }
+
+    public void testSWAP1() {
+        execute(cpu-> cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW), 2, "move.l #$12345678,D3",
+                "swap d3")
+                .expectD3(0x56781234).noOverflow().notNegative().notZero().notExtended().notSupervisor();
+    }
+
+    public void testSWAP2() {
+        execute(cpu-> cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW), 2, "move.l #0,D3",
+                "swap d3")
+                .expectD3(0).noOverflow().notNegative().zero().notExtended().notSupervisor();
+    }
+
+    public void testSWAP3() {
+        execute(cpu-> cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW), 2, "move.l #$ffffffff,D3",
+                "swap d3")
+                .expectD3(0xffffffff).noOverflow().negative().notZero().notExtended().notSupervisor();
+    }
+
+    public void testJSR() {
+
+        // expectTopOfStack
+        execute(cpu-> {}, 2, "start: jsr sub",
+                "illegal",
+                "sub: move.w #$1234,d3")
+                .expectTopOfStack("start", adr -> adr+4)
+                .expectD3(0x1234)
+                .noOverflow()
+                .notNegative()
+                .notZero()
+                .notExtended()
+                .notSupervisor();
+
+        execute(cpu-> {}, 3, "move.l #1,D0",
+                "loop: dbra d0,loop").expectD0(0xffff).noOverflow().notNegative().notZero().notExtended().notSupervisor();
+    }
+
+    public void testRTS() {
+
+        // expectTopOfStack
+        execute(cpu-> {}, 4, "start: jsr sub",
+                "move.w #$5678,d1",
+                "illegal",
+                "sub: move.w #$1234,d3",
+                "rts")
+                .expectD3(0x1234)
+                .expectD1(0x5678)
+                .noOverflow()
+                .notNegative()
+                .notZero()
+                .notExtended()
+                .notSupervisor();
+
+        execute(cpu-> {}, 3, "move.l #1,D0",
+                "loop: dbra d0,loop").expectD0(0xffff).noOverflow().notNegative().notZero().notExtended().notSupervisor();
     }
 
     public void testDBRA() {
@@ -323,7 +383,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 
         // write the actual program
         final String program = lines.stream().collect(Collectors.joining("\n"));
-        final byte[] executable = compile(program);
+        final byte[] executable = compile("ORG "+PROGRAM_START_ADDRESS+"\n"+program);
         System.out.println( Memory.hexdump(PROGRAM_START_ADDRESS,executable,0,executable.length) );
         memory.writeBytes(PROGRAM_START_ADDRESS,executable );
 
@@ -344,14 +404,35 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
     private byte[] compile(String program)
     {
         final Assembler asm = new Assembler();
-        final CompilationUnit unit = new CompilationUnit(IResource.stringResource(program));
-        final CompilationMessages messages = asm.compile(unit);
+        compilationUnit = new CompilationUnit(IResource.stringResource(program));
+        final CompilationMessages messages = asm.compile(compilationUnit);
         assertFalse(messages.hasErrors());
         return asm.getBytes();
     }
 
     protected final class ExpectionBuilder
     {
+        public ExpectionBuilder expectTopOfStack(String label, Function<Integer,Integer> valueTransform)
+        {
+            final Symbol symbol = compilationUnit.symbolTable.lookup(Identifier.of(label));
+            if ( symbol == null ) {
+                fail("Undefined symbol: "+label);
+            }
+            if ( ! symbol.hasValue() ) {
+                fail("Symbol "+label+" has no value ?");
+            }
+            final int expected = valueTransform.apply( symbol.getBits() );
+            return expectTopOfStack(expected );
+        }
+
+        public ExpectionBuilder expectTopOfStack(int expected)
+        {
+            int actual = cpu.memory.readLong(cpu.addressRegisters[7] );
+            // swap because CPU#push(int) pushes HIGH word first
+            actual = (actual >>> 16) | (actual << 16);
+            return assertHexEquals( "value on top of stack mismatch" , expected, actual);
+        }
+
         public ExpectionBuilder expectD0(int value) { return assertHexEquals( "D0 mismatch" , value, cpu.dataRegisters[0]); }
         public ExpectionBuilder expectD1(int value) { return assertHexEquals( "D1 mismatch" , value, cpu.dataRegisters[1]); }
         public ExpectionBuilder expectD2(int value) { return assertHexEquals( "D2 mismatch" , value, cpu.dataRegisters[2]); }

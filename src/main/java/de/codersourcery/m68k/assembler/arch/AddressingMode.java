@@ -1,5 +1,8 @@
 package de.codersourcery.m68k.assembler.arch;
 
+import java.util.Arrays;
+import java.util.Set;
+
 /**
  * M68000 family addressing modes.
  *
@@ -32,38 +35,38 @@ public enum AddressingMode
      *
      * EA = Dn
      */
-    DATA_REGISTER_DIRECT              (0b000,registerNumber(),0),
+    DATA_REGISTER_DIRECT              (0b000,registerNumber(),0, AddressingModeKind.DATA, AddressingModeKind.ALTERABLE),
     /**
      * MOVE A0,.. .
      * EA = An
      */
-    ADDRESS_REGISTER_DIRECT           (0b001,registerNumber(),0),
+    ADDRESS_REGISTER_DIRECT           (0b001,registerNumber(),0, AddressingModeKind.ALTERABLE),
     /**
      * MOVE (A0),.. .
      *
      * EA = (An)
      */
-    ADDRESS_REGISTER_INDIRECT         (0b010,registerNumber(),0),
+    ADDRESS_REGISTER_INDIRECT         (0b010,registerNumber(),0, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL, AddressingModeKind.ALTERABLE),
     /**
      * MOVE.size (An)+,.. .
      *
      * EA = (An)
      * An = An + size
      */
-    ADDRESS_REGISTER_INDIRECT_POST_INCREMENT   (0b011,registerNumber(),0),
+    ADDRESS_REGISTER_INDIRECT_POST_INCREMENT   (0b011,registerNumber(),0, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.ALTERABLE),
     /**
      * MOVE.size -(An),.. .
      *
      * An = An - size
      * EA = (An)
      */
-    ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT    (0b100,registerNumber(),0),
+    ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT    (0b100,registerNumber(),0, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.ALTERABLE),
     /**
      * MOVE d16(An),... (1 extra word).
      *
      * EA = (An) + d16
      */
-    ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT(0b101,registerNumber(),1),
+    ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT(0b101,registerNumber(),1, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL, AddressingModeKind.ALTERABLE),
 
     /*
      * ==============================================
@@ -74,28 +77,28 @@ public enum AddressingMode
      *
      * EA = (An) + (Xn) + d8
      */
-    ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT(0b110,registerNumber(),1),
+    ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT(0b110,registerNumber(),1, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL, AddressingModeKind.ALTERABLE),
     /**
      * MOVE (bd,An,Xn.SIZE*SCALE),...(1-3 extra words).
      *
      * EA = (An) + (Xn) + bd
      */
     // 1,2 or 3 extra words
-    ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT(0b110,registerNumber(),3),
+    ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT(0b110,registerNumber(),3, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL, AddressingModeKind.ALTERABLE),
     /**
      * MOVE ([bd,An],Xn.SIZE*SCALE,od),... (1-5 extra words).
      *
      * EA = (An + bd) + Xn.SIZE*SCALE + od
      */
     // 1,2,3,4 or 5 extra words
-    MEMORY_INDIRECT_POSTINDEXED(0b110,registerNumber(),5),
+    MEMORY_INDIRECT_POSTINDEXED(0b110,registerNumber(),5, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL, AddressingModeKind.ALTERABLE),
     /**
      * MOVE ([bd, An, Xn.SIZE*SCALE], od),... (1-5 extra words).
      *
      * EA = (bd + An) + Xn.SIZE*SCALE + od
      */
     // 1,2,3,4 or 5 extra words
-    MEMORY_INDIRECT_PREINDEXED(0b110,registerNumber(),5),
+    MEMORY_INDIRECT_PREINDEXED(0b110,registerNumber(),5, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL, AddressingModeKind.ALTERABLE),
 
     /*
      * ==============================================
@@ -106,43 +109,43 @@ public enum AddressingMode
      *
      * EA = (PC) + d16
      */
-    PC_INDIRECT_WITH_DISPLACEMENT(0b111,fixedValue(0b010),1),
+    PC_INDIRECT_WITH_DISPLACEMENT(0b111,fixedValue(0b010),1, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL ),
     /**
      * MOVE (d8,PC,Xn.SIZE*SCALE),... (1 extra word).
      * EA = (PC) + (Xn) + d8
      */
-    PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT(0b111,fixedValue(0b011),1),
+    PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT(0b111,fixedValue(0b011),1, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL),
     /**
      * MOVE (bd, PC, Xn. SIZE*SCALE),... (1-3 extra words).
      * EA = (PC) + (Xn) + bd
      */
     // 1,2 or 3 extra words
-    PC_INDIRECT_WITH_INDEX_DISPLACEMENT(0b111,fixedValue(0b011),3),
+    PC_INDIRECT_WITH_INDEX_DISPLACEMENT(0b111,fixedValue(0b011),3, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL),
     /**
      * MOVE ([bd,PC],Xn.SIZE*SCALE,od),.... (1-5 extra words).
      * EA = (bd + PC) + Xn.SIZE*SCALE + od
      */
     // 1,2,3,4 or 5 extra words
-    PC_MEMORY_INDIRECT_POSTINDEXED(0b111,fixedValue(0b011),5),
+    PC_MEMORY_INDIRECT_POSTINDEXED(0b111,fixedValue(0b011),5, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL, AddressingModeKind.ALTERABLE),
     /**
      * EA = (bd + PC) + Xn.SIZE*SCALE + od (1-5 extra words).
      * ([bd,PC,Xn.SIZE*SCALE],od)
      */
     // 1,2,3,4 or 5 extra words
-    PC_MEMORY_INDIRECT_PREINDEXED(0b111,fixedValue(0b011),5),
+    PC_MEMORY_INDIRECT_PREINDEXED(0b111,fixedValue(0b011),5, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL, AddressingModeKind.ALTERABLE),
     /**
      * MOVE (xxx).W,... (1 extra word).
      */
-    ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1 ),
+    ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL),
     /**
      * MOVE (xxx).L,.... (2 extra words).
      */
-    ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2 ),
+    ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL),
     /**
      * MOVE #xxxx,.... (1-6 extra words).
      */
     // 1,2,4, OR 6, EXCEPT FOR PACKED DECIMAL REAL OPERANDS
-    IMMEDIATE_VALUE(0b111,fixedValue(100), 6),   // move #XXXX
+    IMMEDIATE_VALUE(0b111,fixedValue(100), 6, AddressingModeKind.DATA, AddressingModeKind.MEMORY),   // move #XXXX
     /**
      * no or implied operand.
      */
@@ -151,6 +154,7 @@ public enum AddressingMode
     public final FieldContent eaRegisterField;
     public final int eaModeField;
     public final int maxExtensionWords;
+    private final int kinds;
 
     public interface FieldContent
     {
@@ -216,10 +220,32 @@ public enum AddressingMode
         }
     };
 
-    private AddressingMode(int eaModeField,FieldContent eaRegisterField,int maxExtensionWords)
+    AddressingMode(int eaModeField,FieldContent eaRegisterField,int maxExtensionWords)
+    {
+        this(eaModeField,eaRegisterField,maxExtensionWords,null);
+    }
+
+    AddressingMode(int eaModeField,FieldContent eaRegisterField,int maxExtensionWords,AddressingModeKind kind1,AddressingModeKind... kinds)
     {
         this.eaModeField = eaModeField;
         this.eaRegisterField = eaRegisterField;
         this.maxExtensionWords = maxExtensionWords;
+        int mask = kind1 != null ? kind1.bits : 0;
+        if ( kinds != null )
+        {
+            for ( var kind : kinds ) {
+                mask |= kind.bits;
+            }
+        }
+        this.kinds = mask;
+    }
+
+    public boolean isControl() { return hasKind(AddressingModeKind.CONTROL); }
+    public boolean isData() { return hasKind(AddressingModeKind.DATA); }
+    public boolean isMemory() { return hasKind(AddressingModeKind.MEMORY); }
+    public boolean isAlterable() { return hasKind(AddressingModeKind.ALTERABLE); }
+
+    public boolean hasKind(AddressingModeKind kind) {
+        return (this.kinds & kind.bits) != 0;
     }
 }

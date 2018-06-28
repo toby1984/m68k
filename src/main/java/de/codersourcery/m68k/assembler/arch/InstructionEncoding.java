@@ -26,7 +26,7 @@ import java.util.function.Function;
  */
 public class InstructionEncoding
 {
-    public static boolean DEBUG = true; // TODO: make this final and 'false' when done debugging
+    public static boolean DEBUG = false; // TODO: make this final and 'false' when done debugging
 
     private static final int NOT_MAPPED = 0xffff;
 

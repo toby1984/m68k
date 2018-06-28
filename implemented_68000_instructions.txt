@@ -1,0 +1,80 @@
+[ ] ABCD
+[ ] ADD
+[ ] ADDA
+[ ] ADDI
+[ ] ADDQ
+[ ] ADDX
+[ ] AND
+[ ] ANDI
+[ ] ANDI to CCR
+[X] ANDI to SR
+[ ] ASL, ASR
+[X] Bcc
+[ ] BCHG
+[ ] BCLR
+[X] BRA
+[ ] BSET
+[ ] BSR
+[ ] BTST
+[ ] CHK
+[ ] CLR
+[ ] CMP
+[ ] CMPA
+[ ] CMPI
+[ ] CMPM
+[X] DBcc
+[ ] DIVS
+[ ] DIVU
+[ ] EOR
+[ ] EORI
+[ ] EORI to CCR
+[ ] EORI to SR
+[X] EXG
+[ ] EXT
+[X] ILLEGAL
+[X] JMP
+[X] JSR
+[X] LEA
+[ ] LINK
+[ ] LSL, LSR
+[X] MOVE
+[X] MOVEA
+[ ] MOVE to CCR
+[ ] MOVE from SR
+[ ] MOVE to SR
+[X] MOVE USP
+[ ] MOVEM
+[ ] MOVEP
+[X] MOVEQ
+[ ] MULS
+[ ] MULU
+[ ] NBCD
+[ ] NEG
+[ ] NEGX
+[X] NOP
+[ ] NOT
+[ ] OR
+[ ] ORI
+[ ] ORI to CCR
+[ ] ORI to SR
+[ ] PEA
+[ ] RESET
+[ ] ROL, ROR
+[ ] ROXL, ROXR
+[X] RTE
+[ ] RTR
+[X] RTS
+[ ] SBCD
+[ ] Scc
+[ ] STOP
+[ ] SUB
+[ ] SUBA
+[ ] SUBI
+[ ] SUBQ
+[ ] SUBX
+[X] SWAP
+[ ] TAS
+[X] TRAP
+[ ] TRAPV
+[ ] TST
+[ ] UNLK

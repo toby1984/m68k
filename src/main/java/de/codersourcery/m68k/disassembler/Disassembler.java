@@ -145,14 +145,23 @@ public class Disassembler
     {
         switch( insn )
         {
+            case RTS:
+                appendln("rts");
+                return;
+            case JSR:
+                appendln("jsr ");
+                int eaMode     = (insnWord & 0b111000) >> 3;
+                int eaRegister = (insnWord & 0b000111);
+                decodeOperand(4,eaMode,eaRegister);
+                return;
             case MOVEA:
                 int operandSize = 2;
                 if ( (insnWord & 0b0011_0000_0000_0000) == 0b0010_0000_0000_0000) {
                     operandSize = 4;
                 }
                 appendln("movea").append( operandSize == 2 ? ".w" : ".l" ).append(" ");
-                int eaMode     = (insnWord & 0b111000) >> 3;
-                int eaRegister = (insnWord & 0b000111);
+                eaMode     = (insnWord & 0b111000) >> 3;
+                eaRegister = (insnWord & 0b000111);
 
                 decodeOperand(operandSize,eaMode,eaRegister);
                 int regNum = (insnWord & 0b0000111000000000) >> 9;

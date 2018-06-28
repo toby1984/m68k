@@ -14,4 +14,9 @@ public interface ICompilationPhase
      * @throws Exception
      */
     public void run(ICompilationContext ctx) throws Exception;
+
+    public default boolean shouldRun(ICompilationContext ctx)
+    {
+        return true;
+    }
 }

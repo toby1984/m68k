@@ -93,6 +93,30 @@ public class ParserTest extends TestCase
         assertEquals( (Integer) 10 , insn.source().getValue().getBits(null ) );
     }
 
+    public void testParseSwap1() {
+
+        final AST ast = parseAST("swap d7");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.SWAP, insn.getInstructionType() );
+        assertTrue( insn.useImpliedOperandSize );
+        assertEquals( OperandSize.UNSPECIFIED, insn.getOperandSize() );
+        assertEquals( Register.D7, insn.source().getValue().asRegister().register );
+    }
+
+    public void testParseSwap2() {
+
+        final AST ast = parseAST("swap.w d7");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.SWAP, insn.getInstructionType() );
+        assertFalse( insn.useImpliedOperandSize );
+        assertEquals( OperandSize.WORD, insn.getOperandSize() );
+        assertEquals( Register.D7, insn.source().getValue().asRegister().register );
+    }
+
     public void testMoveToUSP() {
 
         final AST ast = parseAST("move.l a3,USP");
@@ -141,6 +165,37 @@ public class ParserTest extends TestCase
         assertEquals( Instruction.JMP, insn.getInstructionType() );
         assertEquals( AddressingMode.ABSOLUTE_SHORT_ADDRESSING, insn.source().addressingMode );
         assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
+    }
+
+    public void testParseRTS()
+    {
+        final AST ast = parseAST("RTS");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.RTS, insn.getInstructionType() );
+    }
+
+    public void testParseJSR1()
+    {
+        final AST ast = parseAST("JSR $12345678");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.JSR, insn.getInstructionType() );
+        assertEquals( AddressingMode.ABSOLUTE_LONG_ADDRESSING, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x12345678), insn.source().getValue().getBits(null) );
+    }
+
+    public void testParseJSR2()
+    {
+        final AST ast = parseAST("JSR (a0)");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.JSR, insn.getInstructionType() );
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT, insn.source().addressingMode );
+        assertEquals( Register.A0 , insn.source().getValue().asRegister().register);
     }
 
     public void testParseLongJMP()

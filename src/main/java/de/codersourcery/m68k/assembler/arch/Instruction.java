@@ -8,6 +8,7 @@ import de.codersourcery.m68k.parser.ast.NumberNode;
 import de.codersourcery.m68k.parser.ast.OperandNode;
 import de.codersourcery.m68k.parser.ast.RegisterNode;
 import de.codersourcery.m68k.utils.Misc;
+import javafx.scene.transform.Rotate;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.IdentityHashMap;
@@ -23,33 +24,50 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
-    /*
-Bits 15 – 12 Operation
-0000 Bit Manipulation/MOVEP/Immediate
-0001 Move Byte
-0010 Move Long
-0011 Move Word
-0100 Miscellaneous (TRAP)
-0101 ADDQ/SUBQ/Scc/DBcc/TRAPc c
-0110 Bcc/BSR/BRA
-0111 MOVEQ
-1000 OR/DIV/SBCD
-1001 SUB/SUBX
-1010 (Unassigned, Reserved)
-1011 CMP/EOR
-1100 AND/MUL/ABCD/EXG
-1101 ADD/ADDX
-1110 Shift/Rotate/Bit Field
-1111 Coprocessor Interface/MC68040 and CPU32 Extensions
-     */
-    JMP("JMP",1, 0b0000)
+    RTS("RTS",0)
+    {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+
+        }
+    },
+    JSR("JSR",1)
+    {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkSourceAddressingMode(node,AddressingModeKind.CONTROL);
+        }
+    },
+    SWAP("SWAP",1)
+    {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            if ( ! node.source().getValue().isDataRegister() ) {
+                throw new RuntimeException("SWAP requires a data requires");
+            }
+            if ( ! node.useImpliedOperandSize && node.getOperandSize() != OperandSize.WORD ) {
+                throw new RuntimeException("SWAP only supports .w");
+            }
+        }
+
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+    },
+    JMP("JMP",1)
             {
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
+                    Instruction.checkSourceAddressingMode(node,AddressingModeKind.CONTROL);
                 }
             },
-    AND("AND",2, 0b0000)
+    AND("AND",2)
             {
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -64,19 +82,19 @@ Bits 15 – 12 Operation
                     if ( node.hasDestination() ) {
                         throw new RuntimeException("TRAP only supports one operand");
                     }
-                    if ( node.source().addressingMode != IMMEDIATE_VALUE ) {
-                        throw new RuntimeException("TRAP requires an immediate mode value as operand");
+                    if ( ! node.source().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE ) ) {
+                        throw new RuntimeException("TRAP requires an immediate mode value as operand but was "+node.source().addressingMode);
                     }
                 }
             },
-    RTE("RTE",0, 0b0000)
+    RTE("RTE",0)
             {
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
                 }
             },
-    ILLEGAL("ILLEGAL",0, 0b0000) {
+    ILLEGAL("ILLEGAL",0) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
         {
@@ -266,7 +284,7 @@ Bits 15 – 12 Operation
                     {
                         throw new RuntimeException("MOVEQ requires a data register as destination operand");
                     }
-                    Instruction.checkOperandSizeUnsigned(node.source().getValue(),Operand.SOURCE,8,ctx);
+                    Instruction.checkOperandSizeUnsigned(node.source().getValue(), 8,ctx);
                 }
 
             },
@@ -299,15 +317,13 @@ Bits 15 – 12 Operation
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
+                    Instruction.checkSourceAddressingMode(node,AddressingModeKind.CONTROL);
+
                     final OperandNode source = node.source();
                     final OperandNode destination = node.destination();
                     if ( destination.getValue().isNot(NodeType.REGISTER) || ! destination.getValue().asRegister().isAddressRegister() )
                     {
                         throw new RuntimeException("LEA needs an address register as destination");
-                    }
-                    if ( ! source.hasAbsoluteAddressing() )
-                    {
-                        throw new RuntimeException("LEA requires an absolute address value as source");
                     }
                 }
             };
@@ -317,6 +333,10 @@ Bits 15 – 12 Operation
     private final String mnemonic;
     private final int operandCount;
     private final int operationMode; // bits 15-12 of first instruction word
+
+    Instruction(String mnemonic, int operandCount) {
+        this(mnemonic,operandCount, 0,null,ConditionalInstructionType.NONE);
+    }
 
     Instruction(String mnemonic, int operandCount, int operationMode) {
         this(mnemonic,operandCount, operationMode,null,ConditionalInstructionType.NONE);
@@ -386,7 +406,9 @@ Bits 15 – 12 Operation
         {
             encoding = getEncoding(this, insn, context,estimateSizeForUnknownOperands);
             if ( estimateSizeForUnknownOperands ) {
-                context.getCodeWriter().allocateBytes(encoding.getSizeInBytes());
+                final int sizeInBytes = encoding.getSizeInBytes();
+                System.out.println( insn.instruction+" with encoding "+encoding+" has size "+sizeInBytes);
+                context.getCodeWriter().allocateBytes(sizeInBytes);
                 return;
             }
 
@@ -459,6 +481,16 @@ Bits 15 – 12 Operation
 
         switch (type)
         {
+            case RTS:
+                return RTS_ENCODING;
+            case JSR:
+                String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( extraSrcWords != null ) {
+                    return JSR_ENCODING.append(extraSrcWords);
+                }
+                return JSR_ENCODING;
+            case SWAP:
+                return SWAP_ENCODING;
             case JMP:
                 switch( insn.source().addressingMode )
                 {
@@ -643,7 +675,7 @@ Bits 15 – 12 Operation
                 }
 
                 // regular move instruction
-                final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( insn.instruction == MOVEA )
                 {
                     final InstructionEncoding encoding =
@@ -761,30 +793,28 @@ D/A   |     |   |           |
         throw new RuntimeException("Unhandled addressing mode: "+op.addressingMode);
     }
 
-    private static int checkOperandSizeUnsigned(IValueNode value,Operand opKind,int maxSizeInBits,ICompilationContext ctx)
+    private static void checkOperandSizeUnsigned(IValueNode value, int maxSizeInBits, ICompilationContext ctx)
     {
         Integer nodeValue = value.getBits(ctx);
         if ( nodeValue == null ) {
-            return maxSizeInBits;
+            return;
         }
         int actualSize = NumberNode.getSizeInBitsUnsigned(nodeValue);
         if ( actualSize > maxSizeInBits ) {
             throw new RuntimeException("Operand out of range, expected at most "+maxSizeInBits+" bits but was "+actualSize);
         }
-        return actualSize;
     }
 
-    private static int checkOperandSizeSigned(IValueNode value,Operand opKind,int maxSizeInBits,ICompilationContext ctx)
+    private static void checkOperandSizeSigned(IValueNode value, int maxSizeInBits, ICompilationContext ctx)
     {
         Integer nodeValue = value.getBits(ctx);
         if ( nodeValue == null ) {
-            return maxSizeInBits;
+            return;
         }
         int actualSize = NumberNode.getSizeInBitsSigned(nodeValue);
         if ( actualSize > maxSizeInBits ) {
             throw new RuntimeException("Operand out of range, expected at most "+maxSizeInBits+" bits but was "+actualSize);
         }
-        return actualSize;
     }
 
     public Condition getCondition()
@@ -847,6 +877,12 @@ D/A   |     |   |           |
     public static final InstructionEncoding MOVEA_WORD_ENCODING = InstructionEncoding.of(  "0011DDD001mmmsss");
     public static final InstructionEncoding MOVEA_LONG_ENCODING = InstructionEncoding.of(  "0010DDD001mmmsss");
 
+    public static final InstructionEncoding SWAP_ENCODING = InstructionEncoding.of(  "0100100001000sss");
+
+    public static final InstructionEncoding JSR_ENCODING = InstructionEncoding.of( "0100111010mmmsss");
+
+    public static final InstructionEncoding RTS_ENCODING = InstructionEncoding.of( "0100111001110101");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -872,10 +908,12 @@ D/A   |     |   |           |
         put(BCC_32BIT_ENCODING,BCC);
         put(MOVEA_LONG_ENCODING,MOVEA);
         put(MOVEA_WORD_ENCODING,MOVEA);
+        put(JSR_ENCODING,JSR);
+        put(RTS_ENCODING,RTS);
     }};
 
 
-    private static final void checkDBccInstructionValid(InstructionNode node,ICompilationContext ctx)
+    private static void checkDBccInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
         if ( node.source().addressingMode != AddressingMode.DATA_REGISTER_DIRECT ) {
             throw new RuntimeException("Unsupported addressing mode: "+node.source().addressingMode );
@@ -888,10 +926,10 @@ D/A   |     |   |           |
             default:
                 throw new RuntimeException("Unsupported addressing mode: "+node.destination().addressingMode );
         }
-        checkOperandSizeSigned(node.destination().getValue(),Operand.DESTINATION,16,ctx);
+        checkOperandSizeSigned(node.destination().getValue(), 16,ctx);
     }
 
-    private static final void checkBranchInstructionValid(InstructionNode node,ICompilationContext ctx)
+    private static void checkBranchInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
         switch (node.source().addressingMode)
         {
@@ -901,7 +939,7 @@ D/A   |     |   |           |
             default:
                 throw new RuntimeException("Unsupported addressing mode: " + node.source().addressingMode);
         }
-        checkOperandSizeSigned(node.source().getValue(), Operand.DESTINATION, 32, ctx);
+        checkOperandSizeSigned(node.source().getValue(), 32, ctx);
     }
 
     private int getValueFor(InstructionNode insn,Field field, ICompilationContext ctx)
@@ -1011,5 +1049,21 @@ D/A   |     |   |           |
                 return 1;
         }
         throw new RuntimeException("Invalid index register operand size "+size);
+    }
+
+    private static void checkSourceAddressingMode(InstructionNode insn,AddressingModeKind kind)
+    {
+        if( ! insn.source().addressingMode.hasKind(kind ) )
+        {
+            throw new RuntimeException("Instruction "+insn.instruction+" only supports addressing modes of kind "+kind);
+        }
+    }
+
+    private static void checkDestinationAddressingMode(InstructionNode insn,AddressingModeKind kind)
+    {
+        if( ! insn.destination().addressingMode.hasKind(kind ) )
+        {
+            throw new RuntimeException("Instruction "+insn.instruction+" only supports addressing modes of kind "+kind);
+        }
     }
 }

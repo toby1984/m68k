@@ -77,6 +77,16 @@ public class DisassemblerTest extends TestCase
         compile("rte");
     }
 
+    public void testJSR() {
+        compile("jsr sub\nillegal\nsub:","00000000: jsr ($6)\n" +
+                "00000004: illegal");
+    }
+
+    public void testRTS()
+    {
+        compile("rts");
+    }
+
     public void testMovea() {
         compile("movea #$1234,a3","00000000: movea.w #$1234,a3");
         compile("movea.l #$123456,a3","00000000: movea.l #$123456,a3");

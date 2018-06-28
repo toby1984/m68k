@@ -39,11 +39,17 @@ public class Assembler
         var phases = new ArrayList<ICompilationPhase>();
         phases.add( new ParsePhase() );
         phases.add( new GatherSymbolsPhase() );
-        phases.add( new CodeGenerationPhase(true) ); // 1st pass, all instructions with as-of-now unknown operands will assume their maximum length
-        phases.add( new CodeGenerationPhase(true) ); // 2nd pass, by now all operands should have addresses assigned so the size estimate gets more accurate
+        // 1st pass, all instructions with as-of-now unknown operands will assume their maximum length
+        phases.add( new CodeGenerationPhase(true) );
+        // 2nd pass, by now all operands should have addresses assigned so the size estimate gets more accurate
+        phases.add( new CodeGenerationPhase(true) );
         phases.add( new ValidationPhase() );
+        // adjust addressing modes based on actual operand sizes
+        // and recalculate label addresses again using the (potentially smaller) addressing modes
         phases.add( new FixAddressingModesPhase() );
-        phases.add( new CodeGenerationPhase(false) ); // 3rd pass, generate code
+        phases.add( new CodeGenerationPhase(true, FixAddressingModesPhase::isAddressingModesUpdated ) );
+        // 4rd pass, actually generate code
+        phases.add( new CodeGenerationPhase(false) );
         return phases;
     }
 
@@ -65,6 +71,14 @@ public class Assembler
         context.setCompilationUnit(unit);
         for ( ICompilationPhase phase : getPhases() )
         {
+            if ( ! phase.shouldRun(context ) )
+            {
+                if ( debug )
+                {
+                    System.out.println("SKIPPING: " + phase);
+                }
+                continue;
+            }
             context.setSegment(ICompilationContext.Segment.TEXT);
             context.setPhase(phase);
             try
@@ -131,6 +145,7 @@ public class Assembler
         private IObjectCodeWriter currentWriter;
         private ICompilationContext.Segment segment = Segment.TEXT;
         private final AssemblerOptions options;
+        private final Map<Class<? extends ICompilationPhase>,Map<String,Object>> blackboards = new HashMap<>();
 
         private MyCompilationContext(AssemblerOptions options)
         {
@@ -143,6 +158,20 @@ public class Assembler
         {
             Validate.notNull(phase, "phase must not be null");
             this.phase = phase;
+        }
+
+        @Override
+        public Map<String, Object> getBlackboard(Class<? extends ICompilationPhase> phase)
+        {
+            if ( phase == null ) {
+                throw new IllegalArgumentException("Phase must not be NULL");
+            }
+            Map<String, Object> result = blackboards.get(phase);
+            if (result==null) {
+                result = new HashMap<>();
+                blackboards.put(phase,result);
+            }
+            return result;
         }
 
         @Override

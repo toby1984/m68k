@@ -1,10 +1,12 @@
 package de.codersourcery.m68k.assembler;
 
+import de.codersourcery.m68k.assembler.phases.FixAddressingModesPhase;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
 import de.codersourcery.m68k.parser.ast.ASTNode;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * Compilation context.
@@ -33,6 +35,8 @@ public interface ICompilationContext
 
     // compilation
     public void setPhase(ICompilationPhase phase);
+
+    public Map<String,Object> getBlackboard(Class<? extends ICompilationPhase> phaseClass);
 
     public ICompilationPhase getPhase();
 
