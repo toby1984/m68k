@@ -145,13 +145,27 @@ public class Disassembler
     {
         switch( insn )
         {
+            case RESET:
+                appendln("reset");
+                return;
+            case UNLK:
+                appendln("unlk ");
+                int eaRegister = (insnWord & 0b000111);
+                append("a").append(eaRegister);
+                return;
+            case LINK:
+                appendln("link ");
+                eaRegister = (insnWord & 0b000111);
+                final int displacement = readWord();
+                append("a").append(eaRegister).append(",#").appendHex16Bit(displacement);
+                return;
             case RTS:
                 appendln("rts");
                 return;
             case JSR:
                 appendln("jsr ");
                 int eaMode     = (insnWord & 0b111000) >> 3;
-                int eaRegister = (insnWord & 0b000111);
+                eaRegister = (insnWord & 0b000111);
                 decodeOperand(4,eaMode,eaRegister);
                 return;
             case MOVEA:
@@ -383,6 +397,17 @@ public class Disassembler
 
     private Disassembler append(int value) {
         output.append( Integer.toString( value ) );
+        return this;
+    }
+
+    private Disassembler appendHex(int value) {
+        output.append( "$").append( Integer.toHexString( value ) );
+        return this;
+    }
+
+    private Disassembler appendHex16Bit(int value)
+    {
+        output.append( "$").append( Integer.toHexString( value & 0xffff ) );
         return this;
     }
 

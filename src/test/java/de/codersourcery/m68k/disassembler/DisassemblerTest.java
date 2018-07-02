@@ -67,9 +67,24 @@ public class DisassemblerTest extends TestCase
         compile("BLE loop\nloop:","00000000: ble $2");
     }
 
+    public void testReset()
+    {
+        compile("reset");
+    }
+
     public void testTrap()
     {
         compile("trap #10");
+    }
+
+    public void testUnlink()
+    {
+        compile("unlk a3");
+    }
+
+    public void testLink()
+    {
+        compile("link a3,#$4");
     }
 
     public void testRTE()

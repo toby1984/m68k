@@ -1,80 +1,82 @@
-[ ] ABCD
-[ ] ADD
-[ ] ADDA
-[ ] ADDI
-[ ] ADDQ
-[ ] ADDX
-[ ] AND
-[ ] ANDI
-[ ] ANDI to CCR
-[X] ANDI to SR
-[ ] ASL, ASR
-[X] Bcc
-[ ] BCHG
-[ ] BCLR
-[X] BRA
-[ ] BSET
-[ ] BSR
-[ ] BTST
-[ ] CHK
-[ ] CLR
-[ ] CMP
-[ ] CMPA
-[ ] CMPI
-[ ] CMPM
-[X] DBcc
-[ ] DIVS
-[ ] DIVU
-[ ] EOR
-[ ] EORI
-[ ] EORI to CCR
-[ ] EORI to SR
-[X] EXG
-[ ] EXT
-[X] ILLEGAL
-[X] JMP
-[X] JSR
-[X] LEA
-[ ] LINK
-[ ] LSL, LSR
-[X] MOVE
-[X] MOVEA
-[ ] MOVE to CCR
-[ ] MOVE from SR
-[ ] MOVE to SR
-[X] MOVE USP
-[ ] MOVEM
-[ ] MOVEP
-[X] MOVEQ
-[ ] MULS
-[ ] MULU
-[ ] NBCD
-[ ] NEG
-[ ] NEGX
-[X] NOP
-[ ] NOT
-[ ] OR
-[ ] ORI
-[ ] ORI to CCR
-[ ] ORI to SR
-[ ] PEA
-[ ] RESET
-[ ] ROL, ROR
-[ ] ROXL, ROXR
-[X] RTE
-[ ] RTR
-[X] RTS
-[ ] SBCD
-[ ] Scc
-[ ] STOP
-[ ] SUB
-[ ] SUBA
-[ ] SUBI
-[ ] SUBQ
-[ ] SUBX
-[X] SWAP
-[ ] TAS
-[X] TRAP
-[ ] TRAPV
-[ ] TST
-[ ] UNLK
+
+Implemented | Timing |
+[ ] [ ] ABCD
+[ ] [ ] ADD
+[ ] [ ] ADDA
+[ ] [ ] ADDI
+[ ] [ ] ADDQ
+[ ] [ ] ADDX
+[ ] [ ] AND
+[ ] [ ] ANDI
+[ ] [ ] ANDI to CCR
+[X] [X] ANDI to SR
+[ ] [ ] ASL, ASR
+[X] [X] Bcc
+[ ] [ ] BCHG
+[ ] [ ] BCLR
+[X] [X] BRA
+[ ] [ ] BSET
+[ ] [ ] BSR
+[ ] [ ] BTST
+[ ] [ ] CHK
+[ ] [ ] CLR
+[ ] [ ] CMP
+[ ] [ ] CMPA
+[ ] [ ] CMPI
+[ ] [ ] CMPM
+[X] [X] DBcc
+[ ] [ ] DIVS
+[ ] [ ] DIVU
+[ ] [ ] EOR
+[ ] [ ] EORI
+[ ] [ ] EORI to CCR
+[ ] [ ] EORI to SR
+[X] [X] EXG
+[ ] [ ] EXT
+[X] [X] ILLEGAL
+[X] [X] JMP
+[X] [X] JSR
+[X] [X] LEA
+[X] [X] LINK
+[ ] [ ] LSL, LSR
+[X] [X] MOVE
+[X] [X] MOVEA
+[ ] [ ] MOVE to CCR
+[ ] [ ] MOVE from SR
+[ ] [ ] MOVE to SR
+[X] [X] MOVE USP
+[ ] [ ] MOVEM
+[ ] [ ] MOVEP
+[X] [X] MOVEQ
+[ ] [ ] MULS
+[ ] [ ] MULU
+[ ] [ ] NBCD
+[ ] [ ] NEG
+[ ] [ ] NEGX
+[X] [X] NOP
+[ ] [ ] NOT
+[ ] [ ] OR
+[ ] [ ] ORI
+[ ] [ ] ORI to CCR
+[ ] [ ] ORI to SR
+[ ] [ ] PEA
+[X] [X] RESET
+[ ] [ ] ROL, ROR
+[ ] [ ] ROXL, ROXR
+[X] [X] RTE
+[ ] [ ] RTR
+[X] [X] RTS
+[ ] [ ] SBCD
+[ ] [ ] Scc
+[ ] [ ] STOP
+[ ] [ ] SUB
+[ ] [ ] SUBA
+[ ] [ ] SUBI
+[ ] [ ] SUBQ
+[ ] [ ] SUBX
+[X] [X] SWAP
+[ ] [ ] TAS
+[X] [X] TRAP
+[ ] [ ] TRAPV
+[ ] [ ] TST
+[X] [X] UNLK

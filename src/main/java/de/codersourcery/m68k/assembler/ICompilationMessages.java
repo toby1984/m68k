@@ -3,8 +3,6 @@ package de.codersourcery.m68k.assembler;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
 import de.codersourcery.m68k.parser.ast.ASTNode;
-import jdk.jfr.StackTrace;
-import org.apache.logging.log4j.message.Message;
 
 import java.util.Arrays;
 import java.util.List;

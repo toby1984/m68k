@@ -177,6 +177,8 @@ public class CPU
     public int pcAtStartOfLastInstruction;
     public int pc;
 
+    public int cycles;
+
     private int ea; // populated from address calculations
     private int value; // value the current instruction operates on
 
@@ -274,6 +276,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b010:
                 // ADDRESS_REGISTER_INDIRECT;
                 ea = addressRegisters[ eaRegister ];
+                cycles += operandSize == 4 ? 8 : 4;
                 return true;
             case 0b011:
                 // ADDRESS_REGISTER_INDIRECT_POST_INCREMENT;
@@ -286,6 +289,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 {
                     addressRegisters[eaRegister] += operandSize;
                 }
+                cycles += operandSize == 4 ? 8 : 4;
                 return true;
             case 0b100:
                 // ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT;
@@ -298,11 +302,13 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     ea = addressRegisters[eaRegister] - operandSize;
                 }
                 addressRegisters[ eaRegister ] = ea;
+                cycles += operandSize == 4 ? 10 : 6;
                 return true;
             case 0b101:
                 // ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
                 int offset = memLoadWord(pc);
                 pc += 2; // skip displacement
+                cycles += operandSize == 4 ? 12 : 8;
                 ea = addressRegisters[ eaRegister ] + offset; // hint: memLoad() performs sign-extension to 32 bits
                 return true;
             case 0b110:
@@ -407,6 +413,15 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 baseDisplacement = (byte) (extensionWord & 0xff);
                 baseDisplacement = (baseDisplacement<<24)>>24;
                 ea = baseRegisterValue+decodeIndexRegisterValue(extensionWord)+baseDisplacement;
+
+                /* TODO: Cycle count not correct here as I don't know how to
+                 * TODO: differentiate indirect with displacement from indirect with index ...
+                 *
+                 *                                                            BYTE/WORD   LONG
+                 * d(An)	 address register indirect with displacement	 8(2/0)		12(3/0)
+                 * d(An,ix)  address register indirect with index	        10(2/0)		14(3/0)
+                 */
+                cycles += operandSize == 4 ? 12 : 8;
                 return true;
             case 0b111:
                 switch(eaRegister)
@@ -415,6 +430,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         // PC_INDIRECT_WITH_DISPLACEMENT(0b111,fixedValue(0b010),1),
                         baseDisplacement = memory.readWordNoCheck(pc);
                         ea = baseDisplacement + pc;
+                        cycles += operandSize == 4 ? 12 : 8;
                         pc += 2;
                         return true;
                     case 0b011:
@@ -436,6 +452,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             baseDisplacement = loadBaseDisplacement(extensionWord);
                         }
                         ea = baseDisplacement + origPc + decodeIndexRegisterValue(extensionWord);
+                        cycles += operandSize == 4 ? 14 : 10; // TODO: Most likely wrong ....
                         return true;
 
                 /*
@@ -455,6 +472,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          * ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1 ),
                          */
                         ea = memLoadWord(pc);
+                        cycles += operandSize == 4 ? 12 : 8;
                         pc += 2;
                         return true;
                     case 0b001:
@@ -463,6 +481,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2 ),
                          */
                         ea = memLoadLong(pc);
+                        cycles += operandSize == 4 ? 12 : 8;
                         pc += 4;
                         return true;
                     case 0b100:
@@ -471,8 +490,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          * // 1,2,4, OR 6, EXCEPT FOR PACKED DECIMAL REAL OPERANDS
                          * IMMEDIATE_VALUE(0b111,fixedValue(100), 6),   // move #XXXX
                          */
-//                        ea = memLoad( pc,operandSize );
                         ea = pc;
+                        cycles += operandSize == 4 ? 8 : 4;
                         pc += operandSize;
                         return true;
                 }
@@ -532,11 +551,27 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         return idxRegisterValue * scale;
     }
 
-    public void executeOneInstruction()
+    /**
+     *
+     * @deprecated UNIT-TESTING ONLY. Invoke {@link #executeOneCycle()} instead.
+     */
+    @Deprecated
+    public void executeOneInstruction() {
+        while ( cycles > 1 ) {
+            executeOneCycle();
+        }
+        executeOneCycle();
+    }
+
+    public void executeOneCycle()
     {
+        if ( --cycles > 0 ) {
+            return;
+        }
+
         try
         {
-            internalExecutionOneInstruction();
+            internalExecutionOneCycle();
 
             checkPendingIRQ();
         }
@@ -546,7 +581,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         }
     }
 
-    private void internalExecutionOneInstruction()
+    private void internalExecutionOneCycle()
     {
         System.out.println(">>>> Executing instruction at 0x"+Integer.toHexString(pc));
 
@@ -572,22 +607,29 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 {
                     decodeSourceOperand(instruction, 2);
                     setStatusRegister( statusRegister & value );
+                    cycles = 20;
                 }
                 return;
             /* ================================
              * Miscellaneous instructions
              * ================================
              */
-            case 0b0100111001110011: // RET
+            case 0b0100111001110011: // RTE
                 returnFromException();
+                cycles = 20;
                 return;
             case 0b0100111001110001:  // NOP
+                cycles = 4;
                 return;
             case 0b0100111001110101:  // RTS
                 pc = popLong();
+                cycles = 16;
                 return;
             case 0b0100101011111100: // ILLEGAL
                 triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
+                return;
+            case 0b0100111001110000: // RESET
+                cycles = 132;
                 return;
         }
         final int insBits = (instruction & 0b1111_0000_0000_0000);
@@ -621,6 +663,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     decodeSourceOperand(instruction,4);
                     // MOVEA does not change any flags
                     storeValue(instruction,4 );
+                    // TODO: MOVEA instruction timing ???
                     return;
                 }
                 decodeSourceOperand(instruction,4);
@@ -651,11 +694,33 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0100_0000_0000_0000:
 
+                if ( (instruction & 0b1111111111111000) == 0b0100111001011000) {
+                    // UNLK
+                    final int regNum = (instruction & 0b111);
+                    addressRegisters[ 7 ] = addressRegisters[regNum];
+                    addressRegisters[regNum] = popLong();
+                    cycles = 12;
+                    return;
+                }
+
+                if ( (instruction & 0b1111111111111000) == 0b0100111001010000) {
+                    // LINK
+                    final int regNum = (instruction & 0b111);
+                    final int displacement = memLoadWord(pc);
+                    pc += 2;
+                    pushLong( addressRegisters[ regNum ] );
+                    addressRegisters[ regNum ] = addressRegisters[ 7 ];
+                    addressRegisters[7] += displacement; // TODO: Is the displacement in bytes or words ??? Stack pointer always needs to point to an even address....
+                    cycles = 16;
+                    return;
+                }
+
                 if ( (instruction & 0b1111111111000000) == 0b0100111010000000)
                 {
                     // JSR
                     decodeSourceOperand(instruction,4);
                     pushLong(pc);
+                    cycles += 4; // TODO: Timing correct ?
                     pc = value;
                     return;
                 }
@@ -685,6 +750,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     // JMP
                     decodeSourceOperand(instruction,4);
                     pc = value;
+                    cycles += 4; // TODO: Timing correct?
                     return;
                 }
                 if ( (instruction & 0b11111111_11110000) == 0b0100111001100000)
@@ -702,11 +768,13 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             addressRegisters[ regNum ] = userModeStackPtr; // USP -> address register
                         }
                     }
+                    cycles = 4;
                     return;
                 }
                 if ( (instruction & 0b1111111111110000) == 0b0100111001000000 ) {
                     // TRAP #xx
                     triggerIRQ(IRQ.userTrapToIRQ( instruction & 0b1111 ),0);
+                    cycles = 38;
                     return;
                 }
 
@@ -717,6 +785,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     final int dstAdrReg = (instruction & 0b1110_0000_0000) >> 9;
 
                     addressRegisters[dstAdrReg] = value;
+                    // TODO: Cycle timing correct ??
                     return;
                 }
                 break;
@@ -739,13 +808,18 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         if ( newValue != 0xffff ) {
                             /*
                              * - If the result is – 1, execution continues with the next instruction.
-                             * - If the result is not equal to – 1, execution continues at the location indicated by the current value of the program
+                             * - If the result is not equal to – 1, execution continues at the location indicated RAy the current value of the program
                              *   counter plus the sign-extended 16-bit displacement. The value in the program counter is
                              *   the address of the instruction word of the DBcc instruction plus two. The
                              */
                             pc = pc + memory.readWordNoCheck(pc);
+                            cycles = 10;
                             return;
+                        } else {
+                            cycles = 14;
                         }
+                    } else {
+                        cycles = 12;
                     }
                     pc += 2; // skip branch offset
                     return;
@@ -770,13 +844,19 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         if (takeBranch)
                         {
                             pc += memLoadWord(pc) - 2; // -2 because we already advanced the PC after reading the instruction word
+                            cycles = 10;
+                        } else {
+                            cycles = 12;
                         }
                         pc += 2; // skip offset
                         break;
-                    case 0xff: // 32 bit offset
+                    case 0xff: // 32 bit offset (NOT an M68000 addressing mode...)
                         if (takeBranch)
                         {
                             pc += memLoadLong(pc) - 2; // -2because we already advanced the PC after reading the instruction word
+                            cycles = 12; // TODO: Wrong timing, find out 68020+ timings...
+                        } else {
+                            cycles = 10; // TODO: Wrong timing, find out 68020+ timings...
                         }
                         pc += 4;
                         break;
@@ -786,6 +866,9 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         {
                             final int offset = ((instruction & 0xff) << 24) >> 24;
                             pc += offset - 2; // -2 because we already advanced the PC after reading the instruction word
+                            cycles = 10;
+                        } else {
+                            cycles = 8;
                         }
                 }
                 return;
@@ -800,6 +883,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 dataRegisters[register] = value;
                 updateFlags();
                 clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
+                cycles = 4;
                 return;
             /* ================================
              * OR/DIV/SBCD
@@ -841,16 +925,19 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             int tmp = dataRegisters[ addressReg ];
                             dataRegisters[ addressReg ] = dataRegisters[ dataReg ];
                             dataRegisters[ dataReg ] = tmp;
+                            cycles = 6;
                             return;
                         case 0b01001000: // swap Address registers
                             tmp = addressRegisters[ addressReg ];
                             addressRegisters[ addressReg ] = addressRegisters[ dataReg ];
                             addressRegisters[ dataReg ] = tmp;
+                            cycles = 6;
                             return;
                         case 0b10001000: // swap Data register and address register
                             tmp = addressRegisters[ addressReg ];
                             addressRegisters[ addressReg ] = dataRegisters[ dataReg ];
                             dataRegisters[ dataReg ] = tmp;
+                            cycles = 6;
                             return;
                     }
                     triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
@@ -956,6 +1043,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          */
                         value = memLoadWord(pc);
                         pc += 2;
+                        cycles += 8;
                         return;
                     case 0b001:
                         /*
@@ -964,6 +1052,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          */
                         value = memLoadLong(pc);
                         pc += 4;
+                        cycles += 12;
                         return;
                 }
                 // $$FALL-THROUGH$$
@@ -1013,6 +1102,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 addressRegisters[eaRegister] = value;
                 break;
             case 0b111:
+
+                int address;
                 switch(eaRegister)
                 {
                     case 0b000:
@@ -1020,16 +1111,35 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          * MOVE (xxx).W,... (1 extra word).
                          * ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1 ),
                          */
+                        address = memory.readWordNoCheck(pc);
+                        pc += 2;
+                        break;
                     case 0b001:
                         /*
                          * MOVE (xxx).L,.... (2 extra words).
                         ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2 ),
                          */
+                        address = memory.readLongNoCheck(pc);
+                        pc += 4;
                         addressRegisters[eaRegister] = value;
                         break;
+                    default:
+                        triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
+                        return;
                 }
-                triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
-                return;
+                switch(operandSize)
+                {
+                    case 1:
+                        memory.writeByte(address,value);
+                        return;
+                    case 2:
+                        memory.writeWord(address,value);
+                        return;
+                    case 4:
+                        memory.writeLong(address,value);
+                        return;
+                }
+                throw new RuntimeException("Unreachable code reached");
             default:
                 if (  decodeOperand(operandSize, eaMode, eaRegister) )
                 {
@@ -1116,6 +1226,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
     {
         if ( irq == IRQ.RESET )
         {
+            cycles = 0;
+
             // clear interrupt stack
             irqStackPtr = 0;
             activeIrq = null;
@@ -1161,6 +1273,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         {
             // GROUP0 IRQs push additional data on the stack
 
+            cycles += 50;
+
             /*
              * 1. Word
              *
@@ -1178,6 +1292,9 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             pushWord( (int) (irqData >> (64-32) ) );
             pushWord( (int) (irqData >> (64-48) ) );
             pushWord( (int) irqData);
+        } else {
+            // TODO: Cycle count is NOT accurate !! Depends on IRQ type...
+            cycles += 38;
         }
 
         // push old status register

@@ -176,6 +176,42 @@ public class ParserTest extends TestCase
         assertEquals( Instruction.RTS, insn.getInstructionType() );
     }
 
+    public void testParseUnlink()
+    {
+        final AST ast = parseAST("unlk a3");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.UNLK, insn.getInstructionType() );
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.source().addressingMode );
+        assertEquals( Register.A3, insn.source().getValue().asRegister().register );
+    }
+
+    public void testParseReset()
+    {
+        final AST ast = parseAST("reset");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.RESET, insn.getInstructionType() );
+    }
+
+    public void testParseLINK()
+    {
+        final AST ast = parseAST("link a3,#$fffe");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.LINK, insn.getInstructionType() );
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.source().addressingMode );
+        assertEquals( Register.A3, insn.source().getValue().asRegister().register );
+
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.destination().addressingMode );
+        assertEquals( Integer.valueOf(0xfffe), insn.destination().getValue().getBits(null) );
+    }
+
     public void testParseJSR1()
     {
         final AST ast = parseAST("JSR $12345678");

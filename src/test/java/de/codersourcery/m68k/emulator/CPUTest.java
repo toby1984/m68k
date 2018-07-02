@@ -24,6 +24,9 @@ public class CPUTest extends TestCase
 {
     private static final int MEM_SIZE = 10*1024;
 
+    private static final int SUPERVISOR_STACK_PTR = MEM_SIZE; // stack grows downwards on M68k
+    private static final int USERMODE_STACK_PTR = SUPERVISOR_STACK_PTR-256; // stack grows downwards on M68k
+
     public static final int ALL_USR_FLAGS = CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW | CPU.FLAG_NEGATIVE | CPU.FLAG_ZERO | CPU.FLAG_EXTENDED;
 
     // program start address in memory (in bytes)
@@ -49,8 +52,12 @@ public class CPUTest extends TestCase
 
     public void testIllegal()
     {
-        // TODO: This test needs to be rewritten once emulator supports interrupt handling
         execute(cpu->{},"illegal").supervisor().irqActive(CPU.IRQ.ILLEGAL_INSTRUCTION);
+    }
+
+    public void testReset()
+    {
+        execute("reset").cycles(132);
     }
 
     public void testLEA2()
@@ -90,6 +97,28 @@ public class CPUTest extends TestCase
         execute(cpu-> cpu.setFlags(CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW), 2, "move.l #$12345678,D3",
                 "swap d3")
                 .expectD3(0x56781234).noOverflow().notNegative().notZero().notExtended().notSupervisor();
+    }
+
+    /*
+Description: Loads the stack pointer from the specified address register, then loads the
+address register with the long word pulled from the top of the stack.
+
+     */
+    public void testUnlink()
+    {
+        execute( cpu -> {},3,
+                 "move.l #$56781234,(2020)",
+                 "move.l #2020,a3",
+                 "unlk a3" )
+                .expectA3(0x12345678)
+                .expectA7(2024).noOverflow().notNegative().notZero().notExtended().notSupervisor();
+    }
+
+    public void testLink()
+    {
+        execute( "link a3,#$fffe" )
+                .expectA3(USERMODE_STACK_PTR-4)
+                .expectA7(USERMODE_STACK_PTR-6).noOverflow().notNegative().notZero().notExtended().notSupervisor();
     }
 
     public void testSWAP2() {
@@ -306,6 +335,48 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 .notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
     }
 
+    public void testMemoryStoreByte()
+    {
+        execute("move.b #$12,(1024)")
+                .expectMemoryByte(1024,0x12 ).notZero().notNegative();
+
+        execute("move.b #$00,(1024)")
+                .expectMemoryByte(1024,0x0).zero().notNegative();
+
+        execute("move.b #$ff,(1024)")
+                .expectMemoryByte(1024,-1 ).notZero().negative();
+    }
+
+    public void testMemoryStoreWord()
+    {
+        execute("move.w #$12,(1024)")
+                .expectMemoryWord(1024,0x12 ).notZero().notNegative();
+
+        execute("move.w #$00,(1024)")
+                .expectMemoryWord(1024,0x0).zero().notNegative();
+
+        execute("move.w #$ff,(1024)")
+                .expectMemoryWord(1024,0xff ).notZero().notNegative();
+
+        execute("move.w #$ffff,(1024)")
+                .expectMemoryWord(1024,-1 ).notZero().negative();
+    }
+
+    public void testMemoryStoreLong()
+    {
+        execute("move.l #$12,(1024)")
+                .expectMemoryLong(1024,0x12 ).notZero().notNegative();
+
+        execute("move.l #$00,(1024)")
+                .expectMemoryLong(1024,0x0).zero().notNegative();
+
+        execute("move.l #$ff,(1024)")
+                .expectMemoryLong(1024,0xff ).notZero().notNegative();
+
+        execute("move.l #$ffffffff,(1024)")
+                .expectMemoryLong(1024,-1 ).notZero().negative();
+    }
+
     public void testMoveaLong()
     {
         execute(cpu -> {} ,
@@ -362,7 +433,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             Arrays.stream(additional).forEach(lines::add );
         }
 
-        memory.writeLong(0, memory.getEndAddress() ); // Supervisor mode stack pointer
+        memory.writeLong(0, SUPERVISOR_STACK_PTR); // Supervisor mode stack pointer
 
         // write reset handler
         // that sets the usermode stack ptr
@@ -373,7 +444,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         insToExecute += 4; // +4 instructions in reset handler
 
         final int mask = ~CPU.FLAG_SUPERVISOR_MODE;
-        final String resetHandler = "MOVE.L #"+Misc.hex(memory.getEndAddress()-128)+",A0\n" +
+        final String resetHandler = "MOVE.L #"+Misc.hex(USERMODE_STACK_PTR)+",A0\n" +
                 "MOVE.L A0,USP\n" +
                 "AND #"+ Misc.binary16Bit(mask)+",SR\n" +
                 "JMP "+Misc.hex(PROGRAM_START_ADDRESS); // clear super visor bit
@@ -451,6 +522,11 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         public ExpectionBuilder expectA6(int value) { return assertHexEquals( "A6 mismatch" , value, cpu.addressRegisters[6]); }
         public ExpectionBuilder expectA7(int value) { return assertHexEquals( "A7 mismatch" , value, cpu.addressRegisters[7]); }
 
+        public ExpectionBuilder cycles(int number) {
+            assertEquals("Expected CPU cycle count "+number+" but was "+cpu.cycles,number,cpu.cycles);
+            return this;
+        }
+
         public ExpectionBuilder expectPC(int value) { return assertHexEquals( "PC mismatch" , value, cpu.pc); }
 
         public ExpectionBuilder zero() { assertTrue( "Z flag not set ?" , cpu.isZero() ); return this; };
@@ -470,6 +546,37 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 
         public ExpectionBuilder supervisor() { assertTrue( "S flag not set ?" , cpu.isSupervisorMode() ); return this; };
         public ExpectionBuilder notSupervisor() { assertTrue( "S flag set ?" , ! cpu.isSupervisorMode()); return this; };
+
+        public ExpectionBuilder expectMemoryByte(int address,int value)
+        {
+            final int actual = memory.readByte(address);
+            if ( value != actual ) {
+                fail("Expected "+Misc.hex(value)+" @ "+Misc.hex(address)+" but got "+Misc.hex(actual));
+            }
+            return this;
+        }
+
+        public ExpectionBuilder expectMemoryWord(int address,int value)
+        {
+            final int actual = memory.readWord(address);
+            if ( value != actual ) {
+                fail("Expected "+Misc.hex(value)+" @ "+Misc.hex(address)+" but got "+Misc.hex(actual));
+            }
+            return this;
+        }
+
+        public ExpectionBuilder expectMemoryLong(int address,int value)
+        {
+            final int actual = memory.readLong(address);
+            if ( value != actual ) {
+                fail("Expected "+Misc.hex(value)+" @ "+Misc.hex(address)+" but got "+Misc.hex(actual));
+            }
+            return this;
+        }
+
+
+
+
 
         public ExpectionBuilder irqActive(CPU.IRQ irq) { assertEquals("Expected "+irq+" but active IRQ was "+cpu.activeIrq,irq,cpu.activeIrq); return this; }
 

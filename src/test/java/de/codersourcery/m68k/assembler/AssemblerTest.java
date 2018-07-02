@@ -173,9 +173,24 @@ public class AssemblerTest extends TestCase
         }
     }
 
+    public void testReset()
+    {
+        assertArrayEquals(compile("reset")    ,0x4e,0x70);
+    }
+
     public void testRTE()
     {
         assertArrayEquals(compile("rte")    ,0x4e,0x73);
+    }
+
+    public void testLINK()
+    {
+        assertArrayEquals(compile("LINK a3,#$04")    ,0x4e,0x53,0x00,0x04);
+    }
+
+    public void testUNLK()
+    {
+        assertArrayEquals(compile("unlk a3")    ,0x4e,0x5b);
     }
 
     public void testRTS()

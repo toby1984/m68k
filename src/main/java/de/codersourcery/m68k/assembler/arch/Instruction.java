@@ -8,7 +8,6 @@ import de.codersourcery.m68k.parser.ast.NumberNode;
 import de.codersourcery.m68k.parser.ast.OperandNode;
 import de.codersourcery.m68k.parser.ast.RegisterNode;
 import de.codersourcery.m68k.utils.Misc;
-import javafx.scene.transform.Rotate;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.IdentityHashMap;
@@ -24,6 +23,34 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    RESET("RESET",0)
+    {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) {}
+    },
+    UNLK("UNLK",1)
+    {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            if ( ! node.source().getValue().isAddressRegister() ) {
+                throw new RuntimeException("Expected an address register as source operand");
+            }
+        }
+    },
+    LINK("LINK",2)
+    {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            if ( ! node.source().getValue().isAddressRegister() ) {
+                throw new RuntimeException("Expected an address register as source operand");
+            }
+            if ( ! node.destination().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE ) ) {
+                throw new RuntimeException("Expected an immediate mode value as destination operand");
+            }
+            Instruction.checkOperandSizeUnsigned( node.destination().getValue() ,16,ctx );
+        }
+    },
     RTS("RTS",0)
     {
         @Override
@@ -481,6 +508,12 @@ public enum Instruction
 
         switch (type)
         {
+            case RESET:
+                return RESET_ENCODING;
+            case UNLK:
+                return UNLINK_ENCODING;
+            case LINK:
+                return LINK_ENCODING;
             case RTS:
                 return RTS_ENCODING;
             case JSR:
@@ -883,6 +916,14 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding RTS_ENCODING = InstructionEncoding.of( "0100111001110101");
 
+    // TODO: 68020+ supports LONG displacement value as well
+    public static final InstructionEncoding LINK_ENCODING = InstructionEncoding.of( "0100111001010sss",
+                                                                                    "VVVVVVVV_VVVVVVVV");
+
+    public static final InstructionEncoding UNLINK_ENCODING = InstructionEncoding.of( "0100111001011sss");
+
+    public static final InstructionEncoding RESET_ENCODING = InstructionEncoding.of( "0100111001110000");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -910,6 +951,9 @@ D/A   |     |   |           |
         put(MOVEA_WORD_ENCODING,MOVEA);
         put(JSR_ENCODING,JSR);
         put(RTS_ENCODING,RTS);
+        put(LINK_ENCODING,LINK);
+        put(UNLINK_ENCODING,UNLK);
+        put(RESET_ENCODING,RESET);
     }};
 
 
