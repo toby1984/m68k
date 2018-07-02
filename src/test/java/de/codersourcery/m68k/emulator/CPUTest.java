@@ -377,6 +377,17 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 .expectMemoryLong(1024,-1 ).notZero().negative();
     }
 
+    public void testRTR()
+    {
+        final int swapped = (PROGRAM_START_ADDRESS << 16) | (PROGRAM_START_ADDRESS >>> 16);
+        execute(cpu -> {} ,
+                "move.l #"+swapped+",-(a7)", // swapped because stack grows towards address 0
+                "move.w #$ff,-(a7)",
+                "rtr")
+                .expectPC( PROGRAM_START_ADDRESS )
+                .carry().overflow().extended().negative().zero().notSupervisor();
+    }
+
     public void testMoveaLong()
     {
         execute(cpu -> {} ,

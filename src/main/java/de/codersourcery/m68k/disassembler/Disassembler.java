@@ -145,6 +145,9 @@ public class Disassembler
     {
         switch( insn )
         {
+            case RTR:
+                appendln("rtr");
+                return;
             case RESET:
                 appendln("reset");
                 return;

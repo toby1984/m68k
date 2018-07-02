@@ -87,6 +87,11 @@ public class DisassemblerTest extends TestCase
         compile("link a3,#$4");
     }
 
+    public void testRTR()
+    {
+        compile("rtr");
+    }
+
     public void testRTE()
     {
         compile("rte");

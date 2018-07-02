@@ -193,6 +193,11 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("unlk a3")    ,0x4e,0x5b);
     }
 
+    public void testRTR()
+    {
+        assertArrayEquals(compile("rtr")    ,0x4e,0x77);
+    }
+
     public void testRTS()
     {
         assertArrayEquals(compile("rts")    ,0x4e,0x75);

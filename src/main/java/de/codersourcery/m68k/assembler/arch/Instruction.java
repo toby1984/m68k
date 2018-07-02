@@ -23,6 +23,12 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    RTR("RTR",0) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+        }
+    },
     RESET("RESET",0)
     {
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) {}
@@ -434,7 +440,6 @@ public enum Instruction
             encoding = getEncoding(this, insn, context,estimateSizeForUnknownOperands);
             if ( estimateSizeForUnknownOperands ) {
                 final int sizeInBytes = encoding.getSizeInBytes();
-                System.out.println( insn.instruction+" with encoding "+encoding+" has size "+sizeInBytes);
                 context.getCodeWriter().allocateBytes(sizeInBytes);
                 return;
             }
@@ -508,6 +513,8 @@ public enum Instruction
 
         switch (type)
         {
+            case RTR:
+                return RTR_ENCODING;
             case RESET:
                 return RESET_ENCODING;
             case UNLK:
@@ -924,6 +931,8 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding RESET_ENCODING = InstructionEncoding.of( "0100111001110000");
 
+    public static final InstructionEncoding RTR_ENCODING = InstructionEncoding.of( "0100111001110111");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -954,6 +963,7 @@ D/A   |     |   |           |
         put(LINK_ENCODING,LINK);
         put(UNLINK_ENCODING,UNLK);
         put(RESET_ENCODING,RESET);
+        put(RTR_ENCODING,RTR);
     }};
 
 

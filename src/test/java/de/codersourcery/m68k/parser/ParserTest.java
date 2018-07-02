@@ -176,6 +176,15 @@ public class ParserTest extends TestCase
         assertEquals( Instruction.RTS, insn.getInstructionType() );
     }
 
+    public void testParseRTR()
+    {
+        final AST ast = parseAST("RTR");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.RTR, insn.getInstructionType() );
+    }
+
     public void testParseUnlink()
     {
         final AST ast = parseAST("unlk a3");

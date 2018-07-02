@@ -614,6 +614,18 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * Miscellaneous instructions
              * ================================
              */
+            case 0b0100111001110111: // RTR
+                /*
+                Pulls the condition code and program counter values from the stack.
+                The previous condition code and program counter values are lost.
+                The supervisor portion of the status register is unaffected.
+                 (SP) → CCR; SP + 2 → SP; (SP) →PC; SP + 4 → SP
+                 */
+                int cr = popWord();
+                pc = popLong();
+                statusRegister = (statusRegister & 0xff00) | (cr & 0xff);
+                cycles = 20;
+                return;
             case 0b0100111001110011: // RTE
                 returnFromException();
                 cycles = 20;
