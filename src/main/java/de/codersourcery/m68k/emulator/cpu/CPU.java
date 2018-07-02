@@ -615,12 +615,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0100111001110111: // RTR
-                /*
-                Pulls the condition code and program counter values from the stack.
-                The previous condition code and program counter values are lost.
-                The supervisor portion of the status register is unaffected.
-                 (SP) → CCR; SP + 2 → SP; (SP) →PC; SP + 4 → SP
-                 */
                 int cr = popWord();
                 pc = popLong();
                 statusRegister = (statusRegister & 0xff00) | (cr & 0xff);
@@ -798,6 +792,13 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
                     addressRegisters[dstAdrReg] = value;
                     // TODO: Cycle timing correct ??
+                    return;
+                }
+
+                if ( (instruction & 0b1111111111000000) == 0b0100100001000000) {
+                    // PEA
+                    decodeSourceOperand( instruction,4 );
+                    pushLong( value );
                     return;
                 }
                 break;

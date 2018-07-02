@@ -82,6 +82,11 @@ public class DisassemblerTest extends TestCase
         compile("unlk a3");
     }
 
+    public void testPEA()
+    {
+        compile("pea (a3)");
+    }
+
     public void testLink()
     {
         compile("link a3,#$4");

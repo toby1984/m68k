@@ -147,6 +147,10 @@ public class AssemblerTest extends TestCase
         check.accept(bytes );
     }
 
+    public void testPEA() {
+        assertArrayEquals(compile("pea (a3)")    ,0x48,0x53);
+    }
+
     public void testJSR() {
         assertArrayEquals(compile("jsr next\nnext:")    ,0x4e,0xb8,0x00,0x04);
         assertArrayEquals(compile("jsr $2(pc)")    ,0x4e,0xba,0x00,0x02);

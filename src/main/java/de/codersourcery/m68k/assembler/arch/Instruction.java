@@ -23,6 +23,13 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    PEA("PEA",1) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkSourceAddressingMode( node,AddressingModeKind.CONTROL );
+        }
+    },
     RTR("RTR",0) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -513,6 +520,8 @@ public enum Instruction
 
         switch (type)
         {
+            case PEA:
+                return PEA_ENCODING;
             case RTR:
                 return RTR_ENCODING;
             case RESET:
@@ -872,99 +881,6 @@ D/A   |     |   |           |
         return false;
     }
 
-    public static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
-    public static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
-
-    public static final InstructionEncoding ANDI_TO_SR_ENCODING =
-            InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
-
-    public static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
-
-    public static final InstructionEncoding RTE_ENCODING = InstructionEncoding.of( "0100111001110011");
-
-    public static final InstructionEncoding JMP_INDIRECT_ENCODING = InstructionEncoding.of( "0100111011mmmsss");
-    public static final InstructionEncoding JMP_SHORT_ENCODING = InstructionEncoding.of(    "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of(     "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
-
-    public static final InstructionEncoding MOVE_BYTE_ENCODING = InstructionEncoding.of("0001DDDMMMmmmsss");
-    public static final InstructionEncoding MOVE_WORD_ENCODING = InstructionEncoding.of("0011DDDMMMmmmsss");
-    public static final InstructionEncoding MOVE_LONG_ENCODING = InstructionEncoding.of("0010DDDMMMmmmsss");
-
-    public static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
-
-    public static final InstructionEncoding LEA_LONG_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv");
-
-    public static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
-
-    public static final InstructionEncoding MOVE_USP_TO_AX_ENCODING = InstructionEncoding.of("0100111001101DDD");
-
-    public static final InstructionEncoding ILLEGAL_ENCODING = InstructionEncoding.of( "0100101011111100");
-
-    public static final InstructionEncoding EXG_ENCODING = InstructionEncoding.of("1100kkk1ooooolll");
-
-    public static final InstructionEncoding NOP_ENCODING = InstructionEncoding.of("0100111001110001");
-
-    public static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss","CCCCCCCC_CCCCCCCC");
-
-    public static final InstructionEncoding BCC_8BIT_ENCODING = InstructionEncoding.of(  "0110ccccCCCCCCCC");
-
-    public static final InstructionEncoding BCC_16BIT_ENCODING = InstructionEncoding.of( "0110cccc00000000","CCCCCCCC_CCCCCCCC");
-
-    public static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111",
-            "CCCCCCCC_CCCCCCCC_CCCCCCCC_CCCCCCCC");
-
-    public static final InstructionEncoding MOVEA_WORD_ENCODING = InstructionEncoding.of(  "0011DDD001mmmsss");
-    public static final InstructionEncoding MOVEA_LONG_ENCODING = InstructionEncoding.of(  "0010DDD001mmmsss");
-
-    public static final InstructionEncoding SWAP_ENCODING = InstructionEncoding.of(  "0100100001000sss");
-
-    public static final InstructionEncoding JSR_ENCODING = InstructionEncoding.of( "0100111010mmmsss");
-
-    public static final InstructionEncoding RTS_ENCODING = InstructionEncoding.of( "0100111001110101");
-
-    // TODO: 68020+ supports LONG displacement value as well
-    public static final InstructionEncoding LINK_ENCODING = InstructionEncoding.of( "0100111001010sss",
-                                                                                    "VVVVVVVV_VVVVVVVV");
-
-    public static final InstructionEncoding UNLINK_ENCODING = InstructionEncoding.of( "0100111001011sss");
-
-    public static final InstructionEncoding RESET_ENCODING = InstructionEncoding.of( "0100111001110000");
-
-    public static final InstructionEncoding RTR_ENCODING = InstructionEncoding.of( "0100111001110111");
-
-    public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
-    {{
-        put(ANDI_TO_SR_ENCODING,AND);
-        put(JMP_INDIRECT_ENCODING,JMP);
-        put(JMP_SHORT_ENCODING,JMP);
-        put(JMP_LONG_ENCODING,JMP);
-        put(TRAP_ENCODING,TRAP);
-        put(RTE_ENCODING,RTE);
-        put(MOVE_BYTE_ENCODING,MOVE);
-        put(MOVE_WORD_ENCODING,MOVE);
-        put(MOVE_LONG_ENCODING,MOVE);
-        put(MOVEQ_ENCODING,MOVEQ);
-        put(LEA_LONG_ENCODING,LEA);
-        put(LEA_WORD_ENCODING,LEA);
-        put(MOVE_AX_TO_USP_ENCODING,MOVE);
-        put(MOVE_USP_TO_AX_ENCODING,MOVE);
-        put(ILLEGAL_ENCODING,ILLEGAL);
-        put(EXG_ENCODING,EXG);
-        put(NOP_ENCODING,NOP);
-        put(DBCC_ENCODING,DBCC);
-        put(BCC_8BIT_ENCODING,BCC);
-        put(BCC_16BIT_ENCODING,BCC);
-        put(BCC_32BIT_ENCODING,BCC);
-        put(MOVEA_LONG_ENCODING,MOVEA);
-        put(MOVEA_WORD_ENCODING,MOVEA);
-        put(JSR_ENCODING,JSR);
-        put(RTS_ENCODING,RTS);
-        put(LINK_ENCODING,LINK);
-        put(UNLINK_ENCODING,UNLK);
-        put(RESET_ENCODING,RESET);
-        put(RTR_ENCODING,RTR);
-    }};
 
 
     private static void checkDBccInstructionValid(InstructionNode node,ICompilationContext ctx)
@@ -1120,4 +1036,101 @@ D/A   |     |   |           |
             throw new RuntimeException("Instruction "+insn.instruction+" only supports addressing modes of kind "+kind);
         }
     }
+
+    public static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
+    public static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
+
+    public static final InstructionEncoding ANDI_TO_SR_ENCODING =
+            InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
+
+    public static final InstructionEncoding RTE_ENCODING = InstructionEncoding.of( "0100111001110011");
+
+    public static final InstructionEncoding JMP_INDIRECT_ENCODING = InstructionEncoding.of( "0100111011mmmsss");
+    public static final InstructionEncoding JMP_SHORT_ENCODING = InstructionEncoding.of(    "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of(     "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding MOVE_BYTE_ENCODING = InstructionEncoding.of("0001DDDMMMmmmsss");
+    public static final InstructionEncoding MOVE_WORD_ENCODING = InstructionEncoding.of("0011DDDMMMmmmsss");
+    public static final InstructionEncoding MOVE_LONG_ENCODING = InstructionEncoding.of("0010DDDMMMmmmsss");
+
+    public static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
+
+    public static final InstructionEncoding LEA_LONG_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
+
+    public static final InstructionEncoding MOVE_USP_TO_AX_ENCODING = InstructionEncoding.of("0100111001101DDD");
+
+    public static final InstructionEncoding ILLEGAL_ENCODING = InstructionEncoding.of( "0100101011111100");
+
+    public static final InstructionEncoding EXG_ENCODING = InstructionEncoding.of("1100kkk1ooooolll");
+
+    public static final InstructionEncoding NOP_ENCODING = InstructionEncoding.of("0100111001110001");
+
+    public static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss","CCCCCCCC_CCCCCCCC");
+
+    public static final InstructionEncoding BCC_8BIT_ENCODING = InstructionEncoding.of(  "0110ccccCCCCCCCC");
+
+    public static final InstructionEncoding BCC_16BIT_ENCODING = InstructionEncoding.of( "0110cccc00000000","CCCCCCCC_CCCCCCCC");
+
+    public static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111",
+            "CCCCCCCC_CCCCCCCC_CCCCCCCC_CCCCCCCC");
+
+    public static final InstructionEncoding MOVEA_WORD_ENCODING = InstructionEncoding.of(  "0011DDD001mmmsss");
+    public static final InstructionEncoding MOVEA_LONG_ENCODING = InstructionEncoding.of(  "0010DDD001mmmsss");
+
+    public static final InstructionEncoding SWAP_ENCODING = InstructionEncoding.of(  "0100100001000sss");
+
+    public static final InstructionEncoding JSR_ENCODING = InstructionEncoding.of( "0100111010mmmsss");
+
+    public static final InstructionEncoding RTS_ENCODING = InstructionEncoding.of( "0100111001110101");
+
+    // TODO: 68020+ supports LONG displacement value as well
+    public static final InstructionEncoding LINK_ENCODING = InstructionEncoding.of( "0100111001010sss",
+                                                                                    "VVVVVVVV_VVVVVVVV");
+
+    public static final InstructionEncoding UNLINK_ENCODING = InstructionEncoding.of( "0100111001011sss");
+
+    public static final InstructionEncoding RESET_ENCODING = InstructionEncoding.of( "0100111001110000");
+
+    public static final InstructionEncoding RTR_ENCODING = InstructionEncoding.of( "0100111001110111");
+
+    public static final InstructionEncoding PEA_ENCODING = InstructionEncoding.of( "0100100001mmmsss");
+
+    public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
+    {{
+        put(ANDI_TO_SR_ENCODING,AND);
+        put(JMP_INDIRECT_ENCODING,JMP);
+        put(JMP_SHORT_ENCODING,JMP);
+        put(JMP_LONG_ENCODING,JMP);
+        put(TRAP_ENCODING,TRAP);
+        put(RTE_ENCODING,RTE);
+        put(MOVE_BYTE_ENCODING,MOVE);
+        put(MOVE_WORD_ENCODING,MOVE);
+        put(MOVE_LONG_ENCODING,MOVE);
+        put(MOVEQ_ENCODING,MOVEQ);
+        put(LEA_LONG_ENCODING,LEA);
+        put(LEA_WORD_ENCODING,LEA);
+        put(MOVE_AX_TO_USP_ENCODING,MOVE);
+        put(MOVE_USP_TO_AX_ENCODING,MOVE);
+        put(ILLEGAL_ENCODING,ILLEGAL);
+        put(EXG_ENCODING,EXG);
+        put(NOP_ENCODING,NOP);
+        put(DBCC_ENCODING,DBCC);
+        put(BCC_8BIT_ENCODING,BCC);
+        put(BCC_16BIT_ENCODING,BCC);
+        put(BCC_32BIT_ENCODING,BCC);
+        put(MOVEA_LONG_ENCODING,MOVEA);
+        put(MOVEA_WORD_ENCODING,MOVEA);
+        put(JSR_ENCODING,JSR);
+        put(RTS_ENCODING,RTS);
+        put(LINK_ENCODING,LINK);
+        put(UNLINK_ENCODING,UNLK);
+        put(RESET_ENCODING,RESET);
+        put(RTR_ENCODING,RTR);
+        put(PEA_ENCODING,PEA);
+    }};
 }

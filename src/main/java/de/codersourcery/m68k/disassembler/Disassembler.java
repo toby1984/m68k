@@ -145,6 +145,12 @@ public class Disassembler
     {
         switch( insn )
         {
+            case PEA:
+                appendln("pea ");
+                int eaMode     = (insnWord & 0b111000) >> 3;
+                int eaRegister = (insnWord & 0b000111);
+                decodeOperand(4,eaMode,eaRegister);
+                return;
             case RTR:
                 appendln("rtr");
                 return;
@@ -153,7 +159,7 @@ public class Disassembler
                 return;
             case UNLK:
                 appendln("unlk ");
-                int eaRegister = (insnWord & 0b000111);
+                eaRegister = (insnWord & 0b000111);
                 append("a").append(eaRegister);
                 return;
             case LINK:
@@ -167,7 +173,7 @@ public class Disassembler
                 return;
             case JSR:
                 appendln("jsr ");
-                int eaMode     = (insnWord & 0b111000) >> 3;
+                eaMode     = (insnWord & 0b111000) >> 3;
                 eaRegister = (insnWord & 0b000111);
                 decodeOperand(4,eaMode,eaRegister);
                 return;

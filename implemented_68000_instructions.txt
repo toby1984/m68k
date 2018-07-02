@@ -57,7 +57,7 @@
 [ ] ORI
 [ ] ORI to CCR
 [ ] ORI to SR
-[ ] PEA
+[X] PEA
 [X] RESET
 [ ] ROL, ROR
 [ ] ROXL, ROXR

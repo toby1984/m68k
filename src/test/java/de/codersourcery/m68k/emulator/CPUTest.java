@@ -327,6 +327,18 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             .carry().overflow().extended().negative().zero().notSupervisor();
     }
 
+    public void testPEA()
+    {
+        final int adr = PROGRAM_START_ADDRESS + 128;
+        execute(cpu -> {} ,
+                "lea "+adr+",a3",
+                "move.l #$12345678,(a3)",
+                "pea (a3)",
+                "move.l (a7)+,d0")
+                .expectD0(0x56781234) // swapped
+                .notCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
+    }
+
     public void testMoveaWord()
     {
         execute(cpu -> {} ,

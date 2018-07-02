@@ -221,6 +221,17 @@ public class ParserTest extends TestCase
         assertEquals( Integer.valueOf(0xfffe), insn.destination().getValue().getBits(null) );
     }
 
+    public void testPEA()
+    {
+        final AST ast = parseAST("PEA $12345678");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.PEA, insn.getInstructionType() );
+        assertEquals( AddressingMode.ABSOLUTE_LONG_ADDRESSING, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x12345678), insn.source().getValue().getBits(null) );
+    }
+
     public void testParseJSR1()
     {
         final AST ast = parseAST("JSR $12345678");
