@@ -145,10 +145,23 @@ public class Disassembler
     {
         switch( insn )
         {
-            case PEA:
-                appendln("pea ");
+            case NEG:
+                appendln("neg");
+                final int sizeBits = (insnWord & 0b11000000) >>> 6;
+                int operandSize = 1<<sizeBits;
+                switch(operandSize){
+                    case 1: append(".b "); break;
+                    case 2: append(".w "); break;
+                    case 4: append(".l "); break;
+                }
                 int eaMode     = (insnWord & 0b111000) >> 3;
                 int eaRegister = (insnWord & 0b000111);
+                decodeOperand(operandSize,eaMode,eaRegister);
+                return;
+            case PEA:
+                appendln("pea ");
+                eaMode     = (insnWord & 0b111000) >> 3;
+                eaRegister = (insnWord & 0b000111);
                 decodeOperand(4,eaMode,eaRegister);
                 return;
             case RTR:
@@ -178,7 +191,7 @@ public class Disassembler
                 decodeOperand(4,eaMode,eaRegister);
                 return;
             case MOVEA:
-                int operandSize = 2;
+                operandSize = 2;
                 if ( (insnWord & 0b0011_0000_0000_0000) == 0b0010_0000_0000_0000) {
                     operandSize = 4;
                 }

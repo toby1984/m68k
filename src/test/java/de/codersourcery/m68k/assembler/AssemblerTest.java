@@ -156,6 +156,13 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("jsr $2(pc)")    ,0x4e,0xba,0x00,0x02);
     }
 
+    public void testNeg()
+    {
+        assertArrayEquals(compile("neg.b d3")    ,0x44,0x03);
+        assertArrayEquals(compile("neg.w d3")    ,0x44,0x43);
+        assertArrayEquals(compile("neg.l d3")    ,0x44,0x83);
+    }
+
     public void testSwap()
     {
         assertArrayEquals(compile("swap d3")    ,0x48,0x43);

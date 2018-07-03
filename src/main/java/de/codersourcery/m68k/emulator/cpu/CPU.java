@@ -733,14 +733,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     return;
                 }
 
-                //                 /*
-                //                01000100SSmmmsss
-                //                1111111100000000
-                //                0100010000000000
-                //                 */
-                //                if ( (instruction & 0b1111111100000000) == 0b0100010000000000) {
-                //
-                //                }
                 if ( (instruction & 0b1111111100000000) == 0b0100010000000000)
                 {
                     // NEG
@@ -754,17 +746,25 @@ V — Set if an overflow occurs; cleared otherwise.
 C — Cleared if the result is zero; set otherwise.
 X — Set the same as the carry bit.
                      */
+                    final int b = value;
                     value = 0 - value;
-                    storeValue(instruction,operandSize);
-                    int clearMask = ~ALL_USERMODE_FLAGS;
-                    int setMask = 0;
+                    int eaMode = (instruction & 0b111000) >> 3;
+                    int eaRegister = (instruction & 0b111);
+                    storeValue(eaMode,eaRegister,operandSize);
+                    int setMask=0;
+                    switch(operandSize) {
+                        case 1: setMask = isOverflow8Bit( 0,b,value ) ? FLAG_OVERFLOW : 0; break;
+                        case 2: setMask = isOverflow16Bit( 0,b,value ) ? FLAG_OVERFLOW : 0; break;
+                        case 4: setMask = isOverflow32Bit( 0,b,value ) ? FLAG_OVERFLOW : 0; break;
+                    }
                     if ( value < 0 ) {
                         setMask |= FLAG_NEGATIVE | FLAG_CARRY | FLAG_EXTENDED;
                     } else if ( value == 0 ) {
                         setMask |= FLAG_ZERO;
-                        clearMask |= FLAG_CARRY | FLAG_EXTENDED;
+                    } else {
+                        setMask |= FLAG_CARRY | FLAG_EXTENDED;
                     }
-                    statusRegister = (statusRegister & clearMask) | setMask;
+                    statusRegister = (statusRegister & 0xff00) | setMask;
                     return;
                 }
 
@@ -1124,9 +1124,21 @@ X — Set the same as the carry bit.
     private void storeValue(int instruction,int operandSize)
     {
         // instruction word: ooooDDDMMMmmmsss
-        int eaMode     = (instruction & 0b0001_1100_0000) >> 6;
+        int eaMode = (instruction & 0b0001_1100_0000) >> 6;
         int eaRegister = (instruction & 0b1110_0000_0000) >> 9;
+        storeValue( eaMode,eaRegister,operandSize );
+    }
 
+    /**
+     * Stores the current operation's value according to the
+     * destination in the given instruction word.
+     *
+     * @param eaMode
+     * @param eaRegister
+     * @param operandSize
+     */
+    private void storeValue(int eaMode,int eaRegister,int operandSize)
+    {
         switch( eaMode )
         {
             case 0b000:
@@ -1134,10 +1146,10 @@ X — Set the same as the carry bit.
                 switch( operandSize )
                 {
                     case 1:
-                        dataRegisters[eaRegister] = value & 0x00ff;
+                        dataRegisters[eaRegister] = (dataRegisters[eaRegister] & 0xffffff00) | (value & 0xff);
                         return;
                     case 2:
-                        dataRegisters[eaRegister] = value & 0xffff;
+                        dataRegisters[eaRegister] = (dataRegisters[eaRegister] & 0xffff0000) | (value & 0xffff);
                         return;
                     case 4:
                         dataRegisters[eaRegister] = value;
@@ -1512,5 +1524,29 @@ X — Set the same as the carry bit.
                         ( ( statusRegister & FLAG_OVERFLOW ) != 0 ? "X" : "-" )+"|"+
                         ( ( statusRegister & FLAG_CARRY    ) != 0 ? "X" : "-" )+"|";
         return "CPU[ pc = "+ Misc.hex(pc)+" , insn="+binaryInsn+", sp="+Misc.hex(addressRegisters[7])+",IRQ="+activeIrq+"]\n"+flagHelp+"\n"+flags;
+    }
+
+    private static boolean isOverflow8Bit(int a,int b,int result) {
+        /*
+       v <= (not add_A(7) and not add_B(7) and Y(7)) or (add_A(7) and add_B(7) and not Y(7))
+         */
+        final boolean msbA = (a & 1<<7) != 0;
+        final boolean msbB = (b & 1<<7) != 0;
+        final boolean msbResult = (result & 1<<7) != 0;
+        return (! msbA & !msbB & msbResult) | (msbA & msbB & ! msbResult);
+    }
+
+    private static boolean isOverflow16Bit(int a,int b,int result) {
+        final boolean msbA = (a & 1<<15) != 0;
+        final boolean msbB = (b & 1<<15) != 0;
+        final boolean msbResult = (result & 1<<15) != 0;
+        return (! msbA & !msbB & msbResult) | (msbA & msbB & ! msbResult);
+    }
+
+    private static boolean isOverflow32Bit(int a,int b,int result) {
+        final boolean msbA = (a & 1<<31) != 0;
+        final boolean msbB = (b & 1<<31) != 0;
+        final boolean msbResult = (result & 1<<31) != 0;
+        return (! msbA & !msbB & msbResult) | (msbA & msbB & ! msbResult);
     }
 }

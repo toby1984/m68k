@@ -29,6 +29,8 @@ public enum Instruction
         {
             Instruction.checkSourceAddressingMode( node,AddressingModeKind.ALTERABLE );
         }
+
+        @Override public boolean supportsExplicitOperandSize() { return true; }
     },
     PEA("PEA",1) {
         @Override

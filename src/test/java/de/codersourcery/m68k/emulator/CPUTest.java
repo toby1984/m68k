@@ -114,6 +114,31 @@ address register with the long word pulled from the top of the stack.
                 .expectA7(2024).noOverflow().notNegative().notZero().notExtended().notSupervisor();
     }
 
+    /*
+N — Set if the result is negative; cleared otherwise.
+Z — Set if the result is zero; cleared otherwise.
+V — Set if an overflow occurs; cleared otherwise.
+C — Cleared if the result is zero; set otherwise.
+X — Set the same as the carry bit.
+*/
+    public void testNegByte()
+    {
+        execute(cpu->{},2,"move.l #1,d0", "neg.b d0")
+                .expectD0(0xff).notZero().negative().carry().extended();
+
+        execute(cpu->{},2,"move.l #0,d0", "neg.b d0")
+                .expectD0(0).zero().notNegative().notCarry().notExtended();
+
+        execute(cpu->{},2,"move.l #$12345601,d0", "neg.b d0")
+                .expectD0(0x123456ff).notZero().negative().carry().extended();
+
+        execute(cpu->{},2,"move.l #$12340001,d0", "neg.w d0")
+                .expectD0(0x1234ffff).notZero().negative().carry().extended();
+
+        execute(cpu->{},2,"move.l #$00000001,d0", "neg.l d0")
+                .expectD0(0xffffffff).notZero().negative().carry().extended();
+    }
+
     public void testLink()
     {
         execute( "link a3,#$fffe" )

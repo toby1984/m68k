@@ -87,6 +87,13 @@ public class DisassemblerTest extends TestCase
         compile("pea (a3)");
     }
 
+    public void testNeg()
+    {
+        compile("neg.b d3");
+        compile("neg.w d3");
+        compile("neg.l d3");
+    }
+
     public void testLink()
     {
         compile("link a3,#$4");
