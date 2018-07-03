@@ -158,6 +158,8 @@ public class CPU
     public static final int FLAG_OVERFLOW = 1<<1;
     public static final int FLAG_CARRY    = 1<<0;
 
+    public static final int ALL_USERMODE_FLAGS = FLAG_EXTENDED|FLAG_NEGATIVE|FLAG_ZERO|FLAG_OVERFLOW|FLAG_CARRY;
+
     public final Memory memory;
 
     public final int[] dataRegisters = new int[8];
@@ -728,6 +730,41 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     pushLong(pc);
                     cycles += 4; // TODO: Timing correct ?
                     pc = value;
+                    return;
+                }
+
+                //                 /*
+                //                01000100SSmmmsss
+                //                1111111100000000
+                //                0100010000000000
+                //                 */
+                //                if ( (instruction & 0b1111111100000000) == 0b0100010000000000) {
+                //
+                //                }
+                if ( (instruction & 0b1111111100000000) == 0b0100010000000000)
+                {
+                    // NEG
+                    final int sizeBits = (instruction & 0b11000000) >>> 6;
+                    final int operandSize = 1<<sizeBits;
+                    decodeSourceOperand(instruction,operandSize);
+                    /*
+N — Set if the result is negative; cleared otherwise.
+Z — Set if the result is zero; cleared otherwise.
+V — Set if an overflow occurs; cleared otherwise.
+C — Cleared if the result is zero; set otherwise.
+X — Set the same as the carry bit.
+                     */
+                    value = 0 - value;
+                    storeValue(instruction,operandSize);
+                    int clearMask = ~ALL_USERMODE_FLAGS;
+                    int setMask = 0;
+                    if ( value < 0 ) {
+                        setMask |= FLAG_NEGATIVE | FLAG_CARRY | FLAG_EXTENDED;
+                    } else if ( value == 0 ) {
+                        setMask |= FLAG_ZERO;
+                        clearMask |= FLAG_CARRY | FLAG_EXTENDED;
+                    }
+                    statusRegister = (statusRegister & clearMask) | setMask;
                     return;
                 }
 

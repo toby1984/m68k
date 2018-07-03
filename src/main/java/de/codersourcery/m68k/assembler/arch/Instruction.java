@@ -23,6 +23,13 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    NEG("NEG",1) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkSourceAddressingMode( node,AddressingModeKind.ALTERABLE );
+        }
+    },
     PEA("PEA",1) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -520,6 +527,8 @@ public enum Instruction
 
         switch (type)
         {
+            case NEG:
+                return NEG_ENCODING;
             case PEA:
                 return PEA_ENCODING;
             case RTR:
@@ -881,8 +890,6 @@ D/A   |     |   |           |
         return false;
     }
 
-
-
     private static void checkDBccInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
         if ( node.source().addressingMode != AddressingMode.DATA_REGISTER_DIRECT ) {
@@ -1100,6 +1107,15 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding PEA_ENCODING = InstructionEncoding.of( "0100100001mmmsss");
 
+    /*
+15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
+ 0  1  0  0  0  1 0 0 +-+ +-+-+ +---+
+                       |    |     |
+                       SIZE |    REGISTER
+                            MODE
+     */
+    public static final InstructionEncoding NEG_ENCODING = InstructionEncoding.of( "01000100SSmmmsss");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -1132,5 +1148,6 @@ D/A   |     |   |           |
         put(RESET_ENCODING,RESET);
         put(RTR_ENCODING,RTR);
         put(PEA_ENCODING,PEA);
+        put(NEG_ENCODING,NEG);
     }};
 }
