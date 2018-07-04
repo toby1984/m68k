@@ -5,6 +5,8 @@ import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Set;
+
 /**
  * M68000 cpu emulation.
  *
@@ -738,18 +740,18 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     // NEG
                     final int sizeBits = (instruction & 0b11000000) >>> 6;
                     final int operandSize = 1<<sizeBits;
-                    decodeSourceOperand(instruction,operandSize);
-                    /*
-N — Set if the result is negative; cleared otherwise.
-Z — Set if the result is zero; cleared otherwise.
-V — Set if an overflow occurs; cleared otherwise.
-C — Cleared if the result is zero; set otherwise.
-X — Set the same as the carry bit.
-                     */
+                    if ( decodeSourceOperand(instruction,operandSize) )
+                    {
+                        // operand is register
+                        cycles += (operandSize <= 2) ? 4 : 6;
+                    } else {
+                        // operand is memory
+                        cycles += (operandSize <= 2) ? 8 : 12;
+                    }
                     final int b = value;
                     value = 0 - value;
-                    int eaMode = (instruction & 0b111000) >> 3;
-                    int eaRegister = (instruction & 0b111);
+                    int eaMode     = (instruction & 0b111000) >> 3;
+                    int eaRegister = (instruction & 0b000111);
                     storeValue(eaMode,eaRegister,operandSize);
                     int setMask=0;
                     switch(operandSize) {
@@ -1005,6 +1007,31 @@ X — Set the same as the carry bit.
              * ================================
              */
             case 0b1110_0000_0000_0000:
+
+                int sizeBits = (instruction & 0b11000000) >> 6;
+                if ( ( instruction & 0b1111000100111000 ) == 0b1110000100011000 )
+                {
+                    // ROL_IMMEDIATE
+                    rotateImmediate(instruction,true);
+                    return;
+                }
+                if ( ( instruction & 0b1111111111000000) == 0b1110011111000000 ) {
+                    // ROL_MEMORY
+                    int eaMode     = (instruction & 0b111000) >> 3;
+                    int eaRegister = (instruction & 0b000111);
+                    decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                    int value = memLoadWord( ea );
+                    value = rotate( value,2,true,1 );
+                    memory.writeWord(ea,value);
+                    return;
+                }
+                // ROL register
+                if ( ( instruction & 0b1111000100111000) == 0b1110000100111000)
+                {
+                    // ROL_REGISTER
+                    rotateRegister(instruction,true);
+                    return;
+                }
                 break;
             /* ================================
              * Coprocessor Interface/MC68040 and CPU32 Extensions
@@ -1016,6 +1043,95 @@ X — Set the same as the carry bit.
                 throw new RuntimeException("Unreachable code reached");
         }
         triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
+    }
+
+    private void rotateRegister(int instruction,boolean rotateLeft)
+    {
+        int sizeBits = (instruction & 0b11000000) >> 6;
+        int srcRegNum = (instruction & 0b0000111000000000 ) >> 9;
+        int dstRegNum = (instruction & 0b111);
+
+        int cnt = dataRegisters[ srcRegNum ];
+        int value = rotate( dataRegisters[ dstRegNum ],1<<sizeBits,rotateLeft,cnt);
+        dataRegisters[ dstRegNum ] = mergeValue(dataRegisters[ dstRegNum ],value,1<<sizeBits);
+    }
+
+    private void rotateImmediate(int instruction,boolean rotateLeft)
+    {
+        int sizeBits = (instruction & 0b11000000) >> 6;
+        final int cnt = (instruction & 0b0000111000000000 ) >> 9;
+        final int regNum = (instruction & 0b111);
+
+        int value = rotate( dataRegisters[ regNum ],1<<sizeBits,rotateLeft,cnt);
+        dataRegisters[ regNum ] = mergeValue(dataRegisters[ regNum ],value,1<<sizeBits);
+    }
+
+    private int mergeValue(int input,int toMerge,int operandSizeInBytes) {
+
+        switch( operandSizeInBytes )
+        {
+            case 1: return (input & 0xffffff00) | (toMerge & 0x00ff);
+            case 2: return (input & 0xffff0000) | (toMerge & 0xffff);
+            case 4: return toMerge;
+        }
+        throw new RuntimeException("Unreachable code reached");
+    }
+
+    private int rotate(int value,int operandSizeInBytes,boolean rotateLeft,int rotateCount)
+    {
+        rotateCount = rotateCount % 64;
+
+        int lastBit=0; // value serves as default (carry clear) when rotate count is 0
+        final int msbBitNum = (operandSizeInBytes*8)-1;
+        if ( rotateLeft )
+        {
+            final int mask = 1 << msbBitNum;
+            for ( ; rotateCount > 0 ; rotateCount-- )
+            {
+                lastBit = (value & mask) >> msbBitNum;
+                value = (value << 1 ) | lastBit;
+            }
+        }
+        else
+        {
+            for ( ; rotateCount > 0 ; rotateCount-- )
+            {
+                lastBit = (value & 1) << msbBitNum;
+                value = (value >>> 1) | lastBit;
+            }
+        }
+        int clearMask = ~FLAG_OVERFLOW; // V flag is always cleared
+        int setMask = 0;
+        switch (operandSizeInBytes)
+        {
+            case 1: value &= value & 0xff;break;
+            case 2: value &= value & 0xffff;break;
+            case 4: break;
+            default:
+                throw new RuntimeException("Unreachable code reached");
+        }
+        if ( (value & 1 << msbBitNum ) != 0 ) { // N — Set if the most significant bit of the result is set; cleared otherwise.
+            setMask |= FLAG_NEGATIVE;
+        }
+        if ( value == 0 ) { // Z — Set if the result is zero; cleared otherwise.
+            setMask |= FLAG_ZERO;
+        }
+        if ( lastBit != 0 ) { // C - carry contains last bit rotated out of the operand
+            setMask |= FLAG_CARRY;
+        }
+        statusRegister = (statusRegister & clearMask) | setMask;
+        return value;
+    }
+
+    private static boolean isMSBSet(int value,int operandSizeInBytes)
+    {
+        switch( operandSizeInBytes )
+        {
+            case 1: return (value & 1<<7) != 0;
+            case 2: return (value & 1<<15) != 0;
+            case 4: return (value & 1<<31) != 0;
+        }
+        throw new RuntimeException("Unreachable code reached");
     }
 
     /**
@@ -1067,7 +1183,14 @@ X — Set the same as the carry bit.
         this.statusRegister = (this.statusRegister & clearMask ) | setMask;
     }
 
-    private void decodeSourceOperand(int instruction, int operandSize)
+    /**
+     * Decodes an 16-bit instruction word's source operand.
+     *
+     * @param instruction
+     * @param operandSize
+     * @return true if the operand is a register, otherwise false
+     */
+    private boolean decodeSourceOperand(int instruction, int operandSize)
     {
         // InstructionEncoding.of("ooooDDDMMMmmmsss");
         int eaMode     = (instruction & 0b111000) >> 3;
@@ -1078,11 +1201,13 @@ X — Set the same as the carry bit.
             case 0b000:
                 // DATA_REGISTER_DIRECT;
                 value = dataRegisters[eaRegister];
-                return;
+                cycles += 4;
+                return true;
             case 0b001:
                 // ADDRESS_REGISTER_DIRECT;
                 value = addressRegisters[eaRegister];
-                return;
+                cycles += 4;
+                return true;
             case 0b111:
                 switch(eaRegister)
                 {
@@ -1094,7 +1219,7 @@ X — Set the same as the carry bit.
                         value = memLoadWord(pc);
                         pc += 2;
                         cycles += 8;
-                        return;
+                        return false;
                     case 0b001:
                         /*
                          * MOVE (xxx).L,.... (2 extra words).
@@ -1103,7 +1228,7 @@ X — Set the same as the carry bit.
                         value = memLoadLong(pc);
                         pc += 4;
                         cycles += 12;
-                        return;
+                        return false;
                 }
                 // $$FALL-THROUGH$$
             default:
@@ -1112,6 +1237,7 @@ X — Set the same as the carry bit.
                     value = memLoad(ea, operandSize);
                 }
         }
+        return false;
     }
 
     /**

@@ -162,36 +162,53 @@ public class Parser
                 }
                 final InstructionNode insn = new InstructionNode(t,operandSize,region);
                 ASTNode operand = null;
-                switch( t.getOperandCount() )
+
+                switch (t.getMaxOperandCount())
                 {
                     case 0:
                         break;
                     case 1:
                         operand = parseOperand();
-                        if ( operand == null ) {
-                            fail("Failed to parse operand");
+                        if (operand == null)
+                        {
+                            if ( t.getMinOperandCount() > 0 )
+                            {
+                                fail("Failed to parse operand, instruction "+ t +" requires at least "+t.getMinOperandCount()+"  operands");
+                            }
+                            return insn;
                         }
-                        insn.add( operand );
+                        insn.add(operand);
                         break;
                     case 2:
                         operand = parseOperand();
-                        if ( operand == null ) {
-                            fail("Failed to parse operand");
+                        if (operand == null)
+                        {
+                            if ( t.getMinOperandCount() > 0 )
+                            {
+                                fail("Failed to parse operand, instruction "+ t +" requires at least "+t.getMinOperandCount()+"  operands");
+                            }
+                            return insn;
                         }
-                        insn.add( operand );
+                        insn.add(operand);
 
-                        if ( ! lexer.peek(TokenType.COMMA ) ) {
-                            fail("Missing comma, instruction "+t+" requires 2 operands");
+                        if (! lexer.peek(TokenType.COMMA))
+                        {
+                            if ( t.getMinOperandCount() > 1 )
+                            {
+                                fail("Missing comma, instruction " + t + " requires at least "+t.getMinOperandCount()+"  operands");
+                            }
+                            return insn;
                         }
                         lexer.next();
                         operand = parseOperand();
-                        if ( operand == null ) {
+                        if (operand == null)
+                        {
                             fail("Failed to parse second operand");
                         }
-                        insn.add( operand );
+                        insn.add(operand);
                         break;
                     default:
-                        throw new RuntimeException("Unsupported operand count: "+t);
+                        throw new RuntimeException("Unsupported operand count: " + t);
                 }
                 return insn;
             }

@@ -31,6 +31,10 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         this.useImpliedOperandSize = operandSize == OperandSize.UNSPECIFIED;
     }
 
+    public int operandCount() {
+        return children().size();
+    }
+
     public void setImplicitOperandSize(OperandSize size)
     {
         if ( size == null ) {

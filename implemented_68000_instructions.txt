@@ -49,7 +49,7 @@
 [ ] MULS
 [ ] MULU
 [ ] NBCD
-[ ] NEG
+[X] NEG
 [ ] NEGX
 [X] NOP
 [ ] NOT
@@ -59,8 +59,10 @@
 [ ] ORI to SR
 [X] PEA
 [X] RESET
-[ ] ROL, ROR
-[ ] ROXL, ROXR
+[X] ROL,
+[X] ROR
+[ ] ROXL
+[ ] ROXR
 [X] RTE
 [X] RTR
 [X] RTS

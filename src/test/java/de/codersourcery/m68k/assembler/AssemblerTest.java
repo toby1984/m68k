@@ -172,6 +172,31 @@ public class AssemblerTest extends TestCase
         assertFailsToCompile("swap.l d3");
     }
 
+    public void testRol()
+    {
+        assertArrayEquals(compile("rol $1234"  ),0xe7,0xf8,0x12,0x34);
+
+        assertArrayEquals(compile("rol.w #3,d2"),0xe7,0x5a);
+        assertArrayEquals(compile("rol.w #8,d2"),0xe1,0x5a);
+
+        assertArrayEquals(compile("rol.w d1,d2"),0xe3,0x7a);
+        assertArrayEquals(compile("rol.b d1,d2"),0xe3,0x3a);
+        assertArrayEquals(compile("rol.l d1,d2"),0xe3,0xba);
+        assertArrayEquals(compile("rol.b #3,d2"),0xe7,0x1a);
+        assertArrayEquals(compile("rol.l #3,d2"),0xe7,0x9a);
+    }
+
+    public void testRor() {
+        assertArrayEquals(compile("ror.w d1,d2"),0xe2,0x7a);
+        assertArrayEquals(compile("ror.b d1,d2"),0xe2,0x3a);
+        assertArrayEquals(compile("ror.l d1,d2"),0xe2,0xba);
+        assertArrayEquals(compile("ror.w #3,d2"),0xe6,0x5a);
+        assertArrayEquals(compile("ror.w #8,d2"),0xe0,0x5a);
+        assertArrayEquals(compile("ror.b #3,d2"),0xe6,0x1a);
+        assertArrayEquals(compile("ror.l #3,d2"),0xe6,0x9a);
+        assertArrayEquals(compile("ror $1234"  ),0xe6,0xf8,0x12,0x34);
+    }
+
     public void testTrap()
     {
         assertArrayEquals(compile("trap #10")    ,0x4e,0x4a);

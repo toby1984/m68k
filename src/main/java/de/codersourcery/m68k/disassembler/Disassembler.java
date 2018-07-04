@@ -139,21 +139,111 @@ public class Disassembler
         return 0;
     }
 
+    /**
+     *
+     * @param sizeBits size bits, already shifted so that b00 = .b / b01 = .w and b10 = .l
+     */
+    private void appendOperandSize(int sizeBits)
+    {
+        int operandSize = 1<<sizeBits;
+        switch(operandSize){
+            case 1: append(".b "); break;
+            case 2: append(".w "); break;
+            case 4: append(".l "); break;
+            default:
+                throw new RuntimeException("Unreachable code reached, size bits: "+sizeBits);
+        }
+    }
+
     private void disassemble(Instruction insn,
                              InstructionEncoding encoding,
                              int insnWord)
     {
         switch( insn )
         {
+            /*
+    public static final InstructionEncoding ROL_REGISTER_ENCODING = InstructionEncoding.of( "1110sss1SS111VVV");
+    public static final InstructionEncoding ROR_REGISTER_ENCODING = InstructionEncoding.of( "1110sss0SS111VVV");
+
+    public static final InstructionEncoding ROL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS011DDD");
+    public static final InstructionEncoding ROR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS011DDD");
+
+    public static final InstructionEncoding ROL_MEMORY_ENCODING = InstructionEncoding.of( "1110011111mmmsss");
+    public static final InstructionEncoding ROR_MEMORY_ENCODING = InstructionEncoding.of( "1110011011mmmsss");
+
+             */
+            case ROL:
+                appendln("rol");
+                int sizeBits = (insnWord & 0b11000000) >> 6;
+                if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100011000 )
+                {
+                    // ROL_IMMEDIATE
+                    appendOperandSize(sizeBits);
+                    int cnt = (insnWord & 0b0000111000000000 ) >> 9;
+                    if ( cnt == 0 ) {
+                        cnt = 8;
+                    }
+                    final int regNum = (insnWord & 0b111);
+                    append("#").append(cnt).append(",d").append(regNum);
+                    return;
+                }
+                if ( ( insnWord & 0b1111111111000000) == 0b1110011111000000 ) {
+                    // ROL_MEMORY
+                    append(" ");
+                    int eaMode     = (insnWord & 0b111000) >> 3;
+                    int eaRegister = (insnWord & 0b000111);
+                    decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                    return;
+                }
+                // ROL register
+                /*
+                if ( ( insnWord & 0b1111000100111000) == 0b1110000100111000) {
+                  // ROL_REGISTER
+                }
+                 */
+                appendOperandSize(sizeBits);
+                int srcRegNum = (insnWord & 0b0000111000000000 ) >> 9;
+                int dstRegNum = (insnWord & 0b111);
+                append("d").append(srcRegNum).append(",d").append(dstRegNum);
+                return;
+            case ROR:
+                appendln("ror");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                if ( ( insnWord & 0b1111000100111000 ) == 0b1110000000011000 ) {
+                    // ROR_IMMEDIATE
+                    appendOperandSize(sizeBits);
+                    int cnt = (insnWord & 0b0000111000000000 ) >> 9;
+                    if ( cnt == 0 ) {
+                        cnt = 8;
+                    }
+                    final int regNum = (insnWord & 0b111);
+                    append("#").append(cnt).append(",d").append(regNum);
+                    return;
+                }
+                if ( ( insnWord & 0b1111111111000000) == 0b1110011011000000 ) {
+                    // ROR_MEMORY
+                    append(" ");
+                    int eaMode     = (insnWord & 0b111000) >> 3;
+                    int eaRegister = (insnWord & 0b000111);
+                    decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                    return;
+                }
+                // ROR register
+                /*
+                if ( ( insnWord & 0b1111000100111000) == 0b1110000000111000) {
+                  // ROR register
+                }
+                 */
+                appendOperandSize(sizeBits);
+                srcRegNum = (insnWord & 0b0000111000000000 ) >> 9;
+                dstRegNum = (insnWord & 0b111);
+                append("d").append(srcRegNum).append(",d").append(dstRegNum);
+                return;
             case NEG:
                 appendln("neg");
-                final int sizeBits = (insnWord & 0b11000000) >>> 6;
+                sizeBits = (insnWord & 0b11000000) >>> 6;
                 int operandSize = 1<<sizeBits;
-                switch(operandSize){
-                    case 1: append(".b "); break;
-                    case 2: append(".w "); break;
-                    case 4: append(".l "); break;
-                }
+                appendOperandSize(sizeBits);
                 int eaMode     = (insnWord & 0b111000) >> 3;
                 int eaRegister = (insnWord & 0b000111);
                 decodeOperand(operandSize,eaMode,eaRegister);
@@ -455,7 +545,7 @@ public class Disassembler
                          */
                         int adr = memLoadWord(pc);
                         pc += 2;
-                        append( "(").append( Misc.hex(adr) ).append(")");
+                        append( Misc.hex(adr) );
                         return;
                     case 0b001:
                         /*
@@ -464,7 +554,7 @@ public class Disassembler
                          */
                         adr = memLoadLong(pc);
                         pc += 4;
-                        append( "(").append( Misc.hex(adr) ).append(")");
+                        append( Misc.hex(adr) );
                         return;
                 }
                 // $$FALL-THROUGH$$

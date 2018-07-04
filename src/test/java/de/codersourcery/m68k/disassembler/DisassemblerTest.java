@@ -67,6 +67,43 @@ public class DisassemblerTest extends TestCase
         compile("BLE loop\nloop:","00000000: ble $2");
     }
 
+    public void testROL()
+    {
+        /*
+   0:   e37a            rolw %d1,%d2
+   2:   e33a            rolb %d1,%d2
+   4:   e3ba            roll %d1,%d2
+   6:   e75a            rolw #3,%d2
+   8:   e71a            rolb #3,%d2
+   a:   e79a            roll #3,%d2
+   c:   e7f8 1234       rolw 0x1234
+         */
+        compile("rol.w d1,d2");
+        compile("rol.b d1,d2");
+        compile("rol.l d1,d2");
+
+        compile("rol.w #1,d2");
+        compile("rol.b #2,d2");
+        compile("rol.l #8,d2");
+
+        compile("rol $1234");
+        compile("rol $12345678");
+    }
+
+    public void testROR()
+    {
+        compile("ror.w d1,d2");
+        compile("ror.b d1,d2");
+        compile("ror.l d1,d2");
+
+        compile("ror.w #1,d2");
+        compile("ror.b #2,d2");
+        compile("ror.l #8,d2");
+
+        compile("ror $1234");
+        compile("ror $12345678");
+    }
+
     public void testReset()
     {
         compile("reset");
@@ -110,7 +147,7 @@ public class DisassemblerTest extends TestCase
     }
 
     public void testJSR() {
-        compile("jsr sub\nillegal\nsub:","00000000: jsr ($6)\n" +
+        compile("jsr sub\nillegal\nsub:","00000000: jsr $6\n" +
                 "00000004: illegal");
     }
 
@@ -125,8 +162,8 @@ public class DisassemblerTest extends TestCase
     }
 
     public void testLEA() {
-        compile("lea $1234,a3","00000000: lea ($1234),a3");
-        compile("lea $12345678,a3","00000000: lea ($12345678),a3");
+        compile("lea $1234,a3","00000000: lea $1234,a3");
+        compile("lea $12345678,a3","00000000: lea $12345678,a3");
     }
 
     public void testJMP() {
@@ -157,15 +194,15 @@ public class DisassemblerTest extends TestCase
         compile("move.w -(a0),d1","00000000: move.w -(a0),d1");
         compile("move.l -(a0),d1","00000000: move.l -(a0),d1");
 
-        compile("move.b ($1234),d1","00000000: move.b ($1234),d1");
-        compile("move   ($1234),d1","00000000: move.w ($1234),d1");
-        compile("move.w ($1234),d1","00000000: move.w ($1234),d1");
-        compile("move.l ($1234),d1","00000000: move.l ($1234),d1");
+        compile("move.b $1234,d1","00000000: move.b $1234,d1");
+        compile("move   $1234,d1","00000000: move.w $1234,d1");
+        compile("move.w $1234,d1","00000000: move.w $1234,d1");
+        compile("move.l $1234,d1","00000000: move.l $1234,d1");
 
-        compile("move.b ($123456),d1","00000000: move.b ($123456),d1");
-        compile("move   ($123456),d1","00000000: move.w ($123456),d1");
-        compile("move.w ($123456),d1","00000000: move.w ($123456),d1");
-        compile("move.l ($123456),d1","00000000: move.l ($123456),d1");
+        compile("move.b $123456,d1","00000000: move.b $123456,d1");
+        compile("move   $123456,d1","00000000: move.w $123456,d1");
+        compile("move.w $123456,d1","00000000: move.w $123456,d1");
+        compile("move.l $123456,d1","00000000: move.l $123456,d1");
 
         compile("move   $10(a0),d1","00000000: move.w $10(a0),d1");
         compile("move.b $10(a0),d1","00000000: move.b $10(a0),d1");

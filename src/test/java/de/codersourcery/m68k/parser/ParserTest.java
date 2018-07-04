@@ -167,6 +167,68 @@ public class ParserTest extends TestCase
         assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
     }
 
+    public void testParseROLImmediate()
+    {
+        testParseRotateImmediate(Instruction.ROL);
+    }
+
+    public void testParseROLMemory()
+    {
+        testParseRotateMemory(Instruction.ROL);
+    }
+
+    public void testParseROLRegister()
+    {
+        testParseRotateRegister(Instruction.ROL);
+    }
+
+    public void testParseRORImmediate()
+    {
+        testParseRotateImmediate(Instruction.ROR);
+    }
+
+    public void testParseRORMemory()
+    {
+        testParseRotateMemory(Instruction.ROR);
+    }
+
+    public void testParseRORRegister()
+    {
+        testParseRotateRegister(Instruction.ROR);
+    }
+
+    private void testParseRotateMemory(Instruction i)
+    {
+        final AST ast = parseAST(i.getMnemonic()+" $1234");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( i, insn.getInstructionType() );
+        assertEquals( 0x1234, insn.source().getValue().asNumber().getValue() );
+    }
+
+    private void testParseRotateRegister(Instruction i)
+    {
+        final AST ast = parseAST(i.getMnemonic()+" D2,D3");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( i, insn.getInstructionType() );
+        assertEquals( Register.D2, insn.source().getValue().asRegister().register );
+        assertEquals( Register.D3, insn.destination().getValue().asRegister().register );
+    }
+
+    private void testParseRotateImmediate(Instruction i)
+    {
+        final AST ast = parseAST(i.getMnemonic()+" #3,d3");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( i, insn.getInstructionType() );
+        assertEquals( Integer.valueOf(3), insn.source().getValue().getBits(null) );
+        assertEquals( Register.D3, insn.destination().getValue().asRegister().register );
+    }
+
     public void testParseRTS()
     {
         final AST ast = parseAST("RTS");

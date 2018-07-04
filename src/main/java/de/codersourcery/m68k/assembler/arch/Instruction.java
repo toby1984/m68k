@@ -10,7 +10,10 @@ import de.codersourcery.m68k.parser.ast.RegisterNode;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.function.Function;
 
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.ABSOLUTE_SHORT_ADDRESSING;
@@ -23,11 +26,35 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    ROL("ROL",2) {
+
+        @Override public int getMinOperandCount() { return 1; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            checkRotateInstructionValid(node,ctx);
+        }
+
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+    },
+    ROR("ROR",2) {
+
+        @Override public int getMinOperandCount() { return 1; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            checkRotateInstructionValid(node,ctx);
+        }
+
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+    },
     NEG("NEG",1) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
         {
-            Instruction.checkSourceAddressingMode( node,AddressingModeKind.ALTERABLE );
+            Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.ALTERABLE );
         }
 
         @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -36,7 +63,7 @@ public enum Instruction
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
         {
-            Instruction.checkSourceAddressingMode( node,AddressingModeKind.CONTROL );
+            Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL );
         }
     },
     RTR("RTR",0) {
@@ -86,7 +113,7 @@ public enum Instruction
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
         {
-            Instruction.checkSourceAddressingMode(node,AddressingModeKind.CONTROL);
+            Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
         }
     },
     SWAP("SWAP",1)
@@ -113,7 +140,7 @@ public enum Instruction
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
-                    Instruction.checkSourceAddressingMode(node,AddressingModeKind.CONTROL);
+                    Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
                 }
             },
     AND("AND",2)
@@ -366,7 +393,7 @@ public enum Instruction
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx)
                 {
-                    Instruction.checkSourceAddressingMode(node,AddressingModeKind.CONTROL);
+                    Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
 
                     final OperandNode source = node.source();
                     final OperandNode destination = node.destination();
@@ -380,21 +407,24 @@ public enum Instruction
     public final ConditionalInstructionType conditionalType;
     public final Condition condition;
     private final String mnemonic;
-    private final int operandCount;
+    private final int maxOperandCount;
     private final int operationMode; // bits 15-12 of first instruction word
 
-    Instruction(String mnemonic, int operandCount) {
-        this(mnemonic,operandCount, 0,null,ConditionalInstructionType.NONE);
+    Instruction(String mnemonic, int maxOperandCount) {
+        this(mnemonic,maxOperandCount, 0,null,ConditionalInstructionType.NONE);
     }
 
-    Instruction(String mnemonic, int operandCount, int operationMode) {
-        this(mnemonic,operandCount, operationMode,null,ConditionalInstructionType.NONE);
+    Instruction(String mnemonic, int maxOperandCount, int operationMode) {
+        this(mnemonic,maxOperandCount, operationMode,null,ConditionalInstructionType.NONE);
     }
 
-    Instruction(String mnemonic, int operandCount, int operationMode, Condition condition, ConditionalInstructionType conditionalType)
+    Instruction(String mnemonic, int maxOperandCount, int operationMode, Condition condition, ConditionalInstructionType conditionalType)
     {
+        if ( maxOperandCount > 2 ) {
+            throw new IllegalArgumentException("Parser only supports up to 2 operands");
+        }
         this.mnemonic = mnemonic.toLowerCase();
-        this.operandCount = operandCount;
+        this.maxOperandCount = maxOperandCount;
         this.operationMode = operationMode;
         this.condition = condition;
         this.conditionalType = conditionalType;
@@ -412,9 +442,14 @@ public enum Instruction
         return operationMode;
     }
 
-    public int getOperandCount()
+    public int getMaxOperandCount()
     {
-        return operandCount;
+        return maxOperandCount;
+    }
+
+    public int getMinOperandCount()
+    {
+        return maxOperandCount;
     }
 
     public String getMnemonic()
@@ -529,6 +564,38 @@ public enum Instruction
 
         switch (type)
         {
+            case ROL:
+                if ( insn.useImpliedOperandSize ) {
+                    insn.setImplicitOperandSize(OperandSize.WORD);
+                }
+                if ( insn.operandCount() == 1 ) {
+                    final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                    if ( extraSrcWords != null ) {
+                        return ROL_MEMORY_ENCODING.append(extraSrcWords);
+                    }
+                    return ROL_MEMORY_ENCODING;
+                }
+                if (insn.source().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE))
+                {
+                    return ROL_IMMEDIATE_ENCODING;
+                }
+                return ROL_REGISTER_ENCODING;
+            case ROR:
+                if ( insn.useImpliedOperandSize ) {
+                    insn.setImplicitOperandSize(OperandSize.WORD);
+                }
+                if ( insn.operandCount() == 1 ) {
+                    final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                    if ( extraSrcWords != null ) {
+                        return ROR_MEMORY_ENCODING.append(extraSrcWords);
+                    }
+                    return ROR_MEMORY_ENCODING;
+                }
+                if (insn.source().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE))
+                {
+                    return ROR_IMMEDIATE_ENCODING;
+                }
+                return ROR_REGISTER_ENCODING;
             case NEG:
                 return NEG_ENCODING;
             case PEA:
@@ -908,6 +975,39 @@ D/A   |     |   |           |
         checkOperandSizeSigned(node.destination().getValue(), 16,ctx);
     }
 
+    private static void checkRotateInstructionValid(InstructionNode node,ICompilationContext ctx)
+    {
+        if ( node.operandCount() == 1 ) {
+            // 1 operand => memory location
+
+            checkSourceAddressingMode(node,AddressingMode.ABSOLUTE_SHORT_ADDRESSING,AddressingMode.ABSOLUTE_LONG_ADDRESSING);
+
+            if ( ! node.useImpliedOperandSize && node.getOperandSize() != OperandSize.WORD) {
+                throw new RuntimeException(node.instruction+" can only operate on WORDs in memory");
+            }
+            return;
+        }
+        // 2 operands, register/immediate
+        if (node.source().getValue().isDataRegister())
+        {
+            // register,register
+            Instruction.checkDestinationAddressingModeKind(node,
+                    AddressingModeKind.DATA);
+            return;
+        }
+        if (node.source().addressingMode == IMMEDIATE_VALUE)
+        {
+            final Integer value = node.source().getValue().getBits( ctx );
+            if ( value != null && ( value < 1 || value > 8 ) ) {
+                throw new RuntimeException( node.instruction+" only supports rotating 1..8 times");
+            }
+            checkDestinationAddressingMode(node,
+                    AddressingMode.DATA_REGISTER_DIRECT);
+            return;
+        }
+        throw new RuntimeException("Operands have unsupported addressing modes for " + node.instruction);
+    }
+
     private static void checkBranchInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
         switch (node.source().addressingMode)
@@ -1030,20 +1130,80 @@ D/A   |     |   |           |
         throw new RuntimeException("Invalid index register operand size "+size);
     }
 
-    private static void checkSourceAddressingMode(InstructionNode insn,AddressingModeKind kind)
+    private static void checkSourceAddressingMode(InstructionNode insn, AddressingMode mode1,AddressingMode...additional)
     {
-        if( ! insn.source().addressingMode.hasKind(kind ) )
+        if ( insn.operandCount() < 1 ) {
+            throw new RuntimeException( insn+" lacks source operand");
+        }
+        if (noMatchingAddressingMode(insn.source(), mode1, additional))
         {
-            throw new RuntimeException("Instruction "+insn.instruction+" only supports addressing modes of kind "+kind);
+            final List<AddressingMode> modes = new ArrayList<>();
+            modes.add(mode1);
+            if ( additional != null ) {
+                modes.addAll(Arrays.asList(additional));
+            }
+            throw new RuntimeException("Unsupported addressing mode in source operand, instruction "+insn.instruction+" only supports "+modes);
         }
     }
 
-    private static void checkDestinationAddressingMode(InstructionNode insn,AddressingModeKind kind)
+    private static void checkDestinationAddressingMode(InstructionNode insn, AddressingMode mode1,AddressingMode...additional)
+    {
+        if ( insn.operandCount() < 2 ) {
+            throw new RuntimeException( insn+" lacks destination operand");
+        }
+        if (noMatchingAddressingMode(insn.destination(), mode1, additional))
+        {
+            final List<AddressingMode> modes = new ArrayList<>();
+            modes.add(mode1);
+            if ( additional != null ) {
+                modes.addAll(Arrays.asList(additional));
+            }
+            throw new RuntimeException("Unsupported addressing mode in destination operand, instruction "+insn.instruction+" only supports "+modes);
+        }
+    }
+
+    private static boolean noMatchingAddressingMode(OperandNode operand, AddressingMode mode1, AddressingMode...additional)
+    {
+        if ( operand.hasAddressingMode(mode1) ) {
+            return false;
+        }
+        if ( additional != null )
+        {
+            for ( AddressingMode expected : additional)
+            {
+                if ( operand.hasAddressingMode(expected ) ) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static void checkSourceAddressingModeKind(InstructionNode insn, AddressingModeKind kind)
+    {
+        if( ! insn.source().addressingMode.hasKind(kind ) )
+        {
+            throw new RuntimeException("Instruction "+insn.instruction+" only supports addressing modes of kind "+kind+" but was "+insn.source().addressingMode);
+        }
+    }
+
+    private static void checkDestinationAddressingModeKind(InstructionNode insn, AddressingModeKind kind)
     {
         if( ! insn.destination().addressingMode.hasKind(kind ) )
         {
-            throw new RuntimeException("Instruction "+insn.instruction+" only supports addressing modes of kind "+kind);
+            throw new RuntimeException("Instruction "+insn.instruction+" only supports addressing modes of kind "+kind+" but was "+insn.destination().addressingMode);
         }
+    }
+
+    private static InstructionEncoding.IValueDecorator fieldDecorator(Field f, Function<Integer, Integer> func)
+    {
+        return (field, inputValue) ->
+        {
+            if ( field == f ) {
+                return func.apply( inputValue );
+            }
+            return inputValue;
+        };
     }
 
     public static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
@@ -1109,13 +1269,18 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding PEA_ENCODING = InstructionEncoding.of( "0100100001mmmsss");
 
-    /*
-15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
- 0  1  0  0  0  1 0 0 +-+ +-+-+ +---+
-                       |    |     |
-                       SIZE |    REGISTER
-                            MODE
-     */
+    public static final InstructionEncoding ROL_REGISTER_ENCODING = InstructionEncoding.of( "1110sss1SS111VVV");
+    public static final InstructionEncoding ROR_REGISTER_ENCODING = InstructionEncoding.of( "1110sss0SS111VVV");
+
+    public static final InstructionEncoding ROL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS011DDD")
+                                                                                        .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ));
+
+    public static final InstructionEncoding ROR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS011DDD")
+                                                                                        .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ) );
+
+    public static final InstructionEncoding ROL_MEMORY_ENCODING = InstructionEncoding.of( "1110011111mmmsss");
+    public static final InstructionEncoding ROR_MEMORY_ENCODING = InstructionEncoding.of( "1110011011mmmsss");
+
     public static final InstructionEncoding NEG_ENCODING = InstructionEncoding.of( "01000100SSmmmsss");
 
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
@@ -1151,5 +1316,11 @@ D/A   |     |   |           |
         put(RTR_ENCODING,RTR);
         put(PEA_ENCODING,PEA);
         put(NEG_ENCODING,NEG);
+        put(ROL_REGISTER_ENCODING,ROL);
+        put(ROR_REGISTER_ENCODING,ROR);
+        put(ROL_IMMEDIATE_ENCODING,ROL);
+        put(ROR_IMMEDIATE_ENCODING,ROR);
+        put(ROL_MEMORY_ENCODING,ROL);
+        put(ROR_MEMORY_ENCODING,ROR);
     }};
 }

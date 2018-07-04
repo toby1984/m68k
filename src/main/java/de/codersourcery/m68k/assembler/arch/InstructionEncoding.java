@@ -1,6 +1,5 @@
 package de.codersourcery.m68k.assembler.arch;
 
-import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.IntRange;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
@@ -18,8 +17,7 @@ import java.util.function.Function;
  * Instruction encoding bit pattern.
  *
  * This class takes a list of strings that describe the bit-encoding for a given instruction and provides a way of
- * applying this pattern using values from {@link de.codersourcery.m68k.parser.ast.InstructionNode#getValueFor(Field, ICompilationContext)}
- * to generate the binary representation of a CPU instruction.
+ * applying this pattern to generate the binary representation of a CPU instruction.
  *
  * @author tobias.gierke@code-sourcery.de
  * @see Field
@@ -38,6 +36,8 @@ public class InstructionEncoding
     private final Map<Field,List<IBitMapping>>[] bitMappings;
     private final int sizeInBytes;
 
+    private final IValueDecorator valueDecorator;
+
     /*
      * Mask that has '1' bits wherever the first 16 bits
      * (=instruction word) of this encoding have a fixed
@@ -51,7 +51,17 @@ public class InstructionEncoding
      */
     private int instructionWordMask;
 
-    private InstructionEncoding(String[] newPatterns, Map<Field,List<IBitMapping>>[] newMappings)
+    /**
+     * Decorator used to change the bit encoding
+     * of certain field values.
+     * @author tobias.gierke@code-sourcery.de
+     */
+    public interface IValueDecorator
+    {
+        int getBits(Field field,int value);
+    }
+
+    private InstructionEncoding(String[] newPatterns, Map<Field,List<IBitMapping>>[] newMappings,IValueDecorator valueDecorator)
     {
         this.patterns = newPatterns;
         this.bitMappings = newMappings;
@@ -61,7 +71,20 @@ public class InstructionEncoding
             size += pattern.length() / 8;
         }
         this.sizeInBytes = size;
+        this.valueDecorator = valueDecorator;
         populateInstructionMask(newPatterns[0]);
+    }
+
+    public InstructionEncoding decorateWith(IValueDecorator decorator)
+    {
+        if ( decorator == null ) {
+            throw new IllegalArgumentException("Decorator must not be NULL");
+        }
+        final IValueDecorator newDecorator = (field, value) ->
+        {
+            return decorator.getBits( field, this.valueDecorator.getBits( field,value ) );
+        };
+        return new InstructionEncoding(this.patterns, this.bitMappings, newDecorator );
     }
 
     private void populateInstructionMask(String pattern)
@@ -323,6 +346,7 @@ public class InstructionEncoding
                 this.bitMappings[i+1] = getMappings(stripped);
             }
         }
+        this.valueDecorator = (field, value) -> value;
         this.sizeInBytes = sizeInBytes;
         populateInstructionMask(pattern1 );
     }
@@ -487,7 +511,15 @@ public class InstructionEncoding
                 final Field field = entry.getKey();
                 final List<IBitMapping> mappings = entry.getValue();
 
-                final int inputValue = field == Field.NONE ? 0 : source.apply(field );
+                final int inputValue;
+                if ( field == Field.NONE )
+                {
+                    inputValue = 0;
+                }
+                else
+                {
+                    inputValue = valueDecorator.getBits( field, source.apply( field ));
+                }
                 for ( var mapping : mappings )
                 {
                     if ( DEBUG )
@@ -540,7 +572,7 @@ public class InstructionEncoding
         System.arraycopy(patterns,0,newPatterns,0,patterns.length);
         newPatterns[newPatterns.length-1] = pattern;
 
-        return new InstructionEncoding(newPatterns,newMappings);
+        return new InstructionEncoding(newPatterns,newMappings,this.valueDecorator );
     }
 
     public InstructionEncoding append(String pattern1,String... morePatterns)
@@ -565,7 +597,7 @@ public class InstructionEncoding
             newMappings[newIdx] = getMappings(pattern);
             newPatterns[newIdx] = pattern;
         }
-        return new InstructionEncoding(newPatterns,newMappings);
+        return new InstructionEncoding(newPatterns,newMappings,this.valueDecorator );
     }
 
     /**
@@ -595,6 +627,6 @@ public class InstructionEncoding
             newMappings[newIdx] = getMappings(pattern);
             newPatterns[newIdx] = pattern;
         }
-        return new InstructionEncoding(newPatterns,newMappings);
+        return new InstructionEncoding(newPatterns,newMappings,this.valueDecorator );
     }
 }

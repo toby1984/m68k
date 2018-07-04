@@ -55,6 +55,31 @@ public class CPUTest extends TestCase
         execute(cpu->{},"illegal").supervisor().irqActive(CPU.IRQ.ILLEGAL_INSTRUCTION);
     }
 
+    public void testRolByte()
+    {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345601,d3",
+                "rol.b #1,d3")
+                .expectD3(  0x12345602 ).notZero().notNegative().notCarry().noOverflow().extended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345600,d3",
+                "rol.b #1,d3")
+                .expectD3(  0x12345602 ).zero().notNegative().notCarry().noOverflow().extended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345680,d3",
+                "rol.b #1,d3")
+                .expectD3(  0x12345601 ).zero().carry().notNegative().noOverflow().extended();
+    }
+
+    public void testRolWord() {
+        fail("Implement me");
+    }
+
+    public void testRolLong() {
+        fail("Implement me");
+    }
+
+    public void testRorByte() { fail("Implement me"); }
+    public void testRorWord() { fail("Implement me"); }
+    public void testRorLong() { fail("Implement me"); }
+
     public void testReset()
     {
         execute("reset").cycles(132);
