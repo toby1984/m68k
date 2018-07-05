@@ -20,10 +20,23 @@ public class SymbolTable
 {
     public SymbolTable parent;
 
-    public final Map<Identifier,Symbol> symbols =
-            new HashMap<>();
-
+    public final Map<Identifier,Symbol> symbols = new HashMap<>();
     public final List<SymbolTable> children = new ArrayList<>();
+
+    /**
+     * Removes all symbols from this table and
+     * clears and removes and child symbol tables it may have.
+     */
+    public void clear()
+    {
+        symbols.clear();
+        children.forEach(c ->
+        {
+            c.clear();
+            c.parent = null;
+        });
+        children.clear();
+    }
 
     /**
      * Set's this symbol table's parent.

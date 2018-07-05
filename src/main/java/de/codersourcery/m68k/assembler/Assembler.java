@@ -65,6 +65,7 @@ public class Assembler
     public CompilationMessages compile(CompilationUnit unit)
     {
         messages.clearMessages();
+        unit.reset();
 
         final boolean debug = options.debug;
         context = createContext(options);

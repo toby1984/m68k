@@ -1269,8 +1269,8 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding PEA_ENCODING = InstructionEncoding.of( "0100100001mmmsss");
 
-    public static final InstructionEncoding ROL_REGISTER_ENCODING = InstructionEncoding.of( "1110sss1SS111VVV");
-    public static final InstructionEncoding ROR_REGISTER_ENCODING = InstructionEncoding.of( "1110sss0SS111VVV");
+    public static final InstructionEncoding ROL_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss1SS111VVV");
+    public static final InstructionEncoding ROR_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss0SS111VVV");
 
     public static final InstructionEncoding ROL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS011DDD")
                                                                                         .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ));
@@ -1278,8 +1278,8 @@ D/A   |     |   |           |
     public static final InstructionEncoding ROR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS011DDD")
                                                                                         .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ) );
 
-    public static final InstructionEncoding ROL_MEMORY_ENCODING = InstructionEncoding.of( "1110011111mmmsss");
-    public static final InstructionEncoding ROR_MEMORY_ENCODING = InstructionEncoding.of( "1110011011mmmsss");
+    public static final InstructionEncoding ROL_MEMORY_ENCODING = InstructionEncoding.of(    "1110011111mmmsss");
+    public static final InstructionEncoding ROR_MEMORY_ENCODING = InstructionEncoding.of(    "1110011011mmmsss");
 
     public static final InstructionEncoding NEG_ENCODING = InstructionEncoding.of( "01000100SSmmmsss");
 

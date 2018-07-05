@@ -18,16 +18,25 @@ import java.util.Optional;
  */
 public class CompilationUnit
 {
-    public CompilationUnit parent;
     public final List<CompilationUnit> children=new ArrayList<>();
     private final IResource resource;
+    public final SymbolTable symbolTable = new SymbolTable();
+
+    public CompilationUnit parent;
     private AST ast;
     private List<IntRange> lines;
-    public final SymbolTable symbolTable = new SymbolTable();
 
     public CompilationUnit(IResource resource) {
         Validate.notNull(resource, "resource must not be null");
         this.resource = resource;
+    }
+
+    public void reset()
+    {
+        this.ast = new AST();
+        symbolTable.clear();
+        lines = null;
+        children.clear();
     }
 
     /**

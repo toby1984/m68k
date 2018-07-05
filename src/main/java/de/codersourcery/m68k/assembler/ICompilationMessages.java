@@ -15,11 +15,11 @@ import java.util.stream.Collectors;
  */
 public interface ICompilationMessages
 {
-    public enum Level {
+    enum Level {
         ERROR,WARN,INFO,DEBUG;
     }
 
-    public static final class Message
+    final class Message
     {
         public final StackTraceElement[] origin;
         public final CompilationUnit unit;

@@ -5,8 +5,6 @@ import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.Set;
-
 /**
  * M68000 cpu emulation.
  *
@@ -657,9 +655,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0001_0000_0000_0000:
                 decodeSourceOperand(instruction,2); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
-                value = (value<<24)>>24; // sign-extend
-                updateFlags();
-                clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
+                value = (value<<24)>>24; // sign-extend so that updateFlagsAfterMove() works correctly
+                updateFlagsAfterMove(1);
                 storeValue(instruction,1 );
                 return;
             /* ================================
@@ -677,8 +674,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     return;
                 }
                 decodeSourceOperand(instruction,4);
-                updateFlags();
-                clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
+                updateFlagsAfterMove(4); // hint: no sign-extension needed here
                 storeValue(instruction,4 );
                 return;
             /* ================================
@@ -694,8 +690,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     return;
                 }
                 decodeSourceOperand(instruction,2);
-                updateFlags();
-                clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
+                updateFlagsAfterMove(2);
                 storeValue(instruction,2 );
                 return;
             /* ================================
@@ -933,8 +928,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 value = (value<<24)>>24; // sign-extend
                 int register = (instruction & 0b0111_0000_0000) >> 8;
                 dataRegisters[register] = value;
-                updateFlags();
-                clearFlags(FLAG_CARRY | FLAG_OVERFLOW );
+                updateFlagsAfterMove(1);
                 cycles = 4;
                 return;
             /* ================================
@@ -1008,28 +1002,35 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b1110_0000_0000_0000:
 
-                int sizeBits = (instruction & 0b11000000) >> 6;
-                if ( ( instruction & 0b1111000100111000 ) == 0b1110000100011000 )
+                /* ---------
+                 * ROL / ROR
+                 * ---------
+                 */
+                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000011000 )
                 {
-                    // ROL_IMMEDIATE
-                    rotateImmediate(instruction,true);
+                    // IMMEDIATE
+                    int sizeBits = (instruction & 0b11000000) >> 6;
+                    final boolean rotateLeft = (instruction & 1<<8) != 0;
+                    rotateImmediate(instruction,rotateLeft);
                     return;
                 }
-                if ( ( instruction & 0b1111111111000000) == 0b1110011111000000 ) {
-                    // ROL_MEMORY
+                if ( ( instruction & 0b1111111101000000) == 0b1110011101000000 ) {
+                    // MEMORY
+                    int sizeBits = (instruction & 0b11000000) >> 6;
+                    final boolean rotateLeft = (instruction & 1<<8) != 0;
                     int eaMode     = (instruction & 0b111000) >> 3;
                     int eaRegister = (instruction & 0b000111);
                     decodeOperand(1<<sizeBits,eaMode,eaRegister);
                     int value = memLoadWord( ea );
-                    value = rotate( value,2,true,1 );
+                    value = rotate( value,2,rotateLeft,1 );
                     memory.writeWord(ea,value);
                     return;
                 }
-                // ROL register
-                if ( ( instruction & 0b1111000100111000) == 0b1110000100111000)
+                if ( ( instruction & 0b1111000000111000) == 0b1110000000111000)
                 {
-                    // ROL_REGISTER
-                    rotateRegister(instruction,true);
+                    // REGISTER
+                    final boolean rotateLeft = (instruction & 1<<8) != 0;
+                    rotateRegister(instruction,rotateLeft);
                     return;
                 }
                 break;
@@ -1077,9 +1078,9 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         throw new RuntimeException("Unreachable code reached");
     }
 
-    private int rotate(int value,int operandSizeInBytes,boolean rotateLeft,int rotateCount)
+    private int rotate(int value,int operandSizeInBytes,boolean rotateLeft,final int rotateCount2)
     {
-        rotateCount = rotateCount % 64;
+        int rotateCount = rotateCount2 % 64;
 
         int lastBit=0; // value serves as default (carry clear) when rotate count is 0
         final int msbBitNum = (operandSizeInBytes*8)-1;
@@ -1088,7 +1089,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             final int mask = 1 << msbBitNum;
             for ( ; rotateCount > 0 ; rotateCount-- )
             {
-                lastBit = (value & mask) >> msbBitNum;
+                lastBit = (value & mask) >>> msbBitNum;
                 value = (value << 1 ) | lastBit;
             }
         }
@@ -1100,13 +1101,21 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 value = (value >>> 1) | lastBit;
             }
         }
-        int clearMask = ~FLAG_OVERFLOW; // V flag is always cleared
+        int clearMask = ~(FLAG_NEGATIVE|FLAG_ZERO|FLAG_CARRY|FLAG_OVERFLOW); // V flag is always cleared
         int setMask = 0;
         switch (operandSizeInBytes)
         {
-            case 1: value &= value & 0xff;break;
-            case 2: value &= value & 0xffff;break;
-            case 4: break;
+            case 1:
+                value &= value & 0xff;
+                cycles += 6+2*rotateCount2;
+             break;
+            case 2:
+                value &= value & 0xffff;
+                cycles += 6+2*rotateCount2;
+                break;
+            case 4:
+                cycles += 8+2*rotateCount2;
+                break;
             default:
                 throw new RuntimeException("Unreachable code reached");
         }
@@ -1165,21 +1174,42 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         this.statusRegister &= ~bitMask;
     }
 
-    private void updateFlags()
+    /**
+     * Updates condition flags according to the current, <b>sign-extended to 32 bits</b> {@link #value}.
+     */
+    private void updateFlagsAfterMove(int operandSize)
     {
-        int clearMask = 0xffffffff;
+        final int clearMask = ~(FLAG_ZERO|FLAG_NEGATIVE|FLAG_OVERFLOW|FLAG_CARRY);
+
         int setMask = 0;
-        if ( value == 0 ) {
-            setMask |= FLAG_ZERO;
-        } else {
-            clearMask &= ~FLAG_ZERO;
+        switch( operandSize )
+        {
+            case 1:
+                if ( ( value & 0xff) == 0 ) {
+                    setMask = FLAG_ZERO;
+                }
+                else if ( (value & 1<<7) != 0 ) {
+                    setMask = FLAG_NEGATIVE;
+                }
+                break;
+            case 2:
+                if ( ( value & 0xffff) == 0 ) {
+                    setMask = FLAG_ZERO;
+                }
+                else if ( (value & 1<<15) != 0 ) {
+                    setMask = FLAG_NEGATIVE;
+                }
+                break;
+            case 4:
+                if ( value == 0 ) {
+                    setMask = FLAG_ZERO;
+                }
+                else if ( value < 0 ) {
+                    setMask = FLAG_NEGATIVE;
+                }
+                break;
         }
 
-        if ( ( value & 1<<31 ) != 0 ) {
-            setMask |= FLAG_NEGATIVE;
-        } else {
-            clearMask &= ~FLAG_NEGATIVE;
-        }
         this.statusRegister = (this.statusRegister & clearMask ) | setMask;
     }
 
