@@ -56,11 +56,9 @@ public class Assembler
     /**
      * Compiles source.
      *
-     * Call {@link #getBytes()} to get the generated binary.
-     *
      * @param unit
      * @return compilation messages
-     * @see #getBytes()
+     * @see #getBytes(boolean)
      */
     public CompilationMessages compile(CompilationUnit unit)
     {
@@ -99,12 +97,16 @@ public class Assembler
             {
                 break;
             }
-         }
-         if ( options.debug )
-         {
+        }
+        if ( options.debug )
+        {
             System.out.println( "==== Symbols =====\n\n"+unit.symbolTable );
-         }
+        }
         return messages;
+    }
+
+    public ICompilationContext getContext() {
+        return context;
     }
 
     public AssemblerOptions getOptions()
@@ -115,17 +117,20 @@ public class Assembler
     /**
      * Returns the generated binary data from the last call to {@link #compile(CompilationUnit)}.
      *
+     * @param padUpToStartOffset whether to zero-pad the beginning of the result if
+     *                           the start address of the first {@link IObjectCodeWriter.Buffer}
+     *                           is greater than zero.
      * @return
      * @throws IllegalStateException if the last compilation failed with an error.
      */
-    public byte[] getBytes()
+    public byte[] getBytes(boolean padUpToStartOffset)
     {
         if ( context.hasErrors() ) {
             throw new IllegalStateException("Compilation failed");
         }
         final ObjectCodeWriter writer = (ObjectCodeWriter)
                 context.getCodeWriter(ICompilationContext.Segment.TEXT);
-        return writer.getBytes();
+        return writer.getBytes(padUpToStartOffset);
     }
 
     private MyCompilationContext createContext(AssemblerOptions options)
@@ -133,7 +138,7 @@ public class Assembler
         return new MyCompilationContext(options);
     }
 
-    private IObjectCodeWriter createObjectCodeWriter(ICompilationContext context)
+    protected IObjectCodeWriter createObjectCodeWriter(ICompilationContext context)
     {
         return new ObjectCodeWriter();
     }

@@ -3,10 +3,12 @@ package de.codersourcery.m68k.tools;
 import de.codersourcery.m68k.assembler.Assembler;
 import de.codersourcery.m68k.assembler.CompilationMessages;
 import de.codersourcery.m68k.assembler.CompilationUnit;
+import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.ICompilationMessages;
+import de.codersourcery.m68k.assembler.IObjectCodeWriter;
 import de.codersourcery.m68k.assembler.IResource;
+import de.codersourcery.m68k.assembler.SRecordHelper;
 import de.codersourcery.m68k.parser.Location;
-import de.codersourcery.m68k.parser.ast.AST;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -19,29 +21,31 @@ import javax.swing.table.TableModel;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.*;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 
 import static javax.swing.SwingUtilities.invokeAndWait;
 
 public class AssemblerUI extends JFrame
 {
+    private static final String CONFIG_FILE = ".m68kconfig";
+
+    private static final String CONFIG_KEY_LAST_SOURCE_FILE = "lastSourceFile";
+
     public static final String DIRTY_SUFFIX = " (UNSAVED)";
     private JToolBar toolbar = new JToolBar(JToolBar.HORIZONTAL );
     private JEditorPane editor = new JEditorPane();
     private JTable messageTable = new JTable();
     private final MyTableModel tableModel = new MyTableModel();
 
+    private boolean configLoaded;
+    private final Properties properties = new Properties();
     private boolean isDirty;
 
     private final CompilationUnit unit = new CompilationUnit( new IResource()
@@ -166,7 +170,15 @@ public class AssemblerUI extends JFrame
     {
         super("AssemblerUI");
         messageTable.setModel(tableModel);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        addWindowListener( new WindowAdapter()
+        {
+            @Override
+            public void windowClosing(WindowEvent e)
+            {
+                quit();
+            }
+        } );
         editor.setFont( new Font(Font.MONOSPACED,Font.PLAIN,18));
 
         editor.getDocument().addDocumentListener(new DocumentListener()
@@ -195,7 +207,7 @@ public class AssemblerUI extends JFrame
         menu1.add( menuItem("Open...", this::load) );
         menu1.add( menuItem("Save", this::save ) );
         menu1.add( menuItem("Save as...", this::saveAs ) );
-        menu1.add( menuItem("Quit", () -> System.exit(0 ) ) );
+        menu1.add( menuItem("Quit", this::quit ) );
 
         final TableCellRenderer tableCellRenderer = new DefaultTableCellRenderer()
         {
@@ -233,7 +245,7 @@ public class AssemblerUI extends JFrame
         // add toolbar
         toolbar.add( button("Compile", this::compile) );
         toolbar.addSeparator();
-        toolbar.add( button("Quit", () -> System.exit(0) ) );
+        toolbar.add( button("Quit", this::quit ) );
 
         GridBagConstraints cnstrs = cnstrs(0, y);
         cnstrs.fill = GridBagConstraints.REMAINDER;
@@ -313,7 +325,7 @@ public class AssemblerUI extends JFrame
         catch (IOException e)
         {
             e.printStackTrace();
-            compilationMessages.error(unit,"Failed to save source to "+sourceFile.getAbsolutePath()+": "+e.getMessage());
+            error("Failed to save source to "+sourceFile.getAbsolutePath()+": "+e.getMessage(),e);
         }
     }
 
@@ -321,9 +333,31 @@ public class AssemblerUI extends JFrame
     {
         File newFile = selectFile(sourceFile,true);
         if ( newFile != null ) {
-            sourceFile = newFile;
+            setSourceFile( newFile );
             save();
         }
+    }
+
+    private File getObjectFile()
+    {
+        return sourceFile == null ? null : createObjectFile( sourceFile );
+    }
+
+    private void setSourceFile(File file)
+    {
+        this.sourceFile = file;
+        getConfiguration().put( CONFIG_KEY_LAST_SOURCE_FILE, file.getAbsolutePath() );
+        saveConfiguration();
+    }
+
+    public void quit()
+    {
+        if ( isDirty && ! proceed( "Unsaved changes", "You have unsaved changes. Do you really want to QUIT ?" ) )
+        {
+            return;
+        }
+        saveConfiguration();
+        System.exit(0);
     }
 
     private void reload()
@@ -343,7 +377,7 @@ public class AssemblerUI extends JFrame
             catch (IOException e)
             {
                 e.printStackTrace();
-                compilationMessages.error(unit,"Failed to load "+sourceFile.getAbsolutePath()+": "+e.getMessage());
+                error("Failed to load "+sourceFile.getAbsolutePath()+": "+e.getMessage(),e);
             }
         }
         else
@@ -354,9 +388,17 @@ public class AssemblerUI extends JFrame
 
     private void load()
     {
-        final File file = selectFile( sourceFile, false );
+        final String lastFile = getConfiguration().getProperty( CONFIG_KEY_LAST_SOURCE_FILE );
+        final File file;
+        if ( lastFile != null ) {
+            file = selectFile( new File(lastFile) , false );
+        }
+        else
+        {
+            file = selectFile( sourceFile, false );
+        }
         if ( file != null && file.exists() ) {
-            sourceFile = file;
+            setSourceFile( file );
             reload();
         }
     }
@@ -395,19 +437,35 @@ public class AssemblerUI extends JFrame
 
         Assembler asm = new Assembler();
 
+
+        final File objectFile = getObjectFile();
+        if ( objectFile != null && objectFile.exists() ) {
+            objectFile.delete();
+        }
         final long start = System.currentTimeMillis();
         try
         {
             compilationMessages = asm.compile(unit);
+            final byte[] executable = asm.getBytes(false);
+            compilationMessages.info(unit,"Compilation produced "+executable.length+" bytes");
+            if ( ! compilationMessages.hasErrors() && objectFile != null )
+            {
+                final IObjectCodeWriter writer = asm.getContext().getCodeWriter( ICompilationContext.Segment.TEXT );
+                try ( FileOutputStream out = new FileOutputStream( objectFile ) )
+                {
+                    new SRecordHelper().write( writer.getBuffers(), out );
+                }
+                compilationMessages.info(unit,"Wrote "+executable.length+" bytes to "+objectFile.getAbsolutePath());
+            }
         }
         catch(Exception e)
         {
             e.printStackTrace();
-            compilationMessages.error(unit,"Internal error: "+e.getMessage());
+            error("Internal error: ",e);
         }
         final long elapsedMillis = System.currentTimeMillis() - start;
         if ( compilationMessages.hasErrors() ) {
-            compilationMessages.info(unit,"Compilation FAILED ("+elapsedMillis+" ms)");
+            error("Compilation FAILED ("+elapsedMillis+" ms)");
         } else {
             compilationMessages.info(unit,"Compilation successful ("+elapsedMillis+" ms)");
         }
@@ -432,6 +490,65 @@ public class AssemblerUI extends JFrame
         return sourceFile == null ? "" : sourceFile.getAbsolutePath();
     }
 
+    private void saveConfiguration()
+    {
+        final File file = getConfigFile();
+        try ( FileOutputStream inputStream = new FileOutputStream( file ) )
+        {
+            properties.save( inputStream, "# auto-generated, do not edit" );
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            error("Failed to save configuration to "+file.getAbsolutePath(),e);
+        }
+    }
+
+    private Properties getConfiguration()
+    {
+        if ( ! configLoaded )
+        {
+            final File file = getConfigFile();
+            if ( file.exists() )
+            {
+                try ( FileInputStream inputStream = new FileInputStream( file ) )
+                {
+                    properties.load( inputStream );
+                    configLoaded = true;
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    error( "Failed to load configuration from "+file.getAbsolutePath(), e);
+                }
+                if ( ! configLoaded )
+                {
+                    configLoaded = true;
+                    saveConfiguration();
+                }
+            }
+        }
+        return properties;
+    }
+
+    private File getConfigFile()
+    {
+        final String userDir = System.getProperty( "user.home" );
+        if ( userDir == null || userDir.trim().isEmpty() ) {
+            throw new RuntimeException("Unable to determine user home directory");
+        }
+        return new File(userDir,CONFIG_FILE);
+    }
+
+    private static File createObjectFile(File sourceFile) {
+
+        String file = sourceFile.getAbsolutePath();
+        if ( file.length() > 2 && file.toLowerCase().endsWith(".s") ) {
+            file = file.substring( 0,file.length()-2 );
+        }
+        return new File( file+".h68" );
+    }
+
     private void clearDirty()
     {
         if ( isDirty )
@@ -439,5 +556,22 @@ public class AssemblerUI extends JFrame
             setTitle(createWindowTitle());
             isDirty = false;
         }
+    }
+
+    private void error(String message)
+    {
+        error(message,null);
+    }
+
+    private void error(String message,Throwable cause)
+    {
+        compilationMessages.error( unit, message );
+        tableModel.modelChanged();
+    }
+
+    private boolean proceed(String title,String message)
+    {
+        final int result = JOptionPane.showConfirmDialog( null, message, title, JOptionPane.WARNING_MESSAGE );
+        return result == JOptionPane.OK_OPTION;
     }
 }

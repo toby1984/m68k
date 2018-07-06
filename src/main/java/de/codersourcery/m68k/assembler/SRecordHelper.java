@@ -3,13 +3,9 @@ package de.codersourcery.m68k.assembler;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -43,6 +39,10 @@ public class SRecordHelper
         private byte[] data = new byte[0];
         private int checksum;
 
+        public SRecord(SRecordType type, int address, byte[] data) {
+            this(type,address,data,0);
+        }
+
         public SRecord(SRecordType type, int address, byte[] data, int checksum)
         {
             Validate.notNull(data, "data must not be null");
@@ -51,6 +51,11 @@ public class SRecordHelper
             this.address = address;
             this.data = data;
             this.checksum = checksum;
+        }
+
+        public SRecord updateChecksum() {
+            checksum = calcChecksum();
+            return this;
         }
 
         public static SRecord parse(String line) {
@@ -194,6 +199,39 @@ public class SRecordHelper
                 throw new RuntimeException("Invalid checksum: "+record);
             }
             this.records.add(record);
+        }
+    }
+
+    public void write(List<IObjectCodeWriter.Buffer> buffers, OutputStream out) throws IOException
+    {
+        try ( BufferedWriter w = new BufferedWriter( new OutputStreamWriter( out ) ) )
+        {
+            w.write(
+                new SRecord(  SRecordType.S0,0,"test.h68".getBytes() ).updateChecksum().toString()
+            );
+            for (IObjectCodeWriter.Buffer buf : buffers )
+            {
+                if ( ! buf.isEmpty() )
+                {
+                    final ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+                    buf.appendTo( outStream );
+                    final byte[] data = outStream.toByteArray();
+                    int toWrite = data.length;
+                    int ptr = 0;
+                    while ( toWrite > 0 )
+                    {
+                        final int len = toWrite > 254 ? 254 : toWrite;
+                        final byte[] subArray = Arrays.copyOfRange(data,ptr,ptr+len);
+                        w.write("\n");
+                        w.write(
+                            // S3 => 4 address bytes
+                            new SRecord(SRecordType.S3,buf.startOffset+ptr,subArray ).updateChecksum().toString()
+                        );
+                        ptr += len;
+                        toWrite -= len;
+                    }
+                }
+            }
         }
     }
 

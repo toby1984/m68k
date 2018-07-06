@@ -2,59 +2,65 @@ package de.codersourcery.m68k.assembler;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ObjectCodeWriter implements IObjectCodeWriter
 {
-    private ByteArrayOutputStream out = new ByteArrayOutputStream();
+    private final int initialBufferSize;
+    private final List<Buffer> buffers = new ArrayList<>();
 
-    private Integer startOffset;
-    private int offset = 0;
+    public ObjectCodeWriter() {
+        this(1024);
+    }
+
+    public ObjectCodeWriter(int initialBufferSize)
+    {
+        if ( initialBufferSize < 1 ) {
+            throw new IllegalArgumentException( "Initial buffer size must be >= 1" );
+        }
+        this.initialBufferSize = initialBufferSize;
+        reset();
+    }
+
+    private Buffer currentBuffer()
+    {
+        return buffers.get( buffers.size()-1 );
+    }
 
     @Override
-    public void setStartOffset(int address) throws IllegalStateException
+    public void setOffset(int address) throws IllegalStateException
     {
-        if ( this.startOffset != null ) {
-            if ( this.startOffset.intValue() != address ) {
-                throw new IllegalStateException("Start offset already set to "+this.startOffset);
+        if ( currentBuffer().isEmpty() ) {
+            buffers.remove( currentBuffer() );
+        }
+        else {
+            if ( address < offset() ) {
+                throw new IllegalStateException("Offset must not be smaller than current offset");
             }
-            return;
         }
-        if ( offset != 0 )
-        {
-            System.err.println("WARNING: ====================================================");
-            System.err.println("WARNING: Changing start offset after bytes have been written has no effect unless generating proper AMIGA executables is implemented");
-            System.err.println("WARNING: ====================================================");
-            // throw new IllegalStateException("Can't set start offset after bytes have been written");
-        }
-        this.startOffset = address;
-        this.offset = address;
+        buffers.add( new Buffer(address,initialBufferSize) );
     }
 
     @Override
     public void writeBytes(byte[] bytes)
     {
-        try
+        for ( byte b : bytes )
         {
-            out.write(bytes);
+            currentBuffer().writeByte( b );
         }
-        catch (IOException e)
-        {
-            throw new RuntimeException(e);
-        }
-        offset+=bytes.length;
     }
 
     @Override
     public void writeByte(int value)
     {
-        out.write(value);
-        offset++;
+        currentBuffer().writeByte((byte) value);
     }
 
     @Override
     public void allocateBytes(int count)
     {
-        offset += count;
+        currentBuffer().allocate( count );
     }
 
     @Override
@@ -72,23 +78,20 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     }
 
     @Override
-    public int getStartOffset()
-    {
-        return startOffset == null ? 0 : startOffset;
-    }
-
-    @Override
     public int offset()
     {
-        return offset;
+        return currentBuffer().startOffset + currentBuffer().size();
     }
 
     @Override
     public void reset()
     {
-        out = new ByteArrayOutputStream();
-        offset = 0;
-        startOffset = null;
+        buffers.clear();
+        buffers.add( new Buffer(0, initialBufferSize ) );
+    }
+
+    public List<Buffer> getBuffers() {
+        return buffers;
     }
 
     @Override
@@ -96,7 +99,48 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     {
     }
 
-    public byte[] getBytes() {
+    /**
+     * Returns the data written to this object code writer.
+     *
+     * @param padUpToStartOffset whether to zero-pad the beginning of the result if
+     *                           the start address of the first {@link IObjectCodeWriter.Buffer}
+     *                           is greater than zero.
+     * @return
+     * @deprecated Useful for unit testing only, real code will most likely want to be aware
+     * of different offsets being used and thus should use {@link #getBuffers()} instead.
+     */
+    @Deprecated
+    public byte[] getBytes(boolean padUpToStartOffset)
+    {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int ptr = 0;
+        for ( Buffer buf : buffers)
+        {
+            if ( ! buf.isEmpty() )
+            {
+                if ( ptr != buf.startOffset )
+                {
+                    if ( ptr != 0 || padUpToStartOffset )
+                    {
+                        int delta = buf.startOffset - ptr;
+                        ptr += delta;
+                        for (; delta > 0; delta--)
+                        {
+                            out.write( 0 );
+                        }
+                    }
+                }
+                try
+                {
+                    buf.appendTo(out);
+                }
+                catch (IOException e)
+                {
+                    // cannot happen
+                }
+                ptr += buf.size();
+            }
+        }
         return out.toByteArray();
     }
 }

@@ -229,7 +229,7 @@ public class DisassemblerTest extends TestCase
             messages.getMessages().stream().forEach(System.out::println );
             throw new RuntimeException("Compilation failed with errors");
         }
-        final byte[] executable = this.asm.getBytes();
+        final byte[] executable = this.asm.getBytes(false);
         System.out.println("COMPILED: "+Memory.hexdump(0,executable,0,executable.length));
 
         final Memory memory = new Memory(2048);

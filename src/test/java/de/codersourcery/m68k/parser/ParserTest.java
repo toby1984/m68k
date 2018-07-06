@@ -1013,7 +1013,7 @@ public class ParserTest extends TestCase
             messages.getMessages().stream().forEach(System.out::println );
             throw new RuntimeException("Compilation failed with errors");
         }
-        final byte[] data = asm.getBytes();
+        final byte[] data = asm.getBytes(false);
 //        try ( FileOutputStream binOut = new FileOutputStream("/home/tgierke/tmp/binout") )
 //        {
 //            binOut.write(data);

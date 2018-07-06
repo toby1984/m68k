@@ -648,7 +648,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         compilationUnit = new CompilationUnit(IResource.stringResource(program));
         final CompilationMessages messages = asm.compile(compilationUnit);
         assertFalse(messages.hasErrors());
-        return asm.getBytes();
+        return asm.getBytes(false);
     }
 
     protected final class ExpectionBuilder

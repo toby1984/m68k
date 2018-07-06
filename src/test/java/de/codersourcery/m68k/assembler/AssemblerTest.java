@@ -324,7 +324,7 @@ public class AssemblerTest extends TestCase
             throw new RuntimeException("Compilation failed with errors");
         }
         //        System.out.println("RESULT: "+Memory.hexdump(0,data,0,data.length));
-        return this.asm.getBytes();
+        return this.asm.getBytes(false);
     }
 
     private void assertFailsToCompile(String program)

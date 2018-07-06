@@ -47,7 +47,7 @@ public class CodeGenerationPhase implements ICompilationPhase
                 final DirectiveNode dn = (DirectiveNode) node;
                 if ( dn.directive == DirectiveNode.Directive.ORG)
                 {
-                    ctx.getCodeWriter().setStartOffset( dn.getOrigin() );
+                    ctx.getCodeWriter().setOffset( dn.getOrigin() );
                 }
             }
             else if ( node instanceof StatementNode)

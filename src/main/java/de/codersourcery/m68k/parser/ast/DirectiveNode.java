@@ -1,7 +1,6 @@
 package de.codersourcery.m68k.parser.ast;
 
 import de.codersourcery.m68k.assembler.ICompilationContext;
-import de.codersourcery.m68k.assembler.arch.Field;
 import de.codersourcery.m68k.parser.TextRegion;
 
 public class DirectiveNode extends ASTNode implements ICodeGeneratingNode
@@ -18,7 +17,7 @@ public class DirectiveNode extends ASTNode implements ICodeGeneratingNode
     {
         if ( directive == Directive.ORG )
         {
-            ctx.getCodeWriter().setStartOffset( getOrigin() );
+            ctx.getCodeWriter().setOffset( getOrigin() );
         }
     }
 
