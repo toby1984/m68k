@@ -54,6 +54,42 @@ public class CPUTest extends TestCase
         execute(cpu->{},"illegal").supervisor().irqActive(CPU.IRQ.ILLEGAL_INSTRUCTION);
     }
 
+    public void testExtByteToWord()
+    {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED | CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW ),
+                "move.l #$12345680,d3",
+                "ext.w d3")
+                .expectD3( 0x1234ff80 ).extended().negative().notZero().noCarry().noOverflow();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED | CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW ),
+                "move.l #$12345600,d3",
+                "ext.w d3")
+                .expectD3( 0x12340000 ).extended().notNegative().zero().noCarry().noOverflow();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED | CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW ),
+                "move.l #$12345601,d3",
+                "ext.w d3")
+                .expectD3( 0x12340001 ).extended().notNegative().notZero().noCarry().noOverflow();
+    }
+
+    public void testExtWordToLong()
+    {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED | CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW ),
+                "move.l #$12348000,d3",
+                "ext.l d3")
+                .expectD3( 0xffff8000 ).extended().negative().notZero().noCarry().noOverflow();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED | CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW ),
+                "move.l #$12340000,d3",
+                "ext.l d3")
+                .expectD3( 0x00000000 ).extended().notNegative().zero().noCarry().noOverflow();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED | CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW ),
+                "move.l #$12340001,d3",
+                "ext.l d3")
+                .expectD3( 0x00000001 ).extended().notNegative().notZero().noCarry().noOverflow();
+    }
+
     public void testRolByte()
     {
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345601,d3",

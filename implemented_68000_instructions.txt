@@ -30,7 +30,7 @@
 [ ] EORI to CCR
 [ ] EORI to SR
 [X] EXG
-[ ] EXT
+[X] EXT
 [X] ILLEGAL
 [X] JMP
 [X] JSR

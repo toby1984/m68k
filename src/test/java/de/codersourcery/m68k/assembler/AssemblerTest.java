@@ -34,6 +34,11 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("move a3,usp")    ,0x4e,0x63 );
     }
 
+    public void testExt() {
+        assertArrayEquals(compile("ext.w d3")    ,0x48,0x83 );
+        assertArrayEquals(compile("ext.l d3")    ,0x48,0xc3 );
+    }
+
     public void testMovea() {
         assertArrayEquals(compile("movea #$1234,a3")    ,0x36,0x7c,0x12,0x34 );
         assertArrayEquals(compile("movea.l #$123456,a3")    ,0x26,0x7c,0x00,0x12,0x34,0x56 );

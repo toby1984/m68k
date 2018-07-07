@@ -161,17 +161,20 @@ public class Disassembler
     {
         switch( insn )
         {
-            /*
-    public static final InstructionEncoding ROL_REGISTER_ENCODING = InstructionEncoding.of( "1110sss1SS111VVV");
-    public static final InstructionEncoding ROR_REGISTER_ENCODING = InstructionEncoding.of( "1110sss0SS111VVV");
+            case EXT:
+                appendln("ext");
 
-    public static final InstructionEncoding ROL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS011DDD");
-    public static final InstructionEncoding ROR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS011DDD");
-
-    public static final InstructionEncoding ROL_MEMORY_ENCODING = InstructionEncoding.of( "1110011111mmmsss");
-    public static final InstructionEncoding ROR_MEMORY_ENCODING = InstructionEncoding.of( "1110011011mmmsss");
-
-             */
+                if ( (insnWord & 0b1111111111111000) == 0b0100100010000000) {
+                    // EXT Byte -> Word
+                    append(".w ").appendDataRegister( insnWord & 0b111 );
+                    return;
+                }
+                if ( (insnWord & 0b1111111111111000) == 0b0100100011000000) {
+                    // EXT Word -> Byte
+                    append(".l ").appendDataRegister( insnWord & 0b111 );
+                    return;
+                }
+                throw new RuntimeException("Unreachable code reached");
             case ROL:
                 appendln("rol");
                 int sizeBits = (insnWord & 0b11000000) >> 6;
@@ -183,8 +186,7 @@ public class Disassembler
                     if ( cnt == 0 ) {
                         cnt = 8;
                     }
-                    final int regNum = (insnWord & 0b111);
-                    append("#").append(cnt).append(",d").append(regNum);
+                    append("#").append(cnt).append(",").appendDataRegister( (insnWord & 0b111) );
                     return;
                 }
                 if ( ( insnWord & 0b1111111111000000) == 0b1110011111000000 ) {
@@ -204,7 +206,7 @@ public class Disassembler
                 appendOperandSize(sizeBits);
                 int srcRegNum = (insnWord & 0b0000111000000000 ) >> 9;
                 int dstRegNum = (insnWord & 0b111);
-                append("d").append(srcRegNum).append(",d").append(dstRegNum);
+                append("d").append(srcRegNum).append(",").appendDataRegister(dstRegNum);
                 return;
             case ROR:
                 appendln("ror");
@@ -217,7 +219,7 @@ public class Disassembler
                         cnt = 8;
                     }
                     final int regNum = (insnWord & 0b111);
-                    append("#").append(cnt).append(",d").append(regNum);
+                    append("#").append(cnt).append(",").appendDataRegister(regNum);
                     return;
                 }
                 if ( ( insnWord & 0b1111111111000000) == 0b1110011011000000 ) {
@@ -237,7 +239,7 @@ public class Disassembler
                 appendOperandSize(sizeBits);
                 srcRegNum = (insnWord & 0b0000111000000000 ) >> 9;
                 dstRegNum = (insnWord & 0b111);
-                append("d").append(srcRegNum).append(",d").append(dstRegNum);
+                append("d").append(srcRegNum).append(",").appendDataRegister(dstRegNum);
                 return;
             case NEG:
                 appendln("neg");
@@ -407,13 +409,13 @@ public class Disassembler
                 appendln("exg ");
                 switch( opMode ) {
                     case 0b01000: // Dx <-> Dx
-                        append( "d").append(rX).append(",d").append(rY);
+                        appendDataRegister(rX).append(",").appendDataRegister(rY);
                         return;
                     case 0b01001: // Ax <-> Ax
-                        append( "a").append(rX).append(",a").append(rY);
+                        appendAddressRegister(rX).append(",").appendAddressRegister(rY);
                         return;
                     case 0b10001: // Ax <-> Dx
-                        append( "d").append(rX).append(",a").append(rY);
+                        appendDataRegister(rX).append(",").appendAddressRegister(rY);
                         return;
                 }
                 break;
@@ -421,7 +423,7 @@ public class Disassembler
                 int value = insnWord & 0xff;
                 value = (value <<24) >> 24;
                 regNum = (insnWord & 0b0000111000000000) >> 9;
-                appendln("moveq #").append( value ).append(",d").append(regNum);
+                appendln("moveq #").append( value ).append(",").appendDataRegister(regNum);
                 return;
             case MOVE:
                 if ( matches(insnWord,Instruction.MOVE_AX_TO_USP_ENCODING ) )
@@ -464,7 +466,7 @@ public class Disassembler
                 appendln("lea ");
                 decodeOperand( 4,(insnWord&0b111000)>>3,insnWord&0b111 );
                 register = (insnWord & 0b0000111000000000) >> 9;
-                append(",a").append(register);
+                append(",").appendAddressRegister(register);
                 return;
         }
         illegalOperation(insnWord);
@@ -510,6 +512,14 @@ public class Disassembler
     private Disassembler append(int value) {
         output.append( Integer.toString( value ) );
         return this;
+    }
+
+    private Disassembler appendDataRegister(int regNum) {
+        return append("d").append(regNum);
+    }
+
+    private Disassembler appendAddressRegister(int regNum) {
+        return append("a").append(regNum);
     }
 
     private Disassembler appendHex(int value) {

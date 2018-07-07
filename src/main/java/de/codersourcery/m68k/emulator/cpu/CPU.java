@@ -2,6 +2,7 @@ package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.arch.Condition;
+import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
@@ -699,6 +700,44 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0100_0000_0000_0000:
 
+                /*
+            InstructionEncoding.of( "0100100010000sss"); // Byte -> Word
+            InstructionEncoding.of( "0100100011000sss"); // Word -> Long
+
+
+
+                 */
+                if ( (instruction & 0b1111111111111000) == 0b0100100010000000)
+                {
+                    final int regNum = instruction & 0b111;
+                    // EXT Byte -> Word
+                    final int input = ( dataRegisters[regNum]  << 24) >> 24;
+                    int setMask = 0;
+                    if ( (input & 0xffff) == 0 ) {
+                        setMask |= CPU.FLAG_ZERO;
+                    } else if ( input < 0 ) {
+                        setMask |= CPU.FLAG_NEGATIVE;
+                    }
+                    statusRegister = (statusRegister & ~(FLAG_CARRY|FLAG_OVERFLOW|FLAG_ZERO|FLAG_NEGATIVE)) | setMask;
+                    dataRegisters[regNum] = (dataRegisters[regNum] & 0xffff0000) | (input & 0xffff);
+                    cycles += 4;
+                    return;
+                }
+                if ( (instruction & 0b1111111111111000) == 0b0100100011000000) {
+                    // EXT Word -> Long
+                    final int regNum = instruction & 0b111;
+                    final int value = ( dataRegisters[regNum]  << 16) >> 16;
+                    dataRegisters[regNum] = value;
+                    int setMask = 0;
+                    if ( value == 0 ) {
+                        setMask |= CPU.FLAG_ZERO;
+                    } else if ( value < 0 ) {
+                        setMask |= CPU.FLAG_NEGATIVE;
+                    }
+                    statusRegister = (statusRegister & ~(FLAG_CARRY|FLAG_OVERFLOW|FLAG_ZERO|FLAG_NEGATIVE)) | setMask;
+                    cycles += 4;
+                    return;
+                }
                 if ( (instruction & 0b1111111111111000) == 0b0100111001011000) {
                     // UNLK
                     final int regNum = (instruction & 0b111);

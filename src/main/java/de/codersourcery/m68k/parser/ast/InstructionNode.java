@@ -2,6 +2,7 @@ package de.codersourcery.m68k.parser.ast;
 
 import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.arch.Field;
+import de.codersourcery.m68k.assembler.arch.Operand;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.Register;
@@ -59,6 +60,10 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         return childCount() > 0;
     }
 
+    public boolean hasOperandSize(OperandSize size) {
+        return ! useImpliedOperandSize && getOperandSize() == size;
+    }
+
     public boolean hasDestination() {
         return childCount() > 1;
     }
@@ -94,5 +99,9 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         {
             ctx.error("Code generation failed: "+e.getMessage(), this,e);
         }
+    }
+
+    public boolean hasExplicitOperandSize() {
+        return ! useImpliedOperandSize;
     }
 }

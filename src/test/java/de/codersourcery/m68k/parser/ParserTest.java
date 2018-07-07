@@ -283,6 +283,18 @@ public class ParserTest extends TestCase
         assertEquals( Integer.valueOf(0xfffe), insn.destination().getValue().getBits(null) );
     }
 
+    public void testParseEXT() {
+        final AST ast = parseAST("ext.w d3");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.EXT, insn.getInstructionType() );
+        assertEquals(OperandSize.WORD,insn.getOperandSize());
+        assertFalse(insn.useImpliedOperandSize);
+        assertEquals( AddressingMode.DATA_REGISTER_DIRECT, insn.source().addressingMode );
+        assertEquals( Register.D3, insn.source().getValue().asRegister().register );
+    }
+
     public void testNEG()
     {
         final AST ast = parseAST("neg.b d3");

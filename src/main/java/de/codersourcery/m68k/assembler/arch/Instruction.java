@@ -26,6 +26,18 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    EXT("EXT",1) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkSourceAddressingMode( node,AddressingMode.DATA_REGISTER_DIRECT );
+            if ( node.hasOperandSize( OperandSize.BYTE ) ) {
+                throw new RuntimeException("Only operand sizes WORD or LONG are supported by EXT");
+            }
+        }
+
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+    },
     ROL("ROL",2) {
 
         @Override public int getMinOperandCount() { return 1; }
@@ -564,6 +576,11 @@ public enum Instruction
 
         switch (type)
         {
+            case EXT:
+                if ( insn.useImpliedOperandSize || insn.hasOperandSize( OperandSize.WORD ) ) {
+                    return EXTW_ENCODING;
+                }
+                return EXTL_ENCODING;
             case ROL:
                 if ( insn.useImpliedOperandSize ) {
                     insn.setImplicitOperandSize(OperandSize.WORD);
@@ -641,7 +658,7 @@ public enum Instruction
                         throw new RuntimeException("Unsupported addressing mode for JMP: "+insn.source().addressingMode);
                 }
             case AND:
-                if ( insn.source().addressingMode == IMMEDIATE_VALUE &&
+                if ( insn.source().hasAddressingMode( IMMEDIATE_VALUE ) &&
                         insn.destination().getValue().isRegister(Register.SR) )
                 {
                     // ANDI #xx,SR
@@ -756,7 +773,7 @@ public enum Instruction
             case MOVEQ:
                 return MOVEQ_ENCODING;
             case LEA:
-                if ( insn.source().addressingMode == ABSOLUTE_SHORT_ADDRESSING ) {
+                if ( insn.source().hasAddressingMode( ABSOLUTE_SHORT_ADDRESSING ) ) {
                     return LEA_WORD_ENCODING;
                 }
                 return LEA_LONG_ENCODING;
@@ -982,7 +999,7 @@ D/A   |     |   |           |
 
             checkSourceAddressingMode(node,AddressingMode.ABSOLUTE_SHORT_ADDRESSING,AddressingMode.ABSOLUTE_LONG_ADDRESSING);
 
-            if ( ! node.useImpliedOperandSize && node.getOperandSize() != OperandSize.WORD) {
+            if ( node.hasExplicitOperandSize() && ! node.hasOperandSize( OperandSize.WORD ) ) {
                 throw new RuntimeException(node.instruction+" can only operate on WORDs in memory");
             }
             return;
@@ -991,18 +1008,16 @@ D/A   |     |   |           |
         if (node.source().getValue().isDataRegister())
         {
             // register,register
-            Instruction.checkDestinationAddressingModeKind(node,
-                    AddressingModeKind.DATA);
+            Instruction.checkDestinationAddressingModeKind(node, AddressingModeKind.DATA);
             return;
         }
-        if (node.source().addressingMode == IMMEDIATE_VALUE)
+        if (node.source().hasAddressingMode( IMMEDIATE_VALUE ) )
         {
             final Integer value = node.source().getValue().getBits( ctx );
             if ( value != null && ( value < 1 || value > 8 ) ) {
                 throw new RuntimeException( node.instruction+" only supports rotating 1..8 times");
             }
-            checkDestinationAddressingMode(node,
-                    AddressingMode.DATA_REGISTER_DIRECT);
+            checkDestinationAddressingMode(node, AddressingMode.DATA_REGISTER_DIRECT);
             return;
         }
         throw new RuntimeException("Operands have unsupported addressing modes for " + node.instruction);
@@ -1181,7 +1196,7 @@ D/A   |     |   |           |
 
     private static void checkSourceAddressingModeKind(InstructionNode insn, AddressingModeKind kind)
     {
-        if( ! insn.source().addressingMode.hasKind(kind ) )
+        if( ! insn.source().addressingMode.hasKind( kind ) )
         {
             throw new RuntimeException("Instruction "+insn.instruction+" only supports addressing modes of kind "+kind+" but was "+insn.source().addressingMode);
         }
@@ -1189,7 +1204,7 @@ D/A   |     |   |           |
 
     private static void checkDestinationAddressingModeKind(InstructionNode insn, AddressingModeKind kind)
     {
-        if( ! insn.destination().addressingMode.hasKind(kind ) )
+        if( ! insn.destination().addressingMode.hasKind( kind ) )
         {
             throw new RuntimeException("Instruction "+insn.instruction+" only supports addressing modes of kind "+kind+" but was "+insn.destination().addressingMode);
         }
@@ -1283,6 +1298,12 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding NEG_ENCODING = InstructionEncoding.of( "01000100SSmmmsss");
 
+    public static final InstructionEncoding EXTW_ENCODING =
+            InstructionEncoding.of( "0100100010000sss"); // Byte -> Word
+
+    public static final InstructionEncoding EXTL_ENCODING =
+            InstructionEncoding.of( "0100100011000sss"); // Word -> Long
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -1322,5 +1343,7 @@ D/A   |     |   |           |
         put(ROR_IMMEDIATE_ENCODING,ROR);
         put(ROL_MEMORY_ENCODING,ROL);
         put(ROR_MEMORY_ENCODING,ROR);
+        put(EXTW_ENCODING,EXT);
+        put(EXTL_ENCODING,EXT);
     }};
 }

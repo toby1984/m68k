@@ -146,6 +146,11 @@ public class DisassemblerTest extends TestCase
         compile("rte");
     }
 
+    public void testEXT()
+    {
+        compile("ext.w d4");
+        compile("ext.l d4");
+    }
     public void testJSR() {
         compile("jsr sub\nillegal\nsub:","00000000: jsr $6\n" +
                 "00000004: illegal");
