@@ -19,6 +19,13 @@ public class DisassemblerTest extends TestCase
         asm = new Assembler();
     }
 
+    public void testBTST()
+    {
+        compile("btst #5,d6");
+        compile("btst d4,d6");
+        compile("btst #5,(a0)");
+    }
+
     public void testIllegal()
     {
         compile("illegal");

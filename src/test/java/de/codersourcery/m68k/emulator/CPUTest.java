@@ -480,6 +480,37 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 .noCarry().noOverflow().notExtended().notNegative().notZero().notSupervisor();
     }
 
+    public void testMoveToMemory()
+    {
+        final int adr = PROGRAM_START_ADDRESS+256;
+        execute(cpu -> cpu.memory.writeLong(adr,0x12345678) ,
+                "move.w #$1234,"+Misc.hex( adr+2 ))
+                .expectMemoryLong(adr,0x12341234);
+
+        execute(cpu -> cpu.memory.writeLong(adr,0x12345678) ,
+                "move.l #$87654321,"+Misc.hex( adr ))
+                .expectMemoryLong(adr,0x87654321);
+    }
+
+    public void testMoveFromMemory()
+    {
+        final int adr = PROGRAM_START_ADDRESS+128;
+        execute(cpu -> cpu.memory.writeLong(adr,0x12345678) ,
+                "move.l #$ffffffff,d0",
+                "move.b "+Misc.hex( adr )+",d0")
+                .expectD0(0xffffff34);
+
+        execute(cpu -> cpu.memory.writeLong(adr,0x12345678) ,
+                "move.l #$ffffffff,d0",
+                "move.w "+Misc.hex( adr )+",d0")
+                .expectD0(0xffff1234);
+
+        execute(cpu -> cpu.memory.writeLong(adr,0x12345678) ,
+                "move.l #$ffffffff,d0",
+                "move.l "+Misc.hex( adr )+",d0")
+                .expectD0(0x12345678);
+    }
+
     public void testMoveaWord()
     {
         execute(cpu -> {} ,
@@ -583,6 +614,46 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 .carry().overflow().extended().negative().zero().notSupervisor();
     }
 
+    public void testBTST()
+    {
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "move.l #31,d1",
+                "btst d1,d0")
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10001001,d0",
+                 "btst #3,d0")
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10001001,d0",
+                "btst #2,d0")
+                .zero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "btst #31,d0")
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "move.l #30,d1",
+                "btst d1,d0")
+                .zero().notSupervisor();
+
+        execute(cpu -> cpu.memory.writeWord( PROGRAM_START_ADDRESS+128, 0x0201 ) ,
+                "lea "+(PROGRAM_START_ADDRESS+128+1)+",a0",
+                "btst #0,(a0)")
+                .notZero().notSupervisor();
+
+        execute(cpu -> cpu.memory.writeWord( PROGRAM_START_ADDRESS+128, 0x0201 ) ,
+                "lea "+(PROGRAM_START_ADDRESS+128+1)+",a0",
+                "btst #1,(a0)")
+                .zero().notSupervisor();
+    }
+
     public void testMoveaLong()
     {
         execute(cpu -> {} ,
@@ -606,7 +677,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 
         execute(cpu -> cpu.setFlags(ALL_USR_FLAGS),
             "lea $12345678,a1",
-            "move.l $76543210,d3",
+            "move.l #$76543210,d3",
             "exg a1,d3")
             .expectA1(0x76543210)
             .expectD3(0x12345678)

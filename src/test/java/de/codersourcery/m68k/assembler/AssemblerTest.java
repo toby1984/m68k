@@ -1,13 +1,9 @@
 package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.Memory;
-import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.ConditionalInstructionType;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.Register;
-import de.codersourcery.m68k.parser.ast.AST;
-import de.codersourcery.m68k.parser.ast.InstructionNode;
-import de.codersourcery.m68k.parser.ast.StatementNode;
 import junit.framework.TestCase;
 
 import java.util.Arrays;
@@ -22,6 +18,13 @@ public class AssemblerTest extends TestCase
     {
         super.setUp();
         asm = new Assembler();
+    }
+
+    public void testBTST()
+    {
+        assertArrayEquals(compile("btst #5,d6")    ,0x08,0x06,0x00,0x05);
+        assertArrayEquals(compile("btst d4,d6")    ,0x09,0x06);
+        assertArrayEquals(compile("btst #5,(a0)")    ,0x08,0x10,0x00,0x05);
     }
 
     public void testIllegal()

@@ -268,6 +268,20 @@ public class ParserTest extends TestCase
         assertEquals( Instruction.RESET, insn.getInstructionType() );
     }
 
+    public void testParseBTST() {
+        final AST ast = parseAST("btst #3,(a3)");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.BTST, insn.getInstructionType() );
+
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x03), insn.source().getValue().getBits(null) );
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT, insn.destination().addressingMode );
+        assertEquals( Register.A3, insn.destination().getValue().asRegister().register );
+    }
+
     public void testParseLINK()
     {
         final AST ast = parseAST("link a3,#$fffe");

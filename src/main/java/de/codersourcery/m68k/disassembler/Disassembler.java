@@ -161,6 +161,24 @@ public class Disassembler
     {
         switch( insn )
         {
+            case BTST:
+                appendln("btst ");
+                if ( (insnWord & 0b1111000111000000) == 0b0000000100000000) {
+                    // BTST Dn,<ea>
+                    final int regNum = (insnWord & 0b0000111000000000) >> 9;
+                    appendDataRegister( regNum ).append(",");
+                    decodeOperand( 2,(insnWord&0b111000)>>3,(insnWord&0b111) );
+                    return;
+                }
+                if ( (insnWord & 0b1111111111000000) == 0b0000100000000000) {
+                    // BTST #xx,<ea>
+                    int bitToTest = memLoadWord(pc) & 0b11111;
+                    pc += 2;
+                    append("#").append(bitToTest).append(",");
+                    decodeOperand( 2,(insnWord&0b111000)>>3,(insnWord&0b111) );
+                    return;
+                }
+                break;
             case EXT:
                 appendln("ext");
 
@@ -198,11 +216,6 @@ public class Disassembler
                     return;
                 }
                 // ROL register
-                /*
-                if ( ( insnWord & 0b1111000100111000) == 0b1110000100111000) {
-                  // ROL_REGISTER
-                }
-                 */
                 appendOperandSize(sizeBits);
                 int srcRegNum = (insnWord & 0b0000111000000000 ) >> 9;
                 int dstRegNum = (insnWord & 0b111);
@@ -231,11 +244,6 @@ public class Disassembler
                     return;
                 }
                 // ROR register
-                /*
-                if ( ( insnWord & 0b1111000100111000) == 0b1110000000111000) {
-                  // ROR register
-                }
-                 */
                 appendOperandSize(sizeBits);
                 srcRegNum = (insnWord & 0b0000111000000000 ) >> 9;
                 dstRegNum = (insnWord & 0b111);
@@ -325,6 +333,7 @@ public class Disassembler
                     appendln("andi #").append( Misc.hex(word) ).append(",sr");
                     return;
                 }
+                // TODO: Implement other AND variants as well
                 break;
             case TRAP:
                 final int no = insnWord & 0b1111;
@@ -353,9 +362,6 @@ public class Disassembler
             case DBLT:
             case DBGT:
             case DBLE:
-                /*
-                 InstructionEncoding.of( "0101cccc11001sss","CCCCCCCC_CCCCCCCC");
-                 */
                 Condition cond = Condition.fromBits( (insnWord & 0b0000111100000000) >> 8 );
                 int register = insnWord & 0b111;
                 int offset = readWord();
@@ -459,10 +465,6 @@ public class Disassembler
                 decodeOperand( operandSize,(insnWord & 0b111000000)>>6,(insnWord & 0b111000000000) >> 9 );
                 return;
             case LEA:
-                /*
-    public static final InstructionEncoding LEA_LONG_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv");
-                 */
                 appendln("lea ");
                 decodeOperand( 4,(insnWord&0b111000)>>3,insnWord&0b111 );
                 register = (insnWord & 0b0000111000000000) >> 9;

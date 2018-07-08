@@ -608,7 +608,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b0000001001111100: // ANDI to SR
                 if ( assertSupervisorMode() )
                 {
-                    decodeSourceOperand(instruction, 2);
+                    decodeSourceOperand(instruction, 2,false);
                     setStatusRegister( statusRegister & value );
                     cycles = 20;
                 }
@@ -649,13 +649,39 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0000_0000_0000_0000:
+                if ( (instruction & 0b1111000111000000) == 0b0000000100000000) {
+                    // BTST Dn,<ea>
+                    final int regNum = (instruction & 0b0000111000000000) >> 9;
+                    final int bitNum = dataRegisters[regNum] & 0b11111;
+                    // hint: decodeSourceOperand only applies operandSize paramete rwhen
+                    //       accessing memory locations
+                    decodeSourceOperand( instruction,1, false );
+                    if ( ( value & 1<<bitNum) == 0 ) {
+                      statusRegister |= FLAG_ZERO;
+                    } else {
+                      statusRegister &= ~FLAG_ZERO;
+                    }
+                    return;
+                }
+                if ( (instruction & 0b1111111111000000) == 0b0000100000000000) {
+                    // BTST #xx,<ea>
+                    int bitNum = memLoadWord(pc) & 0b11111;
+                    pc += 2;
+                    decodeSourceOperand( instruction,1, false );
+                    if ( ( value & 1<<bitNum) == 0 ) {
+                        statusRegister |= FLAG_ZERO;
+                    } else {
+                        statusRegister &= ~FLAG_ZERO;
+                    }
+                    return;
+                }
                 break;
             /* ================================
              * Move Byte
              * ================================
              */
             case 0b0001_0000_0000_0000:
-                decodeSourceOperand(instruction,2); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
+                decodeSourceOperand(instruction,2,false); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
                 value = (value<<24)>>24; // sign-extend so that updateFlagsAfterMove() works correctly
                 updateFlagsAfterMove(1);
                 storeValue(instruction,1 );
@@ -665,16 +691,15 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0010_0000_0000_0000:
-                // 00SSDDD001mmmsss => MOVEA
-                // 1111000111000000 => MOVEA
                 if ( (instruction & 0b0010000111000000) == 0b0010000001000000 ) {
-                    decodeSourceOperand(instruction,4);
+                    // MOVEA
+                    decodeSourceOperand(instruction,4,false);
                     // MOVEA does not change any flags
                     storeValue(instruction,4 );
                     // TODO: MOVEA instruction timing ???
                     return;
                 }
-                decodeSourceOperand(instruction,4);
+                decodeSourceOperand(instruction,4,false);
                 updateFlagsAfterMove(4); // hint: no sign-extension needed here
                 storeValue(instruction,4 );
                 return;
@@ -683,14 +708,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0011_0000_0000_0000:
-                // 00SSDDD001mmmsss => MOVEA
                 if ( (instruction & 0b0011000111000000) == 0b0011000001000000 ) {
-                    decodeSourceOperand(instruction,2);
+                    // MOVEA
+                    decodeSourceOperand(instruction,2,false);
                     // MOVEA does not change any flags
                     storeValue(instruction,4 );
                     return;
                 }
-                decodeSourceOperand(instruction,2);
+                decodeSourceOperand(instruction,2,false);
                 updateFlagsAfterMove(2);
                 storeValue(instruction,2 );
                 return;
@@ -700,13 +725,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0100_0000_0000_0000:
 
-                /*
-            InstructionEncoding.of( "0100100010000sss"); // Byte -> Word
-            InstructionEncoding.of( "0100100011000sss"); // Word -> Long
-
-
-
-                 */
                 if ( (instruction & 0b1111111111111000) == 0b0100100010000000)
                 {
                     final int regNum = instruction & 0b111;
@@ -762,10 +780,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( (instruction & 0b1111111111000000) == 0b0100111010000000)
                 {
                     // JSR
-                    decodeSourceOperand(instruction,4);
+                    decodeSourceOperand(instruction,4,true);
                     pushLong(pc);
                     cycles += 4; // TODO: Timing correct ?
-                    pc = value;
+                    pc = ea;
                     return;
                 }
 
@@ -774,7 +792,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     // NEG
                     final int sizeBits = (instruction & 0b11000000) >>> 6;
                     final int operandSize = 1<<sizeBits;
-                    if ( decodeSourceOperand(instruction,operandSize) )
+                    if ( decodeSourceOperand(instruction,operandSize,false) )
                     {
                         // operand is register
                         cycles += (operandSize <= 2) ? 4 : 6;
@@ -827,8 +845,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( (instruction & 0b0100111011000000) == 0b0100111011000000)
                 {
                     // JMP
-                    decodeSourceOperand(instruction,4);
-                    pc = value;
+                    decodeSourceOperand(instruction,4,true);
+                    pc = ea;
                     cycles += 4; // TODO: Timing correct?
                     return;
                 }
@@ -860,17 +878,17 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( (instruction & 0b1111000111000000) == 0b0100000111000000 )
                 {
                     // LEA
-                    decodeSourceOperand(instruction,4);
+                    decodeSourceOperand(instruction,4,true);
                     final int dstAdrReg = (instruction & 0b1110_0000_0000) >> 9;
 
-                    addressRegisters[dstAdrReg] = value;
+                    addressRegisters[dstAdrReg] = ea;
                     // TODO: Cycle timing correct ??
                     return;
                 }
 
                 if ( (instruction & 0b1111111111000000) == 0b0100100001000000) {
                     // PEA
-                    decodeSourceOperand( instruction,4 );
+                    decodeSourceOperand( instruction,4,true );
                     pushLong( value );
                     return;
                 }
@@ -1171,17 +1189,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         return value;
     }
 
-    private static boolean isMSBSet(int value,int operandSizeInBytes)
-    {
-        switch( operandSizeInBytes )
-        {
-            case 1: return (value & 1<<7) != 0;
-            case 2: return (value & 1<<15) != 0;
-            case 4: return (value & 1<<31) != 0;
-        }
-        throw new RuntimeException("Unreachable code reached");
-    }
-
     /**
      * Sets all bits in the status register where the bit bitMask has a '1' bit.
      *
@@ -1259,7 +1266,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
      * @param operandSize
      * @return true if the operand is a register, otherwise false
      */
-    private boolean decodeSourceOperand(int instruction, int operandSize)
+    private boolean decodeSourceOperand(int instruction, int operandSize,boolean calculateAddressOnly)
     {
         // InstructionEncoding.of("ooooDDDMMMmmmsss");
         int eaMode     = (instruction & 0b111000) >> 3;
@@ -1269,12 +1276,12 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         {
             case 0b000:
                 // DATA_REGISTER_DIRECT;
-                value = dataRegisters[eaRegister];
+                ea = value = dataRegisters[eaRegister];
                 cycles += 4;
                 return true;
             case 0b001:
                 // ADDRESS_REGISTER_DIRECT;
-                value = addressRegisters[eaRegister];
+                ea = value = addressRegisters[eaRegister];
                 cycles += 4;
                 return true;
             case 0b111:
@@ -1285,7 +1292,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          * MOVE (xxx).W,... (1 extra word).
                          * ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1 ),
                          */
-                        value = memLoadWord(pc);
+                        ea = memLoadWord(pc);
+                        if ( ! calculateAddressOnly )
+                        {
+                            value = memLoad( ea, operandSize );
+                        }
                         pc += 2;
                         cycles += 8;
                         return false;
@@ -1294,7 +1305,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          * MOVE (xxx).L,.... (2 extra words).
                         ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2 ),
                          */
-                        value = memLoadLong(pc);
+                        ea = memLoadLong(pc);
+                        if ( ! calculateAddressOnly )
+                        {
+                            value = memLoad( ea, operandSize );
+                        }
                         pc += 4;
                         cycles += 12;
                         return false;
@@ -1303,7 +1318,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             default:
                 if ( decodeOperand(operandSize, eaMode, eaRegister) )
                 {
-                    value = memLoad(ea, operandSize);
+                    if ( ! calculateAddressOnly )
+                    {
+                        value = memLoad( ea, operandSize );
+                    }
                 }
         }
         return false;

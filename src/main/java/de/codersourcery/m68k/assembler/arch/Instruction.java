@@ -26,6 +26,29 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    BTST("BTST",2) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkDestinationAddressingModeKind( node,AddressingModeKind.DATA );
+            if ( node.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
+                final Integer bitNum = node.source().getValue().getBits( ctx );
+                if ( node.destination().addressingMode.hasKind( AddressingModeKind.MEMORY ) ) {
+                    if ( bitNum != null && (bitNum < 0 || bitNum > 7) ) {
+                        throw new RuntimeException( "BTST with memory locations can only operate on bits 0..7");
+                    }
+                } else {
+                    if ( bitNum != null && (bitNum < 0 || bitNum > 31) ) {
+                        throw new RuntimeException( "BTST can only operate on bits 0..31");
+                    }
+                }
+            }
+            else if ( ! node.source().getValue().isDataRegister() )
+            {
+                throw new RuntimeException( "Unsupported source addressing mode for BTST, only immediate or data register are allowed" );
+            }
+        }
+    },
     EXT("EXT",1) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -576,6 +599,11 @@ public enum Instruction
 
         switch (type)
         {
+            case BTST:
+                if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
+                    return BTST_STATIC_ENCODING;
+                }
+                return BTST_DYNAMIC_ENCODING;
             case EXT:
                 if ( insn.useImpliedOperandSize || insn.hasOperandSize( OperandSize.WORD ) ) {
                     return EXTW_ENCODING;
@@ -1304,6 +1332,13 @@ D/A   |     |   |           |
     public static final InstructionEncoding EXTL_ENCODING =
             InstructionEncoding.of( "0100100011000sss"); // Word -> Long
 
+    public static final InstructionEncoding BTST_DYNAMIC_ENCODING = // BTST Dn,<ea>
+            InstructionEncoding.of( "0000sss100MMMDDD");
+
+    public static final InstructionEncoding BTST_STATIC_ENCODING = // BTST #xx,<ea>
+            InstructionEncoding.of( "0000100000MMMDDD",
+                                 "00000000vvvvvvvv");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -1345,5 +1380,7 @@ D/A   |     |   |           |
         put(ROR_MEMORY_ENCODING,ROR);
         put(EXTW_ENCODING,EXT);
         put(EXTL_ENCODING,EXT);
+        put(BTST_DYNAMIC_ENCODING,BTST);
+        put(BTST_STATIC_ENCODING,BTST);
     }};
 }
