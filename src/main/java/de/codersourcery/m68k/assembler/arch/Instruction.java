@@ -26,27 +26,25 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    BCHG("BCHG",2) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkBitInstructionValid( node,ctx );
+        }
+    },
+    BSET("BSET",2) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkBitInstructionValid( node,ctx );
+        }
+    },
     BCLR("BCLR",2) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
         {
-            Instruction.checkDestinationAddressingModeKind( node,AddressingModeKind.ALTERABLE );
-            if ( node.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
-                final Integer bitNum = node.source().getValue().getBits( ctx );
-                if ( node.destination().addressingMode.hasKind( AddressingModeKind.MEMORY ) ) {
-                    if ( bitNum != null && (bitNum < 0 || bitNum > 7) ) {
-                        throw new RuntimeException( "BCLR with memory locations can only operate on bits 0..7");
-                    }
-                } else {
-                    if ( bitNum != null && (bitNum < 0 || bitNum > 31) ) {
-                        throw new RuntimeException( "BCLR can only operate on bits 0..31");
-                    }
-                }
-            }
-            else if ( ! node.source().getValue().isDataRegister() )
-            {
-                throw new RuntimeException( "Unsupported source addressing mode for BCLR, only immediate or data register are allowed" );
-            }
+            Instruction.checkBitInstructionValid( node,ctx );
         }
     },
     BTST("BTST",2) {
@@ -622,6 +620,21 @@ public enum Instruction
 
         switch (type)
         {
+            case BCHG:
+                if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
+                    return BCHG_STATIC_ENCODING;
+                }
+                return BCHG_DYNAMIC_ENCODING;
+            case BSET:
+                if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
+                    return BSET_STATIC_ENCODING;
+                }
+                return BSET_DYNAMIC_ENCODING;
+            case BCLR:
+                if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
+                    return BCLR_STATIC_ENCODING;
+                }
+                return BCLR_DYNAMIC_ENCODING;
             case BTST:
                 if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
                     return BTST_STATIC_ENCODING;
@@ -1074,6 +1087,27 @@ D/A   |     |   |           |
         throw new RuntimeException("Operands have unsupported addressing modes for " + node.instruction);
     }
 
+    private static void checkBitInstructionValid(InstructionNode node,ICompilationContext ctx)
+    {
+        Instruction.checkDestinationAddressingModeKind( node,AddressingModeKind.ALTERABLE );
+        if ( node.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
+            final Integer bitNum = node.source().getValue().getBits( ctx );
+            if ( node.destination().addressingMode.hasKind( AddressingModeKind.MEMORY ) ) {
+                if ( bitNum != null && (bitNum < 0 || bitNum > 7) ) {
+                    throw new RuntimeException( node.instruction+" with memory locations can only operate on bits 0..7");
+                }
+            } else {
+                if ( bitNum != null && (bitNum < 0 || bitNum > 31) ) {
+                    throw new RuntimeException( node.instruction+" can only operate on bits 0..31");
+                }
+            }
+        }
+        else if ( ! node.source().getValue().isDataRegister() )
+        {
+            throw new RuntimeException( "Unsupported source addressing mode for "+node.instruction+", only immediate or data register are allowed" );
+        }
+    }
+
     private static void checkBranchInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
         switch (node.source().addressingMode)
@@ -1361,23 +1395,23 @@ D/A   |     |   |           |
     public static final InstructionEncoding BTST_STATIC_ENCODING = // BTST #xx,<ea>
             InstructionEncoding.of( "0000100000MMMDDD", "00000000vvvvvvvv");
 
-    /* BCLR DYNAMIC
-    15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
-     0  0  0  0  +--+-+ 1 1 0 +-+-+ +-+-+
-               REGISTER       MODE REGISTER
-     */
-
-    /* BCLR STATIC
-    15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
-     0  0  0  0  1  0 0 0 1 0 +-+-+ +-+-+
-                              MODE REGISTER
-     */
-
     public static final InstructionEncoding BCLR_DYNAMIC_ENCODING = // BCLR Dn,<ea>
-            InstructionEncoding.of( "0000sss100MMMDDD");
+            InstructionEncoding.of( "0000sss110MMMDDD");
 
     public static final InstructionEncoding BCLR_STATIC_ENCODING = // BCLR #xx,<ea>
-            InstructionEncoding.of( "0000100000MMMDDD", "00000000vvvvvvvv");
+            InstructionEncoding.of( "0000100010MMMDDD", "00000000vvvvvvvv");
+
+    public static final InstructionEncoding BSET_DYNAMIC_ENCODING = // BSET Dn,<ea>
+            InstructionEncoding.of( "0000sss111MMMDDD");
+
+    public static final InstructionEncoding BSET_STATIC_ENCODING = // BSET #xx,<ea>
+            InstructionEncoding.of( "0000100011MMMDDD", "00000000vvvvvvvv");
+
+    public static final InstructionEncoding BCHG_DYNAMIC_ENCODING = // BCHG Dn,<ea>
+            InstructionEncoding.of( "0000sss101MMMDDD");
+
+    public static final InstructionEncoding BCHG_STATIC_ENCODING = // BCHG #xx,<ea>
+            InstructionEncoding.of( "0000100001MMMDDD", "00000000vvvvvvvv");
 
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
@@ -1422,8 +1456,11 @@ D/A   |     |   |           |
         put(EXTL_ENCODING,EXT);
         put(BTST_DYNAMIC_ENCODING,BTST);
         put(BTST_STATIC_ENCODING,BTST);
-
         put(BCLR_DYNAMIC_ENCODING,BCLR);
         put(BCLR_STATIC_ENCODING,BCLR);
+        put(BSET_DYNAMIC_ENCODING,BSET);
+        put(BSET_STATIC_ENCODING,BSET);
+        put(BCHG_DYNAMIC_ENCODING,BCHG);
+        put(BCHG_STATIC_ENCODING,BCHG);
     }};
 }

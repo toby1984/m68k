@@ -20,11 +20,23 @@ public class AssemblerTest extends TestCase
         asm = new Assembler();
     }
 
-    public void testBTST()
+    public void testBitInstructions()
     {
         assertArrayEquals(compile("btst #5,d6")    ,0x08,0x06,0x00,0x05);
         assertArrayEquals(compile("btst d4,d6")    ,0x09,0x06);
         assertArrayEquals(compile("btst #5,(a0)")    ,0x08,0x10,0x00,0x05);
+
+        assertArrayEquals(compile("bclr #5,d6")   ,0x08,0x86,0x00,0x05);
+        assertArrayEquals(compile("bclr d4,d6")   ,0x09,0x86);
+        assertArrayEquals(compile("bclr #5,(a0)") ,0x08,0x90,0x00,0x05);
+
+        assertArrayEquals(compile("bset #5,d6")   ,0x08,0xc6,0x00,0x05);
+        assertArrayEquals(compile("bset d4,d6")   ,0x09,0xc6);
+        assertArrayEquals(compile("bset #5,(a0)") ,0x08,0xd0,0x00,0x05);
+
+        assertArrayEquals(compile("bchg #5,d6")  ,0x08,0x46,0x00,0x05);
+        assertArrayEquals(compile("bchg d4,d6")  ,0x09,0x46);
+        assertArrayEquals(compile("bchg #5,(a0)"),0x08,0x50,0x00,0x05);
     }
 
     public void testIllegal()

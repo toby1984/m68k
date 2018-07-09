@@ -1,6 +1,8 @@
 package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.assembler.arch.AddressingMode;
+import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.utils.Misc;
@@ -13,6 +15,17 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class CPU
 {
+    private enum BitOp {
+        FLIP,
+        CLEAR,
+        TEST,
+        SET;
+    }
+
+    private enum BitOpMode {
+        IMMEDIATE,REGISTER
+    }
+
     /*
      * Interrupt vectors.
      */
@@ -649,30 +662,44 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0000_0000_0000_0000:
+                if ( (instruction & 0b1111000111000000) == 0b0000000101000000) {
+                    // BCHG Dn,<ea>
+                    bitOp(instruction,BitOp.FLIP,BitOpMode.REGISTER);
+                    return;
+                }
+                if ( (instruction & 0b1111111111000000) == 0b0000100001000000) {
+                    // BCHG #xx,<ea>
+                    bitOp(instruction,BitOp.FLIP,BitOpMode.IMMEDIATE);
+                    return;
+                }
+                if ( (instruction & 0b1111000111000000) == 0b0000000111000000) {
+                    // BSET Dn,<ea>
+                    bitOp(instruction,BitOp.SET,BitOpMode.REGISTER);
+                    return;
+                }
+                if ( (instruction & 0b1111111111000000) == 0b0000100011000000) {
+                    // BSET #xx,<ea>
+                    bitOp(instruction,BitOp.SET,BitOpMode.IMMEDIATE);
+                    return;
+                }
+                if ( (instruction & 0b1111000111000000) == 0b0000000110000000) {
+                    // BCLR Dn,<ea>
+                    bitOp(instruction,BitOp.CLEAR,BitOpMode.REGISTER);
+                    return;
+                }
+                if ( (instruction & 0b1111111111000000) == 0b0000100010000000) {
+                    // BCLR #xx,<ea>
+                    bitOp(instruction,BitOp.CLEAR,BitOpMode.IMMEDIATE);
+                    return;
+                }
                 if ( (instruction & 0b1111000111000000) == 0b0000000100000000) {
                     // BTST Dn,<ea>
-                    final int regNum = (instruction & 0b0000111000000000) >> 9;
-                    final int bitNum = dataRegisters[regNum] & 0b11111;
-                    // hint: decodeSourceOperand only applies operandSize paramete rwhen
-                    //       accessing memory locations
-                    decodeSourceOperand( instruction,1, false );
-                    if ( ( value & 1<<bitNum) == 0 ) {
-                      statusRegister |= FLAG_ZERO;
-                    } else {
-                      statusRegister &= ~FLAG_ZERO;
-                    }
+                    bitOp(instruction,BitOp.TEST,BitOpMode.REGISTER);
                     return;
                 }
                 if ( (instruction & 0b1111111111000000) == 0b0000100000000000) {
                     // BTST #xx,<ea>
-                    int bitNum = memLoadWord(pc) & 0b11111;
-                    pc += 2;
-                    decodeSourceOperand( instruction,1, false );
-                    if ( ( value & 1<<bitNum) == 0 ) {
-                        statusRegister |= FLAG_ZERO;
-                    } else {
-                        statusRegister &= ~FLAG_ZERO;
-                    }
+                    bitOp(instruction,BitOp.TEST,BitOpMode.IMMEDIATE);
                     return;
                 }
                 break;
@@ -1761,5 +1788,52 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         final boolean msbB = (b & 1<<31) != 0;
         final boolean msbResult = (result & 1<<31) != 0;
         return (! msbA & !msbB & msbResult) | (msbA & msbB & ! msbResult);
+    }
+
+    private void bitOp(int instruction,BitOp op,BitOpMode mode)
+    {
+        int bitNum;
+        if ( mode == BitOpMode.IMMEDIATE )
+        {
+            // BTST #xx,<ea>
+            bitNum = memLoadWord( pc ) & 0b11111;
+            pc += 2;
+        }
+        else if ( mode == BitOpMode.REGISTER )
+        {
+            // BTST Dn,<ea>
+            final int regNum = (instruction & 0b0000111000000000) >> 9;
+            bitNum = dataRegisters[regNum] & 0b11111;
+        } else {
+            throw new RuntimeException("Unreachable code reached");
+        }
+        // hint: decodeSourceOperand only applies operandSize parameter when
+        //       accessing memory locations
+        decodeSourceOperand( instruction,1, false );
+        if ( ( value & 1<<bitNum) == 0 ) {
+            statusRegister |= FLAG_ZERO;
+        } else {
+            statusRegister &= ~FLAG_ZERO;
+        }
+        switch( op ) {
+
+            case CLEAR:
+                value &= ~(1<<bitNum);
+                break;
+            case TEST:
+                // nothing to do after Z flag has been updated
+                return;
+            case SET:
+                value |= (1<<bitNum);
+                break;
+            case FLIP:
+                value ^= (1<<bitNum);
+                break;
+        }
+        final int eaMode = (instruction & 0b111000) >> 3;
+        final int eaRegister = (instruction & 0b111);
+        final int modeFlags = AddressingModeKind.bitsToFlags( eaMode,eaRegister );
+        final int operandSize= (modeFlags & AddressingModeKind.MEMORY.bits) != 0 ? 1 : 4;
+        storeValue( eaMode,eaRegister,operandSize);
     }
 }

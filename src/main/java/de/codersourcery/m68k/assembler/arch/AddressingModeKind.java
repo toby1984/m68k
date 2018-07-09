@@ -12,4 +12,35 @@ public enum AddressingModeKind
     AddressingModeKind(int bits) {
         this.bits = bits;
     }
+
+    public static int bitsToFlags(int eaMode,int eaRegister)
+    {
+        switch(eaMode)
+        {
+            case 0b000:
+                return DATA.bits | ALTERABLE.bits;
+            case 0b001:
+                return ALTERABLE.bits;
+            case 0b010:
+                return DATA.bits | MEMORY.bits | CONTROL.bits | ALTERABLE.bits;
+            case 0b011:
+                return DATA.bits | MEMORY.bits | ALTERABLE.bits;
+            case 0b100:
+                return DATA.bits | MEMORY.bits | ALTERABLE.bits;
+            case 0b101:
+                return DATA.bits | MEMORY.bits | CONTROL.bits | ALTERABLE.bits;
+            case 0b110:
+                return DATA.bits | MEMORY.bits | CONTROL.bits | ALTERABLE.bits;
+            case 0b111:
+                switch( eaRegister ) {
+                    case 0b010:
+                    case 0b011:
+                    case 0b000:
+                        return DATA.bits | MEMORY.bits | CONTROL.bits;
+                    case 0b100:
+                        return DATA.bits | MEMORY.bits;
+                }
+        }
+        throw new RuntimeException("Unreachable code. eaMode="+eaMode+",eaRegister="+eaRegister);
+    }
 }

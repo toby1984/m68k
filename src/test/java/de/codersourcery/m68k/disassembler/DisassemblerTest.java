@@ -19,11 +19,18 @@ public class DisassemblerTest extends TestCase
         asm = new Assembler();
     }
 
-    public void testBTST()
+    public void testBitOps() {
+        testBitOp("btst");
+        testBitOp("bset");
+        testBitOp("bclr");
+        testBitOp("bchg");
+    }
+
+    private void testBitOp(String op)
     {
-        compile("btst #5,d6");
-        compile("btst d4,d6");
-        compile("btst #5,(a0)");
+        compile(op+" #5,d6");
+        compile(op+" d4,d6");
+        compile(op+" #5,(a0)");
     }
 
     public void testIllegal()

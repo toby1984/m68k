@@ -10,10 +10,10 @@
 [X] ANDI to SR
 [ ] ASL, ASR
 [X] Bcc
-[ ] BCHG
-[ ] BCLR
+[X] BCHG
+[X] BCLR
 [X] BRA
-[ ] BSET
+[X] BSET
 [ ] BSR
 [X] BTST
 [ ] CHK

@@ -161,21 +161,54 @@ public class Disassembler
     {
         switch( insn )
         {
+            case BCHG:
+                appendln("bchg ");
+                if ( (insnWord & 0b1111000111000000) == 0b0000000101000000) {
+                    // BCHG Dn,<ea>
+                    printBitOp( insnWord,true );
+                    return;
+                }
+                if ( (insnWord & 0b1111111111000000) == 0b0000100001000000) {
+                    // BCHG #xx,<ea>
+                    printBitOp( insnWord,false);
+                    return;
+                }
+            case BSET:
+                appendln("bset ");
+                if ( (insnWord & 0b1111000111000000) == 0b0000000111000000) {
+                    // BSET Dn,<ea>
+                    printBitOp( insnWord,true );
+                    return;
+                }
+                if ( (insnWord & 0b1111111111000000) == 0b0000100011000000) {
+                    // BSET #xx,<ea>
+                    printBitOp( insnWord,false );
+                    return;
+                }
+                break;
+            case BCLR:
+                appendln("bclr ");
+                if ( (insnWord & 0b1111000111000000) == 0b0000000110000000) {
+                    // BCLR Dn,<ea>
+                    printBitOp( insnWord,true );
+                    return;
+                }
+                if ( (insnWord & 0b1111111111000000) == 0b0000100010000000) {
+                    // BCLR #xx,<ea>
+                    printBitOp( insnWord,false );
+                    return;
+                }
+                break;
             case BTST:
                 appendln("btst ");
                 if ( (insnWord & 0b1111000111000000) == 0b0000000100000000) {
                     // BTST Dn,<ea>
-                    final int regNum = (insnWord & 0b0000111000000000) >> 9;
-                    appendDataRegister( regNum ).append(",");
-                    decodeOperand( 2,(insnWord&0b111000)>>3,(insnWord&0b111) );
+                    printBitOp( insnWord,true );
                     return;
                 }
                 if ( (insnWord & 0b1111111111000000) == 0b0000100000000000) {
                     // BTST #xx,<ea>
-                    int bitToTest = memLoadWord(pc) & 0b11111;
-                    pc += 2;
-                    append("#").append(bitToTest).append(",");
-                    decodeOperand( 2,(insnWord&0b111000)>>3,(insnWord&0b111) );
+                    printBitOp( insnWord,false);
                     return;
                 }
                 break;
@@ -892,5 +925,21 @@ public class Disassembler
     private static boolean matches(int instructionWord,InstructionEncoding insn)
     {
         return (instructionWord & insn.getInstructionWordAndMask()) == insn.getInstructionWordMask();
+    }
+
+    private void printBitOp(int insnWord, boolean bitNumInRegister)
+    {
+        if (bitNumInRegister) {
+            // Bxxx Dn,<ea>
+            final int regNum = (insnWord & 0b0000111000000000) >> 9;
+            appendDataRegister( regNum ).append(",");
+            decodeOperand( 2,(insnWord&0b111000)>>3,(insnWord&0b111) );
+            return;
+        }
+        // Bxxx #xx,<ea>
+        int bitToTest = memLoadWord(pc) & 0b11111;
+        pc += 2;
+        append("#").append(bitToTest).append(",");
+        decodeOperand( 2,(insnWord&0b111000)>>3,(insnWord&0b111) );
     }
 }

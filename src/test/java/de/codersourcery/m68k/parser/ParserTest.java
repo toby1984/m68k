@@ -282,6 +282,48 @@ public class ParserTest extends TestCase
         assertEquals( Register.A3, insn.destination().getValue().asRegister().register );
     }
 
+    public void testParseBSET() {
+        final AST ast = parseAST("bset #3,(a3)");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.BSET, insn.getInstructionType() );
+
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x03), insn.source().getValue().getBits(null) );
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT, insn.destination().addressingMode );
+        assertEquals( Register.A3, insn.destination().getValue().asRegister().register );
+    }
+
+    public void testParseBCHG() {
+        final AST ast = parseAST("bchg #3,(a3)");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.BCHG, insn.getInstructionType() );
+
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x03), insn.source().getValue().getBits(null) );
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT, insn.destination().addressingMode );
+        assertEquals( Register.A3, insn.destination().getValue().asRegister().register );
+    }
+
+    public void testParseBCLR() {
+        final AST ast = parseAST("bclr #3,(a3)");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.BCLR, insn.getInstructionType() );
+
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x03), insn.source().getValue().getBits(null) );
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT, insn.destination().addressingMode );
+        assertEquals( Register.A3, insn.destination().getValue().asRegister().register );
+    }
+
     public void testParseLINK()
     {
         final AST ast = parseAST("link a3,#$fffe");

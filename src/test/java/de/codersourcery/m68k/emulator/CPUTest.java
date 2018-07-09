@@ -614,6 +614,53 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 .carry().overflow().extended().negative().zero().notSupervisor();
     }
 
+    public void testBCHG()
+    {
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "move.l #31,d1",
+                "bchg d1,d0")
+                .expectD0(0)
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10001001,d0",
+                "bchg #3,d0")
+                .expectD0(0b10000001)
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10001001,d0",
+                "bchg #2,d0")
+                .expectD0(0b10001101)
+                .zero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "bchg #31,d0")
+                .expectD0(0)
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "move.l #30,d1",
+                "bchg d1,d0")
+                .expectD0( 0xc0000000 )
+                .zero().notSupervisor();
+
+        execute(cpu -> cpu.memory.writeWord( PROGRAM_START_ADDRESS+128, 0x0201 ) ,
+                "lea "+(PROGRAM_START_ADDRESS+128+1)+",a0",
+                "bchg #0,(a0)")
+                .expectMemoryByte( PROGRAM_START_ADDRESS+128+1, 0x00 )
+                .notZero().notSupervisor();
+
+        execute(cpu -> cpu.memory.writeWord( PROGRAM_START_ADDRESS+128, 0x0201 ) ,
+                "lea "+(PROGRAM_START_ADDRESS+128)+",a0",
+                "bchg #0,(a0)")
+                .expectMemoryByte( PROGRAM_START_ADDRESS+128, 0x03 )
+                .zero().notSupervisor();
+    }
+
     public void testBTST()
     {
         execute(cpu -> {} ,
@@ -651,6 +698,100 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         execute(cpu -> cpu.memory.writeWord( PROGRAM_START_ADDRESS+128, 0x0201 ) ,
                 "lea "+(PROGRAM_START_ADDRESS+128+1)+",a0",
                 "btst #1,(a0)")
+                .zero().notSupervisor();
+    }
+
+    public void testBSET()
+    {
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "move.l #30,d1",
+                "bset d1,d0")
+                .expectD0(0b11000000000000000000000000000000)
+                .zero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10001001,d0",
+                "bset #3,d0")
+                .expectD0(0b10001001)
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10001001,d0",
+                "bset #2,d0")
+                .expectD0(0b10001101)
+                .zero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "bset #31,d0")
+                .expectD0(0b10000000000000000000000000000000)
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "move.l #30,d1",
+                "bset d1,d0")
+                .expectD0(0b11000000000000000000000000000000)
+                .zero().notSupervisor();
+
+        execute(cpu -> cpu.memory.writeWord( PROGRAM_START_ADDRESS+128, 0x0201 ) ,
+                "lea "+(PROGRAM_START_ADDRESS+128+1)+",a0",
+                "bset #0,(a0)")
+                .expectMemoryByte( PROGRAM_START_ADDRESS+128+1,0x01 )
+                .notZero().notSupervisor();
+
+        execute(cpu -> cpu.memory.writeWord( PROGRAM_START_ADDRESS+128, 0x0201 ) ,
+                "lea "+(PROGRAM_START_ADDRESS+128+1)+",a0",
+                "bset #1,(a0)")
+                .expectMemoryByte( PROGRAM_START_ADDRESS+128+1,0x03 )
+                .zero().notSupervisor();
+    }
+
+    public void testBCLR()
+    {
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "move.l #31,d1",
+                "bclr d1,d0")
+                .expectD0(0)
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10001001,d0",
+                "bclr #3,d0")
+                .expectD0(0b10000001)
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10001001,d0",
+                "bclr #2,d0")
+                .expectD0(0b10001001)
+                .zero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "bclr #31,d0")
+                .expectD0(0)
+                .notZero().notSupervisor();
+
+        execute(cpu -> {} ,
+                "move.l #%10000000000000000000000000000000,d0",
+                "move.l #30,d1",
+                "bclr d1,d0")
+                .expectD0(0b10000000000000000000000000000000)
+                .zero().notSupervisor();
+
+        execute(cpu -> cpu.memory.writeWord( PROGRAM_START_ADDRESS+128, 0x0201 ) ,
+                "lea "+(PROGRAM_START_ADDRESS+128+1)+",a0",
+                "bclr #0,(a0)")
+                .expectMemoryByte( PROGRAM_START_ADDRESS+128,0x02 )
+                .notZero().notSupervisor();
+
+        execute(cpu -> cpu.memory.writeWord( PROGRAM_START_ADDRESS+128, 0x0201 ) ,
+                "lea "+(PROGRAM_START_ADDRESS+128+1)+",a0",
+                "bclr #1,(a0)")
+                .expectMemoryByte( PROGRAM_START_ADDRESS+128+1,0x01 )
                 .zero().notSupervisor();
     }
 
