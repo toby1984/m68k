@@ -20,6 +20,12 @@ public class AssemblerTest extends TestCase
         asm = new Assembler();
     }
 
+    public void testTST() {
+        assertArrayEquals(compile("tst.b d3")     ,0x4a,0x03);
+        assertArrayEquals(compile("tst.w (a4)")   ,0x4a,0x54);
+        assertArrayEquals(compile("tst.l $12(a5)"),0x4a,0xad,0x00,0x12);
+    }
+
     public void testBitInstructions()
     {
         assertArrayEquals(compile("btst #5,d6")    ,0x08,0x06,0x00,0x05);

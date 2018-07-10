@@ -11,10 +11,12 @@ import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
+import org.easymock.internal.matchers.Not;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -677,6 +679,28 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 "bchg #0,(a0)")
                 .expectMemoryByte( PROGRAM_START_ADDRESS+128, 0x03 )
                 .zero().notSupervisor();
+    }
+
+    public void testTST() {
+
+        final int adr = PROGRAM_START_ADDRESS + 128;
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS) ,
+                "move.l #$00801200,"+adr,
+                "tst.b "+adr)
+                .zero().notNegative().noOverflow().extended().noCarry().notSupervisor();
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS) ,
+                "move.l #$00801200,"+adr,
+                "tst.b "+(adr+1))
+                .notZero().negative().noOverflow().extended().noCarry().notSupervisor();
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS) ,
+                "move.l #$00801200,"+adr,
+                "tst.b "+(adr+2))
+                .notZero().notNegative().noOverflow().extended().noCarry().notSupervisor();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS) ,
+                "move.l #$00801200,"+adr,
+                "tst.w "+(adr+2))
+                .notZero().notNegative().noOverflow().extended().noCarry().notSupervisor();
     }
 
     public void testBTST()

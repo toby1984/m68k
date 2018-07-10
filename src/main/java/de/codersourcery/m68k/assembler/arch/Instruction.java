@@ -26,6 +26,29 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    TST("TST",1) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            final AddressingMode mode = node.source().addressingMode;
+            if ( mode == AddressingMode.PC_INDIRECT_WITH_DISPLACEMENT ||
+                    mode == AddressingMode.PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT ||
+                    mode == AddressingMode.PC_INDIRECT_WITH_INDEX_DISPLACEMENT ||
+                    mode == AddressingMode.IMMEDIATE_VALUE ||
+                    mode == AddressingMode.ADDRESS_REGISTER_DIRECT ||
+                    mode == AddressingMode.PC_MEMORY_INDIRECT_POSTINDEXED ||
+                    mode == AddressingMode.PC_MEMORY_INDIRECT_PREINDEXED )
+            {
+                throw new RuntimeException("TST does not support addressing mode "+mode+" on 68000");
+            }
+        }
+
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+    },
     CLR("CLR",1) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -628,7 +651,17 @@ public enum Instruction
 
         switch (type)
         {
+            case TST:
+                String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( extraSrcWords != null ) {
+                    return TST_ENCODING.append(extraSrcWords);
+                }
+                return TST_ENCODING;
             case CLR:
+                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( extraSrcWords != null ) {
+                    return CLR_ENCODING.append(extraSrcWords);
+                }
                 return CLR_ENCODING;
             case BCHG:
                 if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
@@ -660,7 +693,7 @@ public enum Instruction
                     insn.setImplicitOperandSize(OperandSize.WORD);
                 }
                 if ( insn.operandCount() == 1 ) {
-                    final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                    extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                     if ( extraSrcWords != null ) {
                         return ROL_MEMORY_ENCODING.append(extraSrcWords);
                     }
@@ -676,7 +709,7 @@ public enum Instruction
                     insn.setImplicitOperandSize(OperandSize.WORD);
                 }
                 if ( insn.operandCount() == 1 ) {
-                    final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                    extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                     if ( extraSrcWords != null ) {
                         return ROR_MEMORY_ENCODING.append(extraSrcWords);
                     }
@@ -702,7 +735,7 @@ public enum Instruction
             case RTS:
                 return RTS_ENCODING;
             case JSR:
-                String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( extraSrcWords != null ) {
                     return JSR_ENCODING.append(extraSrcWords);
                 }
@@ -1426,6 +1459,9 @@ D/A   |     |   |           |
     public static final InstructionEncoding CLR_ENCODING = // CLR <ea>
             InstructionEncoding.of( "01000010SSmmmsss");
 
+    public static final InstructionEncoding TST_ENCODING = // TST.s <ea>
+            InstructionEncoding.of( "01001010SSmmmsss");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -1476,5 +1512,6 @@ D/A   |     |   |           |
         put(BCHG_DYNAMIC_ENCODING,BCHG);
         put(BCHG_STATIC_ENCODING,BCHG);
         put(CLR_ENCODING,CLR);
+        put(TST_ENCODING,TST);
     }};
 }

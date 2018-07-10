@@ -8,6 +8,8 @@ import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Set;
+
 /**
  * M68000 cpu emulation.
  *
@@ -751,6 +753,32 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0100_0000_0000_0000:
+
+                if ( (instruction & 0b1111111100000000) == 0b0100101000000000) {
+                    // TST
+                    final int operandSize = 1 << ((instruction & 0b11000000) >>> 6);
+                    decodeSourceOperand( instruction,operandSize,false);
+
+                    int setMask=0;
+                    switch(operandSize) {
+                        case 1:
+                            value &= 0xff;
+                            setMask |= (value&1<<7) != 0 ? FLAG_NEGATIVE : 0 ;
+                            break;
+                        case 2:
+                            value &= 0xffff;
+                            setMask |= (value&1<<15) != 0 ? FLAG_NEGATIVE : 0 ;
+                            break;
+                        case 4:
+                            setMask |= (value<0) ? FLAG_NEGATIVE : 0 ;
+                            break;
+                    }
+                    setMask |= (value == 0) ? FLAG_ZERO : 0 ;
+
+                    statusRegister = (statusRegister &
+                            ~(FLAG_NEGATIVE|FLAG_ZERO|FLAG_OVERFLOW|FLAG_CARRY)) | setMask;
+                    return;
+                }
                 if ( (instruction & 0b1111111100000000) == 0b0100001000000000)
                 {
                     // CLR

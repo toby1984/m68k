@@ -159,12 +159,20 @@ public class Disassembler
     {
         switch( insn )
         {
-            case CLR:
-                appendln("clr");
+            case TST:
+                appendln("tst");
                 int sizeBits = (insnWord & 0b11000000) >>> 6;
                 appendOperandSize(sizeBits);
                 int eaMode     = (insnWord & 0b111000) >>> 3;
                 int eaRegister = (insnWord & 0b000111);
+                decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                return;
+            case CLR:
+                appendln("clr");
+                sizeBits = (insnWord & 0b11000000) >>> 6;
+                appendOperandSize(sizeBits);
+                eaMode     = (insnWord & 0b111000) >>> 3;
+                eaRegister = (insnWord & 0b000111);
                 decodeOperand(1<<sizeBits,eaMode,eaRegister);
                 return;
             case BCHG:

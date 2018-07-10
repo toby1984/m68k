@@ -26,6 +26,13 @@ public class DisassemblerTest extends TestCase
         testBitOp("bchg");
     }
 
+    public void testTST()
+    {
+        compile( "tst.w $12(a0)" );
+        compile( "tst.b d3" );
+        compile( "tst.l (a4)+" );
+    }
+
     private void testBitOp(String op)
     {
         compile(op+" #5,d6");
