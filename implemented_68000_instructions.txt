@@ -54,7 +54,7 @@
 [X] NEG
 [ ] NEGX
 [X] NOP
-[ ] NOT
+[X] NOT
 [ ] OR
 [ ] ORI
 [ ] ORI to CCR

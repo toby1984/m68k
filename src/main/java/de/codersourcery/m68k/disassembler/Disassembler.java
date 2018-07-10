@@ -159,15 +159,23 @@ public class Disassembler
     {
         switch( insn )
         {
+            case NOT:
+                appendln("not");
+                int sizeBits = (insnWord & 0b11000000) >>> 6;
+                appendOperandSize(sizeBits);
+                int eaMode     = (insnWord & 0b111000) >>> 3;
+                int eaRegister = (insnWord & 0b000111);
+                decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                return;
             case TRAPV:
                 appendln("trapv");
                 return;
             case TST:
                 appendln("tst");
-                int sizeBits = (insnWord & 0b11000000) >>> 6;
+                sizeBits = (insnWord & 0b11000000) >>> 6;
                 appendOperandSize(sizeBits);
-                int eaMode     = (insnWord & 0b111000) >>> 3;
-                int eaRegister = (insnWord & 0b000111);
+                eaMode     = (insnWord & 0b111000) >>> 3;
+                eaRegister = (insnWord & 0b000111);
                 decodeOperand(1<<sizeBits,eaMode,eaRegister);
                 return;
             case CLR:

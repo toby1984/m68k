@@ -26,6 +26,19 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    NOT("NOT",1) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkSourceAddressingModeKind( node,AddressingModeKind.ALTERABLE );
+        }
+
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+    },
     TRAPV("TRAPV",0) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -665,6 +678,13 @@ public enum Instruction
                     return TST_ENCODING.append(extraSrcWords);
                 }
                 return TST_ENCODING;
+            case NOT:
+                System.out.println("NOT( "+insn.source().addressingMode+")");
+                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( extraSrcWords != null ) {
+                    return NOT_ENCODING.append(extraSrcWords);
+                }
+                return NOT_ENCODING;
             case CLR:
                 extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( extraSrcWords != null ) {
@@ -1473,6 +1493,9 @@ D/A   |     |   |           |
     public static final InstructionEncoding TRAPV_ENCODING = // TRAPV
             InstructionEncoding.of( "0100111001110110");
 
+    public static final InstructionEncoding NOT_ENCODING = // NOT
+            InstructionEncoding.of( "01000110SSmmmsss");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -1525,5 +1548,6 @@ D/A   |     |   |           |
         put(CLR_ENCODING,CLR);
         put(TST_ENCODING,TST);
         put(TRAPV_ENCODING,TRAPV);
+        put(NOT_ENCODING,NOT);
     }};
 }

@@ -764,29 +764,36 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0100_0000_0000_0000:
 
+                /*
+                01000110SSmmmsss
+                0b1111111100000000
+                0b0100011000000000
+                 */
+                if ( (instruction & 0b1111111100000000) == 0b0100011000000000) {
+                    // NOT
+                    final int sizeBits = (instruction &0b11000000) >> 6;
+                    final int eaMode = (instruction&0b111000) >> 3;
+                    final int eaRegister = (instruction&0b111);
+                    final int operandSize = 1 << sizeBits;
+                    if ( decodeSourceOperand( instruction,operandSize,false ) )
+                    {
+                        // operand is register
+                        cycles += (operandSize <= 2) ? 4 : 6;
+                    } else {
+                        // operand is memory
+                        cycles += (operandSize <= 2) ? 8 : 12;
+                    }
+                    value = ~value;
+                    storeValue( eaMode,eaRegister,operandSize);
+                    updateFlagsAfterTST( operandSize );
+                    return;
+                }
                 if ( (instruction & 0b1111111100000000) == 0b0100101000000000) {
                     // TST
                     final int operandSize = 1 << ((instruction & 0b11000000) >>> 6);
                     decodeSourceOperand( instruction,operandSize,false);
 
-                    int setMask=0;
-                    switch(operandSize) {
-                        case 1:
-                            value &= 0xff;
-                            setMask |= (value&1<<7) != 0 ? FLAG_NEGATIVE : 0 ;
-                            break;
-                        case 2:
-                            value &= 0xffff;
-                            setMask |= (value&1<<15) != 0 ? FLAG_NEGATIVE : 0 ;
-                            break;
-                        case 4:
-                            setMask |= (value<0) ? FLAG_NEGATIVE : 0 ;
-                            break;
-                    }
-                    setMask |= (value == 0) ? FLAG_ZERO : 0 ;
-
-                    statusRegister = (statusRegister &
-                            ~(FLAG_NEGATIVE|FLAG_ZERO|FLAG_OVERFLOW|FLAG_CARRY)) | setMask;
+                    updateFlagsAfterTST( operandSize );
                     cycles += 4;
                     return;
                 }
@@ -1948,5 +1955,26 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         // FIXME: Cycle count for memory operations is probably wrong as storeValue()
         // FIXME: never adds to the 'cycles' variable
         storeValue( eaMode,eaRegister,operandSize);
+    }
+
+    private void updateFlagsAfterTST(int operandSize) {
+        int setMask=0;
+        switch(operandSize) {
+            case 1:
+                value &= 0xff;
+                setMask |= (value&1<<7) != 0 ? FLAG_NEGATIVE : 0 ;
+                break;
+            case 2:
+                value &= 0xffff;
+                setMask |= (value&1<<15) != 0 ? FLAG_NEGATIVE : 0 ;
+                break;
+            case 4:
+                setMask |= (value<0) ? FLAG_NEGATIVE : 0 ;
+                break;
+        }
+        setMask |= (value == 0) ? FLAG_ZERO : 0 ;
+
+        statusRegister = (statusRegister &
+                ~(FLAG_NEGATIVE|FLAG_ZERO|FLAG_OVERFLOW|FLAG_CARRY)) | setMask;
     }
 }

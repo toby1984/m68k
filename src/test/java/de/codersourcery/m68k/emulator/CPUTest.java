@@ -11,7 +11,6 @@ import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
-import org.easymock.internal.matchers.Not;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -247,11 +246,6 @@ public class CPUTest extends TestCase
                 .expectD3(0x56781234).noOverflow().notNegative().notZero().notExtended().notSupervisor();
     }
 
-    /*
-Description: Loads the stack pointer from the specified address register, then loads the
-address register with the long word pulled from the top of the stack.
-
-     */
     public void testUnlink()
     {
         execute( cpu -> {},3,
@@ -262,14 +256,36 @@ address register with the long word pulled from the top of the stack.
                 .expectA7(2024).noOverflow().notNegative().notZero().notExtended().notSupervisor();
     }
 
-    /*
-N — Set if the result is negative; cleared otherwise.
+    public void testNOT()
+    {
+        /*
+        X — Not affected.
+ N — Set if the result is negative; cleared otherwise.
 Z — Set if the result is zero; cleared otherwise.
-V — Set if an overflow occurs; cleared otherwise.
-C — Cleared if the result is zero; set otherwise.
-X — Set the same as the carry bit.
-*/
-    public void testNegByte()
+V — Always cleared.
+C — Always cleared.
+         */
+        execute(cpu-> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),2,"move.l #1,d0", "not.b d0")
+                .expectD0(0b11111110).notZero()
+                .negative().noCarry().noOverflow().extended();
+
+        execute(cpu-> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),2,"move.l #0,d0", "not.b d0")
+                .expectD0(0xff).notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu-> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),2,"move.l #$12345601,d0", "not.b d0")
+                .expectD0(0x123456fe).notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu-> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),2,"move.l #$12340001,d0", "not.w d0")
+                .expectD0(0x1234fffe).notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu-> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),2,"move.l #$00000001,d0", "not.l d0")
+                .expectD0(0xfffffffe).notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu-> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),2,"move.l #$ffffffff,d0", "not.l d0")
+                .expectD0(0).zero().notNegative().noCarry().noOverflow().extended();
+    }
+
+    public void testNeg()
     {
         execute(cpu->{},2,"move.l #1,d0", "neg.b d0")
                 .expectD0(0xff).notZero().negative().carry().extended();

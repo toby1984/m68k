@@ -189,6 +189,18 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("jsr $2(pc)")    ,0x4e,0xba,0x00,0x02);
     }
 
+    public void testNOT()
+    {
+        /*
+   0:   4610            notb %a0@
+   2:   4643            notw %d3
+   4:   46b8 1200       notl 0x1200
+         */
+        assertArrayEquals(compile("not.l $1200"),0x46,0xb8, 0x12,0x00);
+        assertArrayEquals(compile("not.b (a0)") ,0x46,0x10);
+        assertArrayEquals(compile("not.w d3")   ,0x46,0x43);
+    }
+
     public void testNeg()
     {
         assertArrayEquals(compile("neg.b d3")    ,0x44,0x03);
@@ -355,6 +367,7 @@ public class AssemblerTest extends TestCase
         final IResource source = IResource.stringResource(s);
         final CompilationUnit root = new CompilationUnit(source);
 
+        asm.getOptions().debug=true;
         final CompilationMessages messages = asm.compile(root);
         if ( messages.hasErrors() )
         {

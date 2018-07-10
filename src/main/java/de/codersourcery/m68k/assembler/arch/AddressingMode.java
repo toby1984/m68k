@@ -136,11 +136,17 @@ public enum AddressingMode
     /**
      * MOVE (xxx).W,... (1 extra word).
      */
-    ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL),
+    ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1,
+            AddressingModeKind.DATA, AddressingModeKind.MEMORY,
+            AddressingModeKind.CONTROL,
+            AddressingModeKind.ALTERABLE),
     /**
      * MOVE (xxx).L,.... (2 extra words).
      */
-    ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2, AddressingModeKind.DATA, AddressingModeKind.MEMORY, AddressingModeKind.CONTROL),
+    ABSOLUTE_LONG_ADDRESSING(0b111,fixedValue(001) ,2,
+            AddressingModeKind.DATA, AddressingModeKind.MEMORY,
+            AddressingModeKind.CONTROL,
+            AddressingModeKind.ALTERABLE),
     /**
      * MOVE #xxxx,.... (1-6 extra words).
      */

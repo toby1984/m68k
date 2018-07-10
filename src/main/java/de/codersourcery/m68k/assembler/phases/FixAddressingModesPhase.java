@@ -26,6 +26,9 @@ public class FixAddressingModesPhase implements ICompilationPhase
 
     private void addressModesChanged(boolean yesNo,ICompilationContext ctx)
     {
+        if ( ctx.isDebugModeEnabled() ) {
+            System.out.println("===> Addressing mode changed: "+yesNo);
+        }
         ctx.getBlackboard(FixAddressingModesPhase.class).put(PARAM_MODES_CHANGED,yesNo);
     }
 
@@ -46,6 +49,9 @@ public class FixAddressingModesPhase implements ICompilationPhase
             Integer value;
             int sizeInBits;
 
+            if ( ctx.isDebugModeEnabled() ) {
+                System.out.println("Checking address mode: "+op.addressingMode);
+            }
             switch( op.addressingMode )
             {
                 case ABSOLUTE_LONG_ADDRESSING:
@@ -67,6 +73,9 @@ public class FixAddressingModesPhase implements ICompilationPhase
                     if ( sizeInBits <= 16 )
                     {
                         op.addressingMode = AddressingMode.ABSOLUTE_SHORT_ADDRESSING;
+                        if ( ctx.isDebugModeEnabled() ) {
+                            System.out.println("Changing to ABSOLUTE_SHORT_ADDRESSING");
+                        }
                         modesChanged[0] = true;
                     }
                     break;

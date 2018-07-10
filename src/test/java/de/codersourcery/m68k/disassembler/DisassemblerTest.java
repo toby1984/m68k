@@ -163,6 +163,13 @@ public class DisassemblerTest extends TestCase
         compile("neg.l d3");
     }
 
+    public void testNOT()
+    {
+        compile("not.b d3");
+        compile("not.w d3");
+        compile("not.l d3");
+    }
+
     public void testLink()
     {
         compile("link a3,#$4");

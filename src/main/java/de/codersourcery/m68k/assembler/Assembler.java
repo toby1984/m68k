@@ -47,7 +47,8 @@ public class Assembler
         // adjust addressing modes based on actual operand sizes
         // and recalculate label addresses again using the (potentially smaller) addressing modes
         phases.add( new FixAddressingModesPhase() );
-        phases.add( new CodeGenerationPhase(true, FixAddressingModesPhase::isAddressingModesUpdated ) );
+        phases.add( new CodeGenerationPhase(true,
+                FixAddressingModesPhase::isAddressingModesUpdated ) );
         // 4rd pass, actually generate code
         phases.add( new CodeGenerationPhase(false) );
         return phases;

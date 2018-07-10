@@ -83,6 +83,18 @@ public class ParserTest extends TestCase
         assertEquals( Identifier.of("loop"), insn.destination().getValue().asIdentifier().value );
     }
 
+    public void testParseNOT() {
+        // not.l $1200
+        final AST ast = parseAST("not.l $1200");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.NOT, insn.getInstructionType() );
+        assertEquals(OperandSize.LONG,insn.getOperandSize());
+        assertEquals( AddressingMode.ABSOLUTE_SHORT_ADDRESSING, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x1200), insn.source().getValue().getBits( null ) );
+    }
+
     public void testParseTST() {
         final AST ast = parseAST("tst.l $12(a5)");
         assertEquals(1,ast.childCount());
