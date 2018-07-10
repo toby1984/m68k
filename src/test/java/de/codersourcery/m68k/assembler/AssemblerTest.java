@@ -167,6 +167,13 @@ public class AssemblerTest extends TestCase
         check.accept(bytes );
     }
 
+    public void testCLR()
+    {
+        assertArrayEquals(compile("clr.b d3"), 0x42,0x03 );
+        assertArrayEquals(compile("clr.w d3"), 0x42,0x43 );
+        assertArrayEquals(compile("clr.l d3"), 0x42,0x83 );
+    }
+
     public void testPEA() {
         assertArrayEquals(compile("pea (a3)")    ,0x48,0x53);
     }

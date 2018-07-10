@@ -4,7 +4,6 @@ import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
-import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
@@ -14,7 +13,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class Disassembler
 {
@@ -161,6 +159,14 @@ public class Disassembler
     {
         switch( insn )
         {
+            case CLR:
+                appendln("clr");
+                int sizeBits = (insnWord & 0b11000000) >>> 6;
+                appendOperandSize(sizeBits);
+                int eaMode     = (insnWord & 0b111000) >>> 3;
+                int eaRegister = (insnWord & 0b000111);
+                decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                return;
             case BCHG:
                 appendln("bchg ");
                 if ( (insnWord & 0b1111000111000000) == 0b0000000101000000) {
@@ -228,12 +234,12 @@ public class Disassembler
                 throw new RuntimeException("Unreachable code reached");
             case ROL:
                 appendln("rol");
-                int sizeBits = (insnWord & 0b11000000) >> 6;
+                sizeBits = (insnWord & 0b11000000) >> 6;
                 if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100011000 )
                 {
                     // ROL_IMMEDIATE
                     appendOperandSize(sizeBits);
-                    int cnt = (insnWord & 0b0000111000000000 ) >> 9;
+                    int cnt = (insnWord & 0b0000111000000000 ) >>> 9;
                     if ( cnt == 0 ) {
                         cnt = 8;
                     }
@@ -243,24 +249,24 @@ public class Disassembler
                 if ( ( insnWord & 0b1111111111000000) == 0b1110011111000000 ) {
                     // ROL_MEMORY
                     append(" ");
-                    int eaMode     = (insnWord & 0b111000) >> 3;
-                    int eaRegister = (insnWord & 0b000111);
+                    eaMode     = (insnWord & 0b111000) >>> 3;
+                    eaRegister = (insnWord & 0b000111);
                     decodeOperand(1<<sizeBits,eaMode,eaRegister);
                     return;
                 }
                 // ROL register
                 appendOperandSize(sizeBits);
-                int srcRegNum = (insnWord & 0b0000111000000000 ) >> 9;
+                int srcRegNum = (insnWord & 0b0000111000000000 ) >>> 9;
                 int dstRegNum = (insnWord & 0b111);
                 append("d").append(srcRegNum).append(",").appendDataRegister(dstRegNum);
                 return;
             case ROR:
                 appendln("ror");
-                sizeBits = (insnWord & 0b11000000) >> 6;
+                sizeBits = (insnWord & 0b11000000) >>> 6;
                 if ( ( insnWord & 0b1111000100111000 ) == 0b1110000000011000 ) {
                     // ROR_IMMEDIATE
                     appendOperandSize(sizeBits);
-                    int cnt = (insnWord & 0b0000111000000000 ) >> 9;
+                    int cnt = (insnWord & 0b0000111000000000 ) >>> 9;
                     if ( cnt == 0 ) {
                         cnt = 8;
                     }
@@ -271,14 +277,14 @@ public class Disassembler
                 if ( ( insnWord & 0b1111111111000000) == 0b1110011011000000 ) {
                     // ROR_MEMORY
                     append(" ");
-                    int eaMode     = (insnWord & 0b111000) >> 3;
-                    int eaRegister = (insnWord & 0b000111);
+                    eaMode     = (insnWord & 0b111000) >>> 3;
+                    eaRegister = (insnWord & 0b000111);
                     decodeOperand(1<<sizeBits,eaMode,eaRegister);
                     return;
                 }
                 // ROR register
                 appendOperandSize(sizeBits);
-                srcRegNum = (insnWord & 0b0000111000000000 ) >> 9;
+                srcRegNum = (insnWord & 0b0000111000000000 ) >>> 9;
                 dstRegNum = (insnWord & 0b111);
                 append("d").append(srcRegNum).append(",").appendDataRegister(dstRegNum);
                 return;
@@ -287,13 +293,13 @@ public class Disassembler
                 sizeBits = (insnWord & 0b11000000) >>> 6;
                 int operandSize = 1<<sizeBits;
                 appendOperandSize(sizeBits);
-                int eaMode     = (insnWord & 0b111000) >> 3;
-                int eaRegister = (insnWord & 0b000111);
+                eaMode     = (insnWord & 0b111000) >>> 3;
+                eaRegister = (insnWord & 0b000111);
                 decodeOperand(operandSize,eaMode,eaRegister);
                 return;
             case PEA:
                 appendln("pea ");
-                eaMode     = (insnWord & 0b111000) >> 3;
+                eaMode     = (insnWord & 0b111000) >>> 3;
                 eaRegister = (insnWord & 0b000111);
                 decodeOperand(4,eaMode,eaRegister);
                 return;
@@ -319,7 +325,7 @@ public class Disassembler
                 return;
             case JSR:
                 appendln("jsr ");
-                eaMode     = (insnWord & 0b111000) >> 3;
+                eaMode     = (insnWord & 0b111000) >>> 3;
                 eaRegister = (insnWord & 0b000111);
                 decodeOperand(4,eaMode,eaRegister);
                 return;
@@ -329,7 +335,7 @@ public class Disassembler
                     operandSize = 4;
                 }
                 appendln("movea").append( operandSize == 2 ? ".w" : ".l" ).append(" ");
-                eaMode     = (insnWord & 0b111000) >> 3;
+                eaMode     = (insnWord & 0b111000) >>> 3;
                 eaRegister = (insnWord & 0b000111);
 
                 decodeOperand(operandSize,eaMode,eaRegister);
@@ -337,7 +343,7 @@ public class Disassembler
                 append(",a").append( regNum );
                 return;
             case JMP:
-                eaMode     = (insnWord & 0b111000) >> 3;
+                eaMode     = (insnWord & 0b111000) >>> 3;
                 eaRegister = (insnWord & 0b000111);
                 appendln( "jmp " );
                 // JMP encodings only differ in their eaRegister and eaMode values
@@ -395,7 +401,7 @@ public class Disassembler
             case DBLT:
             case DBGT:
             case DBLE:
-                Condition cond = Condition.fromBits( (insnWord & 0b0000111100000000) >> 8 );
+                Condition cond = Condition.fromBits( (insnWord & 0b0000111100000000) >>> 8 );
                 int register = insnWord & 0b111;
                 int offset = readWord();
                 int destinationAdress = pcAtStartOfInstruction + offset;
@@ -419,7 +425,7 @@ public class Disassembler
             case BLT:
             case BGT:
             case BLE:
-                cond = Condition.fromBits( (insnWord & 0b0000111100000000 ) >> 8 );
+                cond = Condition.fromBits( (insnWord & 0b0000111100000000 ) >>> 8 );
                 String suffix = cond.suffix.toLowerCase();
                 if ( cond == Condition.BRT) {
                     suffix = "ra";
@@ -442,8 +448,8 @@ public class Disassembler
                 appendln("nop");
                 break;
             case EXG:
-                final int opMode = (insnWord & 0b0000000011111000) >> 3;
-                final int rX =   (insnWord & 0b0000111000000000) >> 9;
+                final int opMode = (insnWord & 0b0000000011111000) >>> 3;
+                final int rX =   (insnWord & 0b0000111000000000) >>> 9;
                 final int rY =   (insnWord & 0b0000000000000111);
                 appendln("exg ");
                 switch( opMode ) {
@@ -461,7 +467,7 @@ public class Disassembler
             case MOVEQ:
                 int value = insnWord & 0xff;
                 value = (value <<24) >> 24;
-                regNum = (insnWord & 0b0000111000000000) >> 9;
+                regNum = (insnWord & 0b0000111000000000) >>> 9;
                 appendln("moveq #").append( value ).append(",").appendDataRegister(regNum);
                 return;
             case MOVE:
@@ -476,7 +482,7 @@ public class Disassembler
                     appendln("move usp,a"+regNum);
                     return;
                 }
-                switch( (insnWord & 0b1111000000000000) >> 12 ) {
+                switch( (insnWord & 0b1111000000000000) >>> 12 ) {
                     case 0b0001:
                         appendln("move.b ");
                         operandSize = 1;
@@ -493,14 +499,14 @@ public class Disassembler
                         illegalOperation( insnWord );
                         return;
                 }
-                decodeOperand( operandSize,(insnWord & 0b111000)>>3,(insnWord & 0b111) );
+                decodeOperand( operandSize,(insnWord & 0b111000)>>>3,(insnWord & 0b111) );
                 append(",");
-                decodeOperand( operandSize,(insnWord & 0b111000000)>>6,(insnWord & 0b111000000000) >> 9 );
+                decodeOperand( operandSize,(insnWord & 0b111000000)>>>6,(insnWord & 0b111000000000) >>> 9 );
                 return;
             case LEA:
                 appendln("lea ");
-                decodeOperand( 4,(insnWord&0b111000)>>3,insnWord&0b111 );
-                register = (insnWord & 0b0000111000000000) >> 9;
+                decodeOperand( 4,(insnWord&0b111000)>>>3,insnWord&0b111 );
+                register = (insnWord & 0b0000111000000000) >>> 9;
                 append(",").appendAddressRegister(register);
                 return;
         }

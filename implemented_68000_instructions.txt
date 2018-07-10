@@ -8,7 +8,8 @@
 [ ] ANDI
 [ ] ANDI to CCR
 [X] ANDI to SR
-[ ] ASL, ASR
+[ ] ASL
+[ ] ASR
 [X] Bcc
 [X] BCHG
 [X] BCLR
@@ -17,7 +18,7 @@
 [ ] BSR
 [X] BTST
 [ ] CHK
-[ ] CLR
+[X] CLR
 [ ] CMP
 [ ] CMPA
 [ ] CMPI
@@ -36,7 +37,8 @@
 [X] JSR
 [X] LEA
 [X] LINK
-[ ] LSL, LSR
+[ ] LSL
+[ ] LSR
 [X] MOVE
 [X] MOVEA
 [ ] MOVE to CCR

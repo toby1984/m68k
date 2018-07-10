@@ -72,6 +72,24 @@ public class CPUTest extends TestCase
                 .expectD3( 0x12340001 ).extended().notNegative().notZero().noCarry().noOverflow();
     }
 
+    public void testCLR()
+    {
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),
+                 "move.l #$12345678,d3",
+                 "clr.b d3")
+                .expectD3( 0x12345600 ).extended().notNegative().zero().noOverflow().noCarry();
+
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),
+                 "move.l #$12345678,d3",
+                 "clr.w d3")
+                .expectD3( 0x12340000 ).extended().notNegative().zero().noOverflow().noCarry();
+
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),
+                 "move.l #$12345678,d3",
+                 "clr.l d3")
+                .expectD3( 0 ).extended().notNegative().zero().noOverflow().noCarry();
+    }
+
     public void testExtWordToLong()
     {
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED | CPU.FLAG_CARRY | CPU.FLAG_OVERFLOW ),

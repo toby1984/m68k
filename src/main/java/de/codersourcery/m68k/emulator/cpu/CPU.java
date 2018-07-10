@@ -751,11 +751,31 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0100_0000_0000_0000:
+                if ( (instruction & 0b1111111100000000) == 0b0100001000000000)
+                {
+                    // CLR
+                    int eaMode = (instruction & 0b111000)>>>3;
+                    int eaRegister  = (instruction & 0b111);
+                    final int operandSize =  1 << ((instruction & 0b11000000) >>> 6);
 
+                    value = 0;
+                    switch(operandSize) {
+                        case 1:
+                        case 2:
+                            cycles += 2; // TODO: Not correct
+                            break;
+                        case 4:
+                            cycles += 4; // TODO: Not correct
+                            break;
+                    }
+                    statusRegister = ( statusRegister & ~(FLAG_NEGATIVE|FLAG_OVERFLOW|FLAG_CARRY) ) | FLAG_ZERO;
+                    storeValue(eaMode,eaRegister,operandSize);
+                    return;
+                }
                 if ( (instruction & 0b1111111111111000) == 0b0100100010000000)
                 {
-                    final int regNum = instruction & 0b111;
                     // EXT Byte -> Word
+                    final int regNum = instruction & 0b111;
                     final int input = ( dataRegisters[regNum]  << 24) >> 24;
                     int setMask = 0;
                     if ( (input & 0xffff) == 0 ) {
@@ -1093,7 +1113,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( ( instruction & 0b1111000000111000 ) == 0b1110000000011000 )
                 {
                     // IMMEDIATE
-                    int sizeBits = (instruction & 0b11000000) >> 6;
                     final boolean rotateLeft = (instruction & 1<<8) != 0;
                     rotateImmediate(instruction,rotateLeft);
                     return;
@@ -1387,12 +1406,15 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 {
                     case 1:
                         dataRegisters[eaRegister] = (dataRegisters[eaRegister] & 0xffffff00) | (value & 0xff);
+                        cycles += 2;
                         return;
                     case 2:
                         dataRegisters[eaRegister] = (dataRegisters[eaRegister] & 0xffff0000) | (value & 0xffff);
+                        cycles += 2;
                         return;
                     case 4:
                         dataRegisters[eaRegister] = value;
+                        cycles += 2;
                         return;
                 }
                 throw new RuntimeException("Unreachable code reached");
@@ -1402,6 +1424,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     throw new IllegalArgumentException("Unexpected operand size "+operandSize+" for address register");
                 }
                 addressRegisters[eaRegister] = value;
+                cycles += 2;
                 break;
             case 0b111:
 
@@ -1415,6 +1438,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          */
                         address = memory.readWordNoCheck(pc);
                         pc += 2;
+                        cycles += 6;
                         break;
                     case 0b001:
                         /*
@@ -1424,6 +1448,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         address = memory.readLongNoCheck(pc);
                         pc += 4;
                         addressRegisters[eaRegister] = value;
+                        cycles += 8;
                         break;
                     default:
                         triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
@@ -1443,7 +1468,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 }
                 throw new RuntimeException("Unreachable code reached");
             default:
-                if (  decodeOperand(operandSize, eaMode, eaRegister) )
+                if ( decodeOperand(operandSize, eaMode, eaRegister) )
                 {
                     switch (operandSize)
                     {
@@ -1833,7 +1858,56 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         final int eaMode = (instruction & 0b111000) >> 3;
         final int eaRegister = (instruction & 0b111);
         final int modeFlags = AddressingModeKind.bitsToFlags( eaMode,eaRegister );
-        final int operandSize= (modeFlags & AddressingModeKind.MEMORY.bits) != 0 ? 1 : 4;
+        final boolean isMemory = (modeFlags & AddressingModeKind.MEMORY.bits) != 0;
+        final int operandSize= isMemory ? 1 : 4;
+
+        switch( mode )
+        {
+            case IMMEDIATE: // BTST #x,<ea>
+                // STATIC
+                if ( isMemory )
+                {
+                    switch( op ) {
+                        case FLIP:  cycles += 12; break;
+                        case CLEAR: cycles += 12; break;
+                        case SET:   cycles += 12; break;
+                        case TEST:  cycles +=  8; break;
+                    }
+                }
+                else
+                {
+                    switch( op ) {
+                        case FLIP:  cycles += 12; break;
+                        case CLEAR: cycles += 14; break;
+                        case SET:   cycles += 12; break;
+                        case TEST:  cycles += 10; break;
+                    }
+                }
+                break;
+            case REGISTER:  // BTST Dx,<ea>
+                // DYNAMIC
+                if ( isMemory )
+                {
+                    switch( op )
+                    {
+                        case FLIP:  cycles += 8; break;
+                        case CLEAR: cycles += 8; break;
+                        case SET:   cycles += 8; break;
+                        case TEST:  cycles += 4; break;
+                    }
+                }
+                else
+                {
+                    switch( op ) {
+                        case FLIP:  cycles +=  8; break;
+                        case CLEAR: cycles += 10; break;
+                        case SET:   cycles +=  8; break;
+                        case TEST:  cycles +=  6; break;
+                    }
+                }
+        }
+        // FIXME: Cycle count for memory operations is probably wrong as storeValue()
+        // FIXME: never adds to the 'cycles' variable
         storeValue( eaMode,eaRegister,operandSize);
     }
 }

@@ -26,6 +26,14 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    CLR("CLR",1) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkSourceAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+        }
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+    },
     BCHG("BCHG",2) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -620,6 +628,8 @@ public enum Instruction
 
         switch (type)
         {
+            case CLR:
+                return CLR_ENCODING;
             case BCHG:
                 if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
                     return BCHG_STATIC_ENCODING;
@@ -1413,6 +1423,9 @@ D/A   |     |   |           |
     public static final InstructionEncoding BCHG_STATIC_ENCODING = // BCHG #xx,<ea>
             InstructionEncoding.of( "0000100001MMMDDD", "00000000vvvvvvvv");
 
+    public static final InstructionEncoding CLR_ENCODING = // CLR <ea>
+            InstructionEncoding.of( "01000010SSmmmsss");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -1462,5 +1475,6 @@ D/A   |     |   |           |
         put(BSET_STATIC_ENCODING,BSET);
         put(BCHG_DYNAMIC_ENCODING,BCHG);
         put(BCHG_STATIC_ENCODING,BCHG);
+        put(CLR_ENCODING,CLR);
     }};
 }

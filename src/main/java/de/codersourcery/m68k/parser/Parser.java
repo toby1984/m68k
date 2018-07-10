@@ -135,7 +135,7 @@ public class Parser
                 if ( lexer.peek(TokenType.DOT ) )
                 {
                     if ( ! t.supportsExplicitOperandSize() ) {
-                        fail("Instruction does not support explicit operand sizes",tok);
+                        fail("Instruction "+t+" does not support explicit operand sizes",tok);
                     }
 
                     final Token token = lexer.next(); // consume dot

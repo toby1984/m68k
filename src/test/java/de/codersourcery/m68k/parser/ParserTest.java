@@ -93,6 +93,18 @@ public class ParserTest extends TestCase
         assertEquals( (Integer) 10 , insn.source().getValue().getBits(null ) );
     }
 
+    public void testParseCLR() {
+
+        final AST ast = parseAST("clr d7");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.CLR, insn.getInstructionType() );
+        assertTrue( insn.useImpliedOperandSize );
+        assertEquals( OperandSize.UNSPECIFIED, insn.getOperandSize() );
+        assertEquals( Register.D7, insn.source().getValue().asRegister().register );
+    }
+
     public void testParseSwap1() {
 
         final AST ast = parseAST("swap d7");
