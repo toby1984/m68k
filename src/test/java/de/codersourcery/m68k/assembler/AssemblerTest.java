@@ -230,6 +230,11 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("ror $1234"  ),0xe6,0xf8,0x12,0x34);
     }
 
+    public void testTrapV()
+    {
+        assertArrayEquals( compile( "trapv" ), 0x4e, 0x76 );
+    }
+
     public void testTrap()
     {
         assertArrayEquals(compile("trap #10")    ,0x4e,0x4a);

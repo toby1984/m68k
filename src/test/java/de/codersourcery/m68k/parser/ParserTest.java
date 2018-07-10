@@ -95,6 +95,16 @@ public class ParserTest extends TestCase
         assertEquals( Integer.valueOf(0x12) ,
                 insn.source().getBaseDisplacement().getBits( null ) );
     }
+
+    public void testParseTrapV() {
+
+        final AST ast = parseAST("TRAPV");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.TRAPV, insn.getInstructionType() );
+    }
+
     public void testParseTrap() {
 
         final AST ast = parseAST("TRAP #10");

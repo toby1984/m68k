@@ -209,6 +209,18 @@ public class CPUTest extends TestCase
         execute("move.b #$ff,d0").expectD0(0xff).noCarry().noOverflow().notExtended().negative().notZero().notSupervisor();
     }
 
+    public void testTrapVTriggered()
+    {
+        execute(cpu -> cpu.setFlags( CPU.FLAG_OVERFLOW ), "TRAPV")
+                .supervisor().irqActive(CPU.IRQ.FTRAP_TRAP_TRAPV);
+    }
+
+    public void testTrapVNoTriggered()
+    {
+        execute(cpu -> cpu.clearFlags( CPU.FLAG_OVERFLOW ), "TRAPV")
+                .notSupervisor().noIrqActive();
+    }
+
     public void testTrap()
     {
         execute("TRAP #0").supervisor().irqActive(CPU.IRQ.TRAP0_0);
@@ -1038,7 +1050,16 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 
 
 
-        public ExpectionBuilder irqActive(CPU.IRQ irq) { assertEquals("Expected "+irq+" but active IRQ was "+cpu.activeIrq,irq,cpu.activeIrq); return this; }
+        public ExpectionBuilder noIrqActive()
+        {
+            assertNull("Expected no CPU active but got "+cpu.activeIrq,cpu.activeIrq);
+            return this;
+        }
+
+        public ExpectionBuilder irqActive(CPU.IRQ irq) {
+            assertEquals("Expected "+irq+" but active IRQ was "+cpu.activeIrq,irq,cpu.activeIrq);
+            return this;
+        }
 
         private ExpectionBuilder assertHexEquals(String msg,int expected,int actual)
         {

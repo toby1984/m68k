@@ -159,6 +159,9 @@ public class Disassembler
     {
         switch( insn )
         {
+            case TRAPV:
+                appendln("trapv");
+                return;
             case TST:
                 appendln("tst");
                 int sizeBits = (insnWord & 0b11000000) >>> 6;

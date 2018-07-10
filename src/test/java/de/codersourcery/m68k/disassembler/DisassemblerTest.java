@@ -136,6 +136,11 @@ public class DisassemblerTest extends TestCase
         compile("reset");
     }
 
+    public void testTrapV()
+    {
+        compile("trapv");
+    }
+
     public void testTrap()
     {
         compile("trap #10");

@@ -632,6 +632,16 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * Miscellaneous instructions
              * ================================
              */
+            case 0b0100111001110110: // TRAPV
+                if ( isOverflow() )
+                {
+                    triggerIRQ( IRQ.FTRAP_TRAP_TRAPV, 0 );
+                }
+                else
+                {
+                    cycles += 4;
+                }
+                return;
             case 0b0100111001110111: // RTR
                 int cr = popWord();
                 pc = popLong();
@@ -777,6 +787,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
                     statusRegister = (statusRegister &
                             ~(FLAG_NEGATIVE|FLAG_ZERO|FLAG_OVERFLOW|FLAG_CARRY)) | setMask;
+                    cycles += 4;
                     return;
                 }
                 if ( (instruction & 0b1111111100000000) == 0b0100001000000000)

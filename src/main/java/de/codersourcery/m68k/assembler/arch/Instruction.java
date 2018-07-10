@@ -26,6 +26,12 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    TRAPV("TRAPV",0) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+        }
+    },
     TST("TST",1) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -651,6 +657,8 @@ public enum Instruction
 
         switch (type)
         {
+            case TRAPV:
+                return TRAPV_ENCODING;
             case TST:
                 String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( extraSrcWords != null ) {
@@ -1462,6 +1470,9 @@ D/A   |     |   |           |
     public static final InstructionEncoding TST_ENCODING = // TST.s <ea>
             InstructionEncoding.of( "01001010SSmmmsss");
 
+    public static final InstructionEncoding TRAPV_ENCODING = // TRAPV
+            InstructionEncoding.of( "0100111001110110");
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -1513,5 +1524,6 @@ D/A   |     |   |           |
         put(BCHG_STATIC_ENCODING,BCHG);
         put(CLR_ENCODING,CLR);
         put(TST_ENCODING,TST);
+        put(TRAPV_ENCODING,TRAPV);
     }};
 }

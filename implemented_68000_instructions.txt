@@ -79,6 +79,6 @@
 [X] SWAP
 [ ] TAS
 [X] TRAP
-[ ] TRAPV
-[ ] TST
+[X] TRAPV
+[X] TST
 [X] UNLK
