@@ -217,6 +217,28 @@ public class AssemblerTest extends TestCase
         assertFailsToCompile("swap.l d3");
     }
 
+    /*
+   0:   0xe3,0xf8,0x1234);
+   4:   0xe7,0x4a,0x    );
+   6:   0xe1,0x4a,0x    );
+   8:   0xe3,0x6a,0x    );
+   a:   0xe3,0x2a,0x    );
+   c:   0xe3,0xaa,0x    );
+   e:   0xe7,0x0a,0x    );
+  10:   0xe7,0x8a,0x    );
+     */
+    public void testLsl()
+    {
+        assertArrayEquals(compile("lsl $1234"  ),0xe3,0xf8,0x12,0x34);
+        assertArrayEquals(compile("lsl.w #3,d2"),0xe7,0x4a);
+        assertArrayEquals(compile("lsl.w #8,d2"),0xe1,0x4a);
+        assertArrayEquals(compile("lsl.w d1,d2"),0xe3,0x6a);
+        assertArrayEquals(compile("lsl.b d1,d2"),0xe3,0x2a);
+        assertArrayEquals(compile("lsl.l d1,d2"),0xe3,0xaa);
+        assertArrayEquals(compile("lsl.b #3,d2"),0xe7,0x0a);
+        assertArrayEquals(compile("lsl.l #3,d2"),0xe7,0x8a);
+    }
+
     public void testRol()
     {
         assertArrayEquals(compile("rol $1234"  ),0xe7,0xf8,0x12,0x34);
@@ -229,6 +251,18 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("rol.l d1,d2"),0xe3,0xba);
         assertArrayEquals(compile("rol.b #3,d2"),0xe7,0x1a);
         assertArrayEquals(compile("rol.l #3,d2"),0xe7,0x9a);
+    }
+
+    public void testLsr()
+    {
+        assertArrayEquals(compile("lsr $1234"  ),0xe2,0xf8,0x12,0x34);
+        assertArrayEquals(compile("lsr.w #3,d2"),0xe6,0x4a);
+        assertArrayEquals(compile("lsr.w #8,d2"),0xe0,0x4a);
+        assertArrayEquals(compile("lsr.w d1,d2"),0xe2,0x6a);
+        assertArrayEquals(compile("lsr.b d1,d2"),0xe2,0x2a);
+        assertArrayEquals(compile("lsr.l d1,d2"),0xe2,0xaa);
+        assertArrayEquals(compile("lsr.b #3,d2"),0xe6,0x0a);
+        assertArrayEquals(compile("lsr.l #3,d2"),0xe6,0x8a);
     }
 
     public void testRor() {

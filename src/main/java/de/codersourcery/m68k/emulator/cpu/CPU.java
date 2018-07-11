@@ -1,14 +1,10 @@
 package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
-import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.Condition;
-import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
-
-import java.util.Set;
 
 /**
  * M68000 cpu emulation.
@@ -26,6 +22,22 @@ public class CPU
 
     private enum BitOpMode {
         IMMEDIATE,REGISTER
+    }
+
+    public enum RotateOperandMode
+    {
+        // ASL/LSL/ROL #1,Dx
+        IMMEDIATE,
+        // ASL/LSL/ROL <ea>
+        MEMORY,
+        // ASL/LSL/ROL Dx,Dy
+        REGISTER;
+    }
+
+    public enum RotateMode {
+        ARITHMETIC_SHIFT,
+        LOGICAL_SHIFT,
+        ROTATE;
     }
 
     /*
@@ -1153,33 +1165,59 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b1110_0000_0000_0000:
 
                 /* ---------
-                 * ROL / ROR
+                 * ROL/ ROR / LSL / LSR
                  * ---------
                  */
-                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000011000 )
+                if ( ( instruction & 0b1111000000111000) ==  0b1110000000001000 ) // LSL/LSR
                 {
-                    // IMMEDIATE
-                    final boolean rotateLeft = (instruction & 1<<8) != 0;
-                    rotateImmediate(instruction,rotateLeft);
+                    // LSL/LSR IMMEDIATE
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    rotateImmediate(instruction,RotateMode.LOGICAL_SHIFT,rotateLeft);
                     return;
                 }
-                if ( ( instruction & 0b1111111101000000) == 0b1110011101000000 ) {
-                    // MEMORY
+                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000011000 )
+                {
+                    // ROL/ROR IMMEDIATE
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    rotateImmediate(instruction,RotateMode.ROTATE,rotateLeft);
+                    return;
+                }
+                if ( ( instruction & 0b1111111011000000) == 0b1110001011000000 ) { // LSL/LSR
+                    // LSL/LSR MEMORY
                     int sizeBits = (instruction & 0b11000000) >> 6;
-                    final boolean rotateLeft = (instruction & 1<<8) != 0;
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
                     int eaMode     = (instruction & 0b111000) >> 3;
                     int eaRegister = (instruction & 0b000111);
                     decodeOperand(1<<sizeBits,eaMode,eaRegister);
                     int value = memLoadWord( ea );
-                    value = rotate( value,2,rotateLeft,1 );
+                    value = rotate( value,2,RotateMode.LOGICAL_SHIFT,rotateLeft,1 );
                     memory.writeWord(ea,value);
                     return;
                 }
+                if ( ( instruction & 0b1111111001000000) == 0b1110011001000000 ) {
+                    // ROL/ROR MEMORY
+                    int sizeBits = (instruction & 0b11000000) >> 6;
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    int eaMode     = (instruction & 0b111000) >> 3;
+                    int eaRegister = (instruction & 0b000111);
+                    decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                    int value = memLoadWord( ea );
+                    value = rotate( value,2,RotateMode.ROTATE,rotateLeft,1 );
+                    memory.writeWord(ea,value);
+                    return;
+                }
+                if ( ( instruction & 0b1111000000111000) == 0b1110000000101000) { // LSL/LSR
+                    // LSL/LSR REGISTER
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    rotateRegister(instruction,RotateMode.LOGICAL_SHIFT,rotateLeft);
+                    return;
+                }
+
                 if ( ( instruction & 0b1111000000111000) == 0b1110000000111000)
                 {
-                    // REGISTER
-                    final boolean rotateLeft = (instruction & 1<<8) != 0;
-                    rotateRegister(instruction,rotateLeft);
+                    // ROL/ROR REGISTER
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    rotateRegister(instruction,RotateMode.ROTATE,rotateLeft);
                     return;
                 }
                 break;
@@ -1195,24 +1233,25 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
     }
 
-    private void rotateRegister(int instruction,boolean rotateLeft)
+    private void rotateRegister(int instruction,RotateMode mode,boolean rotateLeft)
     {
         int sizeBits = (instruction & 0b11000000) >> 6;
         int srcRegNum = (instruction & 0b0000111000000000 ) >> 9;
         int dstRegNum = (instruction & 0b111);
 
         int cnt = dataRegisters[ srcRegNum ];
-        int value = rotate( dataRegisters[ dstRegNum ],1<<sizeBits,rotateLeft,cnt);
+        int value = rotate( dataRegisters[ dstRegNum ],
+                1<<sizeBits,mode,rotateLeft,cnt);
         dataRegisters[ dstRegNum ] = mergeValue(dataRegisters[ dstRegNum ],value,1<<sizeBits);
     }
 
-    private void rotateImmediate(int instruction,boolean rotateLeft)
+    private void rotateImmediate(int instruction,RotateMode mode,boolean rotateLeft)
     {
         int sizeBits = (instruction & 0b11000000) >> 6;
         final int cnt = (instruction & 0b0000111000000000 ) >> 9;
         final int regNum = (instruction & 0b111);
 
-        int value = rotate( dataRegisters[ regNum ],1<<sizeBits,rotateLeft,cnt);
+        int value = rotate( dataRegisters[ regNum ],1<<sizeBits,mode,rotateLeft,cnt);
         dataRegisters[ regNum ] = mergeValue(dataRegisters[ regNum ],value,1<<sizeBits);
     }
 
@@ -1227,31 +1266,68 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         throw new RuntimeException("Unreachable code reached");
     }
 
-    private int rotate(int value,int operandSizeInBytes,boolean rotateLeft,final int rotateCount2)
+    private int rotate(int value,int operandSizeInBytes,
+                       RotateMode mode,
+                       boolean rotateLeft,
+                       final int rotateCount2)
     {
+        int clearMask = FLAG_NEGATIVE|FLAG_ZERO|FLAG_CARRY|FLAG_OVERFLOW; // V flag is always cleared
+        int setMask = 0;
+
         int rotateCount = rotateCount2 % 64;
 
         int lastBit=0; // value serves as default (carry clear) when rotate count is 0
         final int msbBitNum = (operandSizeInBytes*8)-1;
-        if ( rotateLeft )
+        switch( mode )
         {
-            final int mask = 1 << msbBitNum;
-            for ( ; rotateCount > 0 ; rotateCount-- )
-            {
-                lastBit = (value & mask) >>> msbBitNum;
-                value = (value << 1 ) | lastBit;
-            }
+            case LOGICAL_SHIFT:
+                clearMask |= FLAG_EXTENDED;
+                if ( rotateLeft )
+                {
+                    final int mask = 1 << msbBitNum;
+                    for ( ; rotateCount > 0 ; rotateCount-- )
+                    {
+                        lastBit = (value & mask);
+                        value <<= 1;
+                    }
+                }
+                else
+                {
+                    for ( ; rotateCount > 0 ; rotateCount-- )
+                    {
+                        lastBit = (value & 1);
+                        value >>>= 1;
+                    }
+                }
+                if ( lastBit != 0 ) {
+                    setMask |= FLAG_EXTENDED;
+                }
+                break;
+            case ROTATE:
+                if ( rotateLeft )
+                {
+                    final int mask = 1 << msbBitNum;
+                    for ( ; rotateCount > 0 ; rotateCount-- )
+                    {
+                        lastBit = (value & mask) >>> msbBitNum;
+                        value = (value << 1 ) | lastBit;
+                    }
+                }
+                else
+                {
+                    for ( ; rotateCount > 0 ; rotateCount-- )
+                    {
+                        lastBit = (value & 1) << msbBitNum;
+                        value = (value >>> 1) | lastBit;
+                    }
+                }
+                break;
+            case ARITHMETIC_SHIFT:
+                break;
+            default:
+                throw new RuntimeException("Unhandled switch/case: "+mode);
         }
-        else
-        {
-            for ( ; rotateCount > 0 ; rotateCount-- )
-            {
-                lastBit = (value & 1) << msbBitNum;
-                value = (value >>> 1) | lastBit;
-            }
-        }
-        int clearMask = ~(FLAG_NEGATIVE|FLAG_ZERO|FLAG_CARRY|FLAG_OVERFLOW); // V flag is always cleared
-        int setMask = 0;
+
         switch (operandSizeInBytes)
         {
             case 1:
@@ -1268,6 +1344,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             default:
                 throw new RuntimeException("Unreachable code reached");
         }
+
         if ( (value & 1 << msbBitNum ) != 0 ) { // N — Set if the most significant bit of the result is set; cleared otherwise.
             setMask |= FLAG_NEGATIVE;
         }
@@ -1277,7 +1354,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         if ( lastBit != 0 ) { // C - carry contains last bit rotated out of the operand
             setMask |= FLAG_CARRY;
         }
-        statusRegister = (statusRegister & clearMask) | setMask;
+        statusRegister = (statusRegister & ~clearMask) | setMask;
         return value;
     }
 

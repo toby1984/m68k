@@ -132,6 +132,29 @@ public enum Instruction
 
         @Override public boolean supportsExplicitOperandSize() { return true; }
     },
+    LSL("LSL",2) {
+        @Override public int getMinOperandCount() { return 1; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            checkRotateInstructionValid(node,ctx);
+        }
+
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+    },
+    LSR("LSR",2) {
+
+        @Override public int getMinOperandCount() { return 1; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            checkRotateInstructionValid(node,ctx);
+        }
+
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+    },
     ROL("ROL",2) {
 
         @Override public int getMinOperandCount() { return 1; }
@@ -716,38 +739,26 @@ public enum Instruction
                     return EXTW_ENCODING;
                 }
                 return EXTL_ENCODING;
+            case LSL:
+                return selectRotateEncoding( insn,
+                        LSL_MEMORY_ENCODING,
+                        LSL_IMMEDIATE_ENCODING,
+                        LSL_REGISTER_ENCODING,context);
+            case LSR:
+                return selectRotateEncoding( insn,
+                        LSR_MEMORY_ENCODING,
+                        LSR_IMMEDIATE_ENCODING,
+                        LSR_REGISTER_ENCODING,context);
             case ROL:
-                if ( insn.useImpliedOperandSize ) {
-                    insn.setImplicitOperandSize(OperandSize.WORD);
-                }
-                if ( insn.operandCount() == 1 ) {
-                    extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                    if ( extraSrcWords != null ) {
-                        return ROL_MEMORY_ENCODING.append(extraSrcWords);
-                    }
-                    return ROL_MEMORY_ENCODING;
-                }
-                if (insn.source().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE))
-                {
-                    return ROL_IMMEDIATE_ENCODING;
-                }
-                return ROL_REGISTER_ENCODING;
+                return selectRotateEncoding( insn,
+                        ROL_MEMORY_ENCODING,
+                        ROL_IMMEDIATE_ENCODING,
+                        ROL_REGISTER_ENCODING,context);
             case ROR:
-                if ( insn.useImpliedOperandSize ) {
-                    insn.setImplicitOperandSize(OperandSize.WORD);
-                }
-                if ( insn.operandCount() == 1 ) {
-                    extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                    if ( extraSrcWords != null ) {
-                        return ROR_MEMORY_ENCODING.append(extraSrcWords);
-                    }
-                    return ROR_MEMORY_ENCODING;
-                }
-                if (insn.source().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE))
-                {
-                    return ROR_IMMEDIATE_ENCODING;
-                }
-                return ROR_REGISTER_ENCODING;
+                return selectRotateEncoding( insn,
+                        ROR_MEMORY_ENCODING,
+                        ROR_IMMEDIATE_ENCODING,
+                        ROR_REGISTER_ENCODING,context);
             case NEG:
                 return NEG_ENCODING;
             case PEA:
@@ -997,7 +1008,7 @@ public enum Instruction
 
     // returns any InstructionEncoding patterns
     // needed to accomodate all operand values
-    private String[] getExtraWordPatterns(OperandNode op, Operand operandKind,InstructionNode insn,ICompilationContext ctx)
+    private static String[] getExtraWordPatterns(OperandNode op, Operand operandKind,InstructionNode insn,ICompilationContext ctx)
     {
         if ( op.addressingMode.maxExtensionWords == 0 ) {
             return null;
@@ -1070,6 +1081,29 @@ D/A   |     |   |           |
             case IMPLIED: return null; // handled
         }
         throw new RuntimeException("Unhandled addressing mode: "+op.addressingMode);
+    }
+
+    private static InstructionEncoding selectRotateEncoding(InstructionNode insn,
+                                               InstructionEncoding memory,
+                                               InstructionEncoding immediate,
+                                               InstructionEncoding register,
+                                               ICompilationContext context)
+    {
+        if ( insn.useImpliedOperandSize ) {
+            insn.setImplicitOperandSize(OperandSize.WORD);
+        }
+        if ( insn.operandCount() == 1 ) {
+            final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+            if ( extraSrcWords != null ) {
+                return memory.append(extraSrcWords);
+            }
+            return memory;
+        }
+        if (insn.source().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE))
+        {
+            return immediate;
+        }
+        return register;
     }
 
     private static void checkOperandSizeUnsigned(IValueNode value, int maxSizeInBits, ICompilationContext ctx)
@@ -1452,6 +1486,39 @@ D/A   |     |   |           |
     public static final InstructionEncoding ROL_MEMORY_ENCODING = InstructionEncoding.of(    "1110011111mmmsss");
     public static final InstructionEncoding ROR_MEMORY_ENCODING = InstructionEncoding.of(    "1110011011mmmsss");
 
+
+    // --
+
+    public static final InstructionEncoding LSL_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss1SS101VVV");
+    public static final InstructionEncoding LSR_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss0SS101VVV");
+
+    public static final InstructionEncoding LSL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS001DDD")
+                                                                                        .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ));
+
+    public static final InstructionEncoding LSR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS001DDD")
+                                                                                        .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ) );
+
+    public static final InstructionEncoding LSL_MEMORY_ENCODING = InstructionEncoding.of(    "1110001111mmmsss");
+    public static final InstructionEncoding LSR_MEMORY_ENCODING = InstructionEncoding.of(    "1110001011mmmsss");
+
+    /*
+    LSL/LSR Dx,Dy
+    LSL/LSR #xx,Dy
+
+15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
+ 1  1  1  0  +--+-+ + +-+ | 0 1 +-+-+
+             CNT/REG|  S  |       register
+                    dr    i/r
+
+   LSL/LSR <ea>
+
+15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
+ 1  1  1  0  0  0 1 dr 1 1+-+-+ +-+-+
+                          MODE   REGISTER
+
+dr = 0 => SHIFT RIGHT
+dr = 1 => SHIFT LEFT
+     */
     public static final InstructionEncoding NEG_ENCODING = InstructionEncoding.of( "01000100SSmmmsss");
 
     public static final InstructionEncoding EXTW_ENCODING =
@@ -1535,6 +1602,12 @@ D/A   |     |   |           |
         put(ROR_IMMEDIATE_ENCODING,ROR);
         put(ROL_MEMORY_ENCODING,ROL);
         put(ROR_MEMORY_ENCODING,ROR);
+        put(LSL_REGISTER_ENCODING,LSL);
+        put(LSR_REGISTER_ENCODING,LSR);
+        put(LSL_IMMEDIATE_ENCODING,LSL);
+        put(LSR_IMMEDIATE_ENCODING,LSR);
+        put(LSL_MEMORY_ENCODING,LSL);
+        put(LSR_MEMORY_ENCODING,LSR);
         put(EXTW_ENCODING,EXT);
         put(EXTL_ENCODING,EXT);
         put(BTST_DYNAMIC_ENCODING,BTST);

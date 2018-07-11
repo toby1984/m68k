@@ -37,8 +37,8 @@
 [X] JSR
 [X] LEA
 [X] LINK
-[ ] LSL
-[ ] LSR
+[X] LSL
+[X] LSR
 [X] MOVE
 [X] MOVEA
 [ ] MOVE to CCR

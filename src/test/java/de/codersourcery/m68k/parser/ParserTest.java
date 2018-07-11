@@ -213,38 +213,21 @@ public class ParserTest extends TestCase
         assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
     }
 
-    public void testParseROLImmediate()
-    {
-        testParseRotateImmediate(Instruction.ROL);
-    }
+    public void testParseROLImmediate() { testParseRotateImmediate(Instruction.ROL); }
+    public void testParseROLMemory() { testParseRotateMemory(Instruction.ROL); }
+    public void testParseROLRegister() { testParseRotateRegister(Instruction.ROL); }
+    public void testParseRORImmediate() { testParseRotateImmediate(Instruction.ROR); }
+    public void testParseRORMemory() { testParseRotateMemory(Instruction.ROR); }
+    public void testParseRORRegister() { testParseRotateRegister(Instruction.ROR); }
 
-    public void testParseROLMemory()
-    {
-        testParseRotateMemory(Instruction.ROL);
-    }
+    public void testParseLSLImmediate() { testParseRotateImmediate(Instruction.LSL); }
+    public void testParseLSLMemory() { testParseRotateMemory(Instruction.LSL); }
+    public void testParseLSLRegister() { testParseRotateRegister(Instruction.LSL); }
+    public void testParseLSRImmediate() { testParseRotateImmediate(Instruction.LSR); }
+    public void testParseLSRMemory() { testParseRotateMemory(Instruction.LSR); }
+    public void testParseLSRRegister() { testParseRotateRegister(Instruction.LSR); }
 
-    public void testParseROLRegister()
-    {
-        testParseRotateRegister(Instruction.ROL);
-    }
-
-    public void testParseRORImmediate()
-    {
-        testParseRotateImmediate(Instruction.ROR);
-    }
-
-    public void testParseRORMemory()
-    {
-        testParseRotateMemory(Instruction.ROR);
-    }
-
-    public void testParseRORRegister()
-    {
-        testParseRotateRegister(Instruction.ROR);
-    }
-
-    private void testParseRotateMemory(Instruction i)
-    {
+    private void testParseRotateMemory(Instruction i) {
         final AST ast = parseAST(i.getMnemonic()+" $1234");
         assertEquals(1,ast.childCount());
         final StatementNode stmt = ast.child(0).asStatement();

@@ -4,6 +4,7 @@ import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
+import de.codersourcery.m68k.emulator.cpu.CPU;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
@@ -251,61 +252,74 @@ public class Disassembler
                     return;
                 }
                 throw new RuntimeException("Unreachable code reached");
+                // ====
+            case LSL:
+                appendln("lsl");
+                /*
+                1110vvv1SS001DDD
+                1110000100111000
+                1110vvv1SS001DDD
+                 */
+                if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100101000 )
+                {
+                    // LSL_IMMEDIATE
+                    printRotateOperands(insnWord, CPU.RotateOperandMode.IMMEDIATE);
+                    return;
+                }
+                if ( ( insnWord & 0b1111111111000000) == 0b1110011111000000 ) {
+                    // LSL_MEMORY
+                    printRotateOperands(insnWord,CPU.RotateOperandMode.MEMORY);
+                    return;
+                }
+                // LSL register
+                printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
+                return;
+            case LSR:
+                appendln("lsr");
+                if ( ( insnWord & 0b1111000100111000 ) == 0b1110000000011000 ) {
+                    // LSR_IMMEDIATE
+                    printRotateOperands(insnWord, CPU.RotateOperandMode.IMMEDIATE);
+                    return;
+                }
+                if ( ( insnWord & 0b1111111111000000) == 0b1110011011000000 ) {
+                    // LSR_MEMORY
+                    printRotateOperands(insnWord,CPU.RotateOperandMode.MEMORY);
+                    return;
+                }
+                // LSR register
+                printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
+                return;
+                // ====
             case ROL:
                 appendln("rol");
-                sizeBits = (insnWord & 0b11000000) >> 6;
                 if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100011000 )
                 {
                     // ROL_IMMEDIATE
-                    appendOperandSize(sizeBits);
-                    int cnt = (insnWord & 0b0000111000000000 ) >>> 9;
-                    if ( cnt == 0 ) {
-                        cnt = 8;
-                    }
-                    append("#").append(cnt).append(",").appendDataRegister( (insnWord & 0b111) );
+                    printRotateOperands(insnWord, CPU.RotateOperandMode.IMMEDIATE);
                     return;
                 }
                 if ( ( insnWord & 0b1111111111000000) == 0b1110011111000000 ) {
                     // ROL_MEMORY
-                    append(" ");
-                    eaMode     = (insnWord & 0b111000) >>> 3;
-                    eaRegister = (insnWord & 0b000111);
-                    decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                    printRotateOperands(insnWord,CPU.RotateOperandMode.MEMORY);
                     return;
                 }
                 // ROL register
-                appendOperandSize(sizeBits);
-                int srcRegNum = (insnWord & 0b0000111000000000 ) >>> 9;
-                int dstRegNum = (insnWord & 0b111);
-                append("d").append(srcRegNum).append(",").appendDataRegister(dstRegNum);
+                printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
                 return;
             case ROR:
                 appendln("ror");
-                sizeBits = (insnWord & 0b11000000) >>> 6;
                 if ( ( insnWord & 0b1111000100111000 ) == 0b1110000000011000 ) {
                     // ROR_IMMEDIATE
-                    appendOperandSize(sizeBits);
-                    int cnt = (insnWord & 0b0000111000000000 ) >>> 9;
-                    if ( cnt == 0 ) {
-                        cnt = 8;
-                    }
-                    final int regNum = (insnWord & 0b111);
-                    append("#").append(cnt).append(",").appendDataRegister(regNum);
+                    printRotateOperands(insnWord, CPU.RotateOperandMode.IMMEDIATE);
                     return;
                 }
                 if ( ( insnWord & 0b1111111111000000) == 0b1110011011000000 ) {
                     // ROR_MEMORY
-                    append(" ");
-                    eaMode     = (insnWord & 0b111000) >>> 3;
-                    eaRegister = (insnWord & 0b000111);
-                    decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                    printRotateOperands(insnWord,CPU.RotateOperandMode.MEMORY);
                     return;
                 }
                 // ROR register
-                appendOperandSize(sizeBits);
-                srcRegNum = (insnWord & 0b0000111000000000 ) >>> 9;
-                dstRegNum = (insnWord & 0b111);
-                append("d").append(srcRegNum).append(",").appendDataRegister(dstRegNum);
+                printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
                 return;
             case NEG:
                 appendln("neg");
@@ -941,6 +955,41 @@ public class Disassembler
                 break;
         }
         return baseDisplacement;
+    }
+
+    private void printRotateOperands(int insnWord, CPU.RotateOperandMode mode)
+    {
+        int sizeBits = (insnWord & 0b11000000) >> 6;
+
+        if ( mode == CPU.RotateOperandMode.IMMEDIATE )
+        {
+            // ROL/LSL/ASL IMMEDIATE
+            appendOperandSize(sizeBits);
+            int cnt = (insnWord & 0b0000111000000000 ) >>> 9;
+            if ( cnt == 0 ) {
+                cnt = 8;
+            }
+            append("#").append(cnt).append(",").appendDataRegister( (insnWord & 0b111) );
+            return;
+        }
+        if ( mode == CPU.RotateOperandMode.MEMORY ) {
+            // ROL/LSL/ASL MEMORY
+            append(" ");
+            int eaMode     = (insnWord & 0b111000) >>> 3;
+            int eaRegister = (insnWord & 0b000111);
+            decodeOperand(1<<sizeBits,eaMode,eaRegister);
+            return;
+        }
+        // ROL/LSL/ASL register
+        if ( mode == CPU.RotateOperandMode.REGISTER)
+        {
+            appendOperandSize(sizeBits);
+            int srcRegNum = (insnWord & 0b0000111000000000) >>> 9;
+            int dstRegNum = (insnWord & 0b111);
+            append("d").append(srcRegNum).append(",").appendDataRegister(dstRegNum);
+            return;
+        }
+        throw new RuntimeException("unhandled mode: "+mode);
     }
 
     private void illegalOperand() {
