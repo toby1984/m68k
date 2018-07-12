@@ -319,6 +319,17 @@ public class CPUTest extends TestCase
                 .expectD3(  0x12345640 ).notZero().noCarry().notNegative().noOverflow().notExtended();
     }
 
+    public void testBSR() {
+
+            execute(cpu -> {}, 4, "org $2000",
+                            "bsr sub",
+                            "move #2,d1",
+                            "illegal",
+                            "sub:",
+                            "move #1,d0",
+                            "rts").noIrqActive().expectD0(1).expectD1(2);
+    }
+
     public void testRorByte()
     {
         execute( cpu -> cpu.setFlags( CPU.FLAG_CARRY | CPU.FLAG_EXTENDED),

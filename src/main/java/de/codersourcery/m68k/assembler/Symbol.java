@@ -37,11 +37,14 @@ public class Symbol
     @Override
     public String toString()
     {
+        final String hex = value instanceof Number ?
+                ("($"+Integer.toHexString( ((Number) value).intValue() )+")") : "";
+
         return "Symbol{" +
                 "identifier=" + identifier +
                 ", declarationSite=" + declarationSite +
                 ", type=" + type +
-                ", value=" + value +
+                ", value=" + value + hex +
                 '}';
     }
 

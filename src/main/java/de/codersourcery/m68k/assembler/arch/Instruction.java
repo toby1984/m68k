@@ -351,7 +351,7 @@ public enum Instruction
     DBT("DBT",2, 0b0000,Condition.BRT,ConditionalInstructionType.DBCC) { // aka 'always branch'
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
     },
-    DBRA("DBRA",2, 0b0001,Condition.BRF,ConditionalInstructionType.DBCC) { // ignores condition check
+    DBRA("DBRA",2, 0b0001,Condition.BSR,ConditionalInstructionType.DBCC) { // ignores condition check
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
     },
     DBHI("DBHI",2, 0b0010,Condition.BHI,ConditionalInstructionType.DBCC) {
@@ -402,7 +402,7 @@ public enum Instruction
     BRA("BRA",1, 0b0000,Condition.BRT,ConditionalInstructionType.BCC) { // aka 'always branch'
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
     },
-    BRF("BRF",1, 0b0001,Condition.BRF,ConditionalInstructionType.BCC) { // TODO: this is essentially "never branch" .... not very useful as NOP exists as well...
+    BSR("BSR",1, 0b0001,Condition.BSR,ConditionalInstructionType.BCC) { // TODO: this is essentially "never branch" .... not very useful as NOP exists as well...
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
     },
     BHI("BHI",1, 0b0010,Condition.BHI,ConditionalInstructionType.BCC) {
@@ -919,7 +919,7 @@ public enum Instruction
                 return DBCC_ENCODING;
             // Bcc branch instructions
             case BRA:
-                // case BRF:
+            case BSR:
             case BHI:
             case BLS:
             case BCC:
@@ -968,9 +968,12 @@ public enum Instruction
                 }
                 if ( size <= 32 )
                 {
+                    if ( context.options().cpuType.isNotCompatibleWith( CPUType.M68020 ) ) {
+                        context.error("32-bit relative branch offset only supported on M68020+");
+                    }
                     return BCC_32BIT_ENCODING;
                 }
-                throw new RuntimeException("Branch offset larger than 32 bits?");
+                throw new RuntimeException("Internal error - relative branch offset larger than 32 bits?");
             case NOP:
                 return NOP_ENCODING;
             case EXG:
@@ -1505,7 +1508,8 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss","CCCCCCCC_CCCCCCCC");
 
-    public static final InstructionEncoding BCC_8BIT_ENCODING = InstructionEncoding.of(  "0110ccccCCCCCCCC");
+    public static final InstructionEncoding BCC_8BIT_ENCODING =
+            InstructionEncoding.of(  "0110ccccCCCCCCCC");
 
     public static final InstructionEncoding BCC_16BIT_ENCODING = InstructionEncoding.of( "0110cccc00000000","CCCCCCCC_CCCCCCCC");
 

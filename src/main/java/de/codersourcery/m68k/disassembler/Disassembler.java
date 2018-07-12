@@ -493,7 +493,7 @@ public class Disassembler
                 return;
             // Bcc
             case BRA:
-            case BRF:
+            case BSR:
             case BHI:
             case BLS:
             case BCC:

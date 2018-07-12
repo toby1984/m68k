@@ -60,6 +60,21 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("ext.l d3")    ,0x48,0xc3 );
     }
 
+    public void testBSR() {
+
+        assertArrayEquals(compile("org $2000\n" +
+                "bsr sub\n" +
+                "move #2,d1\n" +
+                "illegal\n" +
+                "sub:\n" +
+                "move #1,d0\n" +
+                "rts")    ,         0x61,0x08,
+                0x32,0x3c,0x00,0x02,
+                0x4a,0xfc,
+                0x30,0x3c,0x00,0x01,
+                0x4e,0x75);
+    }
+
     public void testMovea() {
         assertArrayEquals(compile("movea #$1234,a3")    ,0x36,0x7c,0x12,0x34 );
         assertArrayEquals(compile("movea.l #$123456,a3")    ,0x26,0x7c,0x00,0x12,0x34,0x56 );

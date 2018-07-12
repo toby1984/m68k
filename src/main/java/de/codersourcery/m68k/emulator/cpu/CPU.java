@@ -1084,12 +1084,37 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0110_0000_0000_0000:
 
-                if ( (instruction & 0b11111111_00000000) == 0b01100001_00000000 ) {
-                    throw new RuntimeException("BSR not implemented yet");
-                }
-
-                // BRA/Bcc
+                // BRA/Bcc/BSR
                 final int cc = (instruction & 0b0000111100000000) >> 8;
+                if ( cc == Condition.BSR.bits )
+                {
+                    switch (instruction & 0xff)
+                    {
+                        case 0x00: // 16 bit offset
+                            pushLong( pc+2 );
+                            pc += memLoadWord(pc)-2; // -2 because we already advanced the PC after reading the instruction word
+                            cycles = 18;
+                            return;
+                        case 0xff: // 32 bit offset
+                            if ( cpuType.isNotCompatibleWith( CPUType.M68020 ) )
+                            {
+                                break;
+                            }
+                            pushLong( pc+4 );
+                            pc += memLoadLong( pc )-2; // -2because we already advanced the PC after reading the instruction word
+                            cycles = 24; // TODO: Wrong timing, find out 68020+ timings...
+                            return;
+                        default:
+                            // 8-bit branch offset encoded in instruction itself
+                            pushLong( pc );
+                            final int offset = ((instruction & 0xff) << 24) >> 24;
+                            pc += offset - 2; // -2 because we already advanced the PC after reading the instruction word
+                            cycles = 18;
+                            return;
+                    }
+                    invalidInstruction();
+                    return;
+                }
                 final boolean takeBranch = Condition.isTrue(this, cc);
                 switch (instruction & 0xff)
                 {

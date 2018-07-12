@@ -88,6 +88,13 @@ public class DisassemblerTest extends TestCase
         compile("BLE loop\nloop:","00000000: ble $2");
     }
 
+    public void testBSR() {
+        compile("org $2000\n" +
+                        "bsr sub\n" +
+                        "illegal\n" +
+                        "sub:\n","00000000: bsr $4\n" +
+                "00000002: illegal");
+    }
     public void testChk()
     {
         compile("chk.w $1200,d3");

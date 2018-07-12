@@ -15,7 +15,7 @@
 [X] BCLR
 [X] BRA
 [X] BSET
-[ ] BSR
+[X] BSR
 [X] BTST
 [X] CHK
 [X] CLR

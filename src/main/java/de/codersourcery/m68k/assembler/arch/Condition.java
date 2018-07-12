@@ -11,7 +11,7 @@ import de.codersourcery.m68k.utils.Misc;
 public enum Condition
 {
     BRT(0b0000),  // always true
-    BRF(0b0001),  // always false
+    BSR(0b0001),  // always false
     BHI(0b0010),
     BLS(0b0011),
     BCC(0b0100),
@@ -39,7 +39,7 @@ public enum Condition
     {
         switch(bits) {
             case 0b0000: return BRT;
-            case 0b0001: return BRF;
+            case 0b0001: return BSR;
             case 0b0010: return BHI;
             case 0b0011: return BLS;
             case 0b0100: return BCC;

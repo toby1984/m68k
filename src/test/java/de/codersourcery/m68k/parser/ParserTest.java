@@ -73,6 +73,15 @@ public class ParserTest extends TestCase
         assertFails( () -> parseAST("moveq.l #$70,d0") );
     }
 
+    public void testParseBSR() {
+        final AST ast = parseAST("BSR loop\nloop:",true);
+        assertEquals(2,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.getInstruction();
+        assertEquals( Instruction.BSR, insn.getInstructionType() );
+        assertEquals( Identifier.of("loop"), insn.source().getValue().asIdentifier().value );
+    }
+
     public void testParseDBRA() {
         final AST ast = parseAST("loop: DBRA d1,loop",true);
         assertEquals(1,ast.childCount());
