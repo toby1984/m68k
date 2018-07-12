@@ -26,6 +26,23 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    CHK("CHK",2) {
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            Instruction.checkSourceAddressingModeKind( node,AddressingModeKind.DATA );
+            Instruction.checkDestinationAddressingMode( node,AddressingMode.DATA_REGISTER_DIRECT );
+            if ( ! node.useImpliedOperandSize && node.getOperandSize() == OperandSize.BYTE ) {
+                throw new RuntimeException("CHK only supports .w or .l operand sizes");
+            }
+        }
+
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+    },
     NOT("NOT",1) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx)
@@ -128,6 +145,29 @@ public enum Instruction
             if ( node.hasOperandSize( OperandSize.BYTE ) ) {
                 throw new RuntimeException("Only operand sizes WORD or LONG are supported by EXT");
             }
+        }
+
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+    },
+    ASL("ASL",2) {
+        @Override public int getMinOperandCount() { return 1; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            checkRotateInstructionValid(node,ctx);
+        }
+
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+    },
+    ASR("ASR",2) {
+
+        @Override public int getMinOperandCount() { return 1; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        {
+            checkRotateInstructionValid(node,ctx);
         }
 
         @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -693,10 +733,19 @@ public enum Instruction
 
         switch (type)
         {
+            case CHK:
+                if ( insn.useImpliedOperandSize ) {
+                    insn.setImplicitOperandSize(OperandSize.WORD);
+                }
+                String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( extraSrcWords != null ) {
+                    return CHK_ENCODING.append(extraSrcWords);
+                }
+                return CHK_ENCODING;
             case TRAPV:
                 return TRAPV_ENCODING;
             case TST:
-                String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( extraSrcWords != null ) {
                     return TST_ENCODING.append(extraSrcWords);
                 }
@@ -739,6 +788,16 @@ public enum Instruction
                     return EXTW_ENCODING;
                 }
                 return EXTL_ENCODING;
+            case ASL:
+                return selectRotateEncoding( insn,
+                         ASL_MEMORY_ENCODING,
+                         ASL_IMMEDIATE_ENCODING,
+                         ASL_REGISTER_ENCODING,context);
+            case ASR:
+                return selectRotateEncoding( insn,
+                         ASR_MEMORY_ENCODING,
+                         ASR_IMMEDIATE_ENCODING,
+                         ASR_REGISTER_ENCODING,context);
             case LSL:
                 return selectRotateEncoding( insn,
                         LSL_MEMORY_ENCODING,
@@ -1465,7 +1524,6 @@ D/A   |     |   |           |
     // TODO: 68020+ supports LONG displacement value as well
     public static final InstructionEncoding LINK_ENCODING = InstructionEncoding.of( "0100111001010sss",
                                                                                     "VVVVVVVV_VVVVVVVV");
-
     public static final InstructionEncoding UNLINK_ENCODING = InstructionEncoding.of( "0100111001011sss");
 
     public static final InstructionEncoding RESET_ENCODING = InstructionEncoding.of( "0100111001110000");
@@ -1474,51 +1532,30 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding PEA_ENCODING = InstructionEncoding.of( "0100100001mmmsss");
 
-    public static final InstructionEncoding ROL_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss1SS111VVV");
-    public static final InstructionEncoding ROR_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss0SS111VVV");
+    public static final InstructionEncoding ROL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS011DDD").decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ));
+    public static final InstructionEncoding LSL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS001DDD").decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ));
+    public static final InstructionEncoding ASL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS000DDD").decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ));
 
-    public static final InstructionEncoding ROL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS011DDD")
-                                                                                        .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ));
-
-    public static final InstructionEncoding ROR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS011DDD")
-                                                                                        .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ) );
+    public static final InstructionEncoding ROR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS011DDD").decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ) );
+    public static final InstructionEncoding LSR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS001DDD").decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ) );
+    public static final InstructionEncoding ASR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS000DDD").decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ) );
 
     public static final InstructionEncoding ROL_MEMORY_ENCODING = InstructionEncoding.of(    "1110011111mmmsss");
-    public static final InstructionEncoding ROR_MEMORY_ENCODING = InstructionEncoding.of(    "1110011011mmmsss");
-
-
-    // --
-
-    public static final InstructionEncoding LSL_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss1SS101VVV");
-    public static final InstructionEncoding LSR_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss0SS101VVV");
-
-    public static final InstructionEncoding LSL_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv1SS001DDD")
-                                                                                        .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ));
-
-    public static final InstructionEncoding LSR_IMMEDIATE_ENCODING = InstructionEncoding.of( "1110vvv0SS001DDD")
-                                                                                        .decorateWith(fieldDecorator(Field.SRC_VALUE , x -> x == 8 ? 0 :x ) );
-
     public static final InstructionEncoding LSL_MEMORY_ENCODING = InstructionEncoding.of(    "1110001111mmmsss");
+    public static final InstructionEncoding ASL_MEMORY_ENCODING = InstructionEncoding.of(    "1110000111mmmsss");
+
+    public static final InstructionEncoding ROR_MEMORY_ENCODING = InstructionEncoding.of(    "1110011011mmmsss");
     public static final InstructionEncoding LSR_MEMORY_ENCODING = InstructionEncoding.of(    "1110001011mmmsss");
+    public static final InstructionEncoding ASR_MEMORY_ENCODING = InstructionEncoding.of(    "1110000011mmmsss");
 
-    /*
-    LSL/LSR Dx,Dy
-    LSL/LSR #xx,Dy
+    public static final InstructionEncoding ROL_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss1SS111VVV");
+    public static final InstructionEncoding LSL_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss1SS101VVV");
+    public static final InstructionEncoding ASL_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss1SS100VVV");
 
-15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
- 1  1  1  0  +--+-+ + +-+ | 0 1 +-+-+
-             CNT/REG|  S  |       register
-                    dr    i/r
+    public static final InstructionEncoding ROR_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss0SS111VVV");
+    public static final InstructionEncoding LSR_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss0SS101VVV");
+    public static final InstructionEncoding ASR_REGISTER_ENCODING = InstructionEncoding.of(  "1110sss0SS100VVV");
 
-   LSL/LSR <ea>
-
-15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
- 1  1  1  0  0  0 1 dr 1 1+-+-+ +-+-+
-                          MODE   REGISTER
-
-dr = 0 => SHIFT RIGHT
-dr = 1 => SHIFT LEFT
-     */
     public static final InstructionEncoding NEG_ENCODING = InstructionEncoding.of( "01000100SSmmmsss");
 
     public static final InstructionEncoding EXTW_ENCODING =
@@ -1563,6 +1600,18 @@ dr = 1 => SHIFT LEFT
     public static final InstructionEncoding NOT_ENCODING = // NOT
             InstructionEncoding.of( "01000110SSmmmsss");
 
+    public static final InstructionEncoding CHK_ENCODING = // CHK <ea>,Dn
+            InstructionEncoding.of( "0100DDDSS0mmmsss").decorateWith(fieldDecorator(Field.SIZE, originalValue ->
+            {
+                if ( originalValue == OperandSize.WORD.bits) {
+                    return 0b11;
+                }
+                if ( originalValue == OperandSize.LONG.bits ) {
+                    return 0b10;
+                }
+                throw new RuntimeException("Unhandled size bit-pattern: %"+Integer.toBinaryString(originalValue ) );
+            }));
+
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
         put(ANDI_TO_SR_ENCODING,AND);
@@ -1602,12 +1651,21 @@ dr = 1 => SHIFT LEFT
         put(ROR_IMMEDIATE_ENCODING,ROR);
         put(ROL_MEMORY_ENCODING,ROL);
         put(ROR_MEMORY_ENCODING,ROR);
+
         put(LSL_REGISTER_ENCODING,LSL);
         put(LSR_REGISTER_ENCODING,LSR);
         put(LSL_IMMEDIATE_ENCODING,LSL);
         put(LSR_IMMEDIATE_ENCODING,LSR);
         put(LSL_MEMORY_ENCODING,LSL);
         put(LSR_MEMORY_ENCODING,LSR);
+
+        put(ASL_REGISTER_ENCODING,ASL);
+        put(ASR_REGISTER_ENCODING,ASR);
+        put(ASL_IMMEDIATE_ENCODING,ASL);
+        put(ASR_IMMEDIATE_ENCODING,ASR);
+        put(ASL_MEMORY_ENCODING,ASL);
+        put(ASR_MEMORY_ENCODING,ASR);
+
         put(EXTW_ENCODING,EXT);
         put(EXTL_ENCODING,EXT);
         put(BTST_DYNAMIC_ENCODING,BTST);
@@ -1622,5 +1680,6 @@ dr = 1 => SHIFT LEFT
         put(TST_ENCODING,TST);
         put(TRAPV_ENCODING,TRAPV);
         put(NOT_ENCODING,NOT);
+        put(CHK_ENCODING,CHK);
     }};
 }

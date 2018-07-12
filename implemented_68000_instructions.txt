@@ -8,8 +8,8 @@
 [ ] ANDI
 [ ] ANDI to CCR
 [X] ANDI to SR
-[ ] ASL
-[ ] ASR
+[X] ASL
+[X] ASR
 [X] Bcc
 [X] BCHG
 [X] BCLR
@@ -17,7 +17,7 @@
 [X] BSET
 [ ] BSR
 [X] BTST
-[ ] CHK
+[X] CHK
 [X] CLR
 [ ] CMP
 [ ] CMPA

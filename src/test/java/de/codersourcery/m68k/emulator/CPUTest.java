@@ -6,6 +6,7 @@ import de.codersourcery.m68k.assembler.CompilationMessages;
 import de.codersourcery.m68k.assembler.CompilationUnit;
 import de.codersourcery.m68k.assembler.IResource;
 import de.codersourcery.m68k.assembler.Symbol;
+import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.emulator.cpu.CPU;
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.utils.Misc;
@@ -41,7 +42,7 @@ public class CPUTest extends TestCase
     {
         super.setUp();
         memory = new Memory(MEM_SIZE);
-        cpu = new CPU(memory);
+        cpu = new CPU(CPUType.BEST,memory);
     }
 
     public void testLEA()
@@ -111,6 +112,18 @@ public class CPUTest extends TestCase
 
     public void testLslByte()
     {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_CARRY | CPU.FLAG_EXTENDED),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "lsl.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_CARRY),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "lsl.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().notExtended();
+
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345601,d3",
                 "lsl.b #1,d3")
                 .expectD3(  0x12345602 ).notZero().notNegative().noCarry().noOverflow().notExtended();
@@ -122,8 +135,66 @@ public class CPUTest extends TestCase
                 .expectD3(  0x12345600 ).zero().carry().notNegative().noOverflow().extended();
     }
 
+    public void testAsrByte()
+    {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED|CPU.FLAG_CARRY ),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "asr.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_CARRY ),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "asr.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().notExtended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345601,d3",
+                 "asr.b #1,d3")
+                .expectD3(  0x12345600 ).zero().notNegative().carry().noOverflow().extended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345600,d3",
+                 "asr.b #1,d3")
+                .expectD3(  0x12345600 ).zero().notNegative().noCarry().noOverflow().notExtended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345680,d3",
+                 "asr.b #1,d3")
+                .expectD3(  0x123456C0 ).notZero().noCarry().negative().noOverflow().notExtended();
+    }
+
+    public void testAslByte()
+    {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED|CPU.FLAG_CARRY ),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "asl.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_CARRY ),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "asl.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().notExtended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345601,d3",
+                 "asl.b #1,d3")
+                .expectD3(  0x12345602 ).notZero().notNegative().noCarry().noOverflow().notExtended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345600,d3",
+                 "asl.b #1,d3")
+                .expectD3(  0x12345600 ).zero().notNegative().noCarry().noOverflow().notExtended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345680,d3",
+                 "asl.b #1,d3")
+                .expectD3(  0x12345600 ).zero().carry().notNegative().overflow().extended();
+    }
+
     public void testRolByte()
     {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_CARRY | CPU.FLAG_EXTENDED),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "rol.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().extended();
+
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345601,d3",
                 "rol.b #1,d3")
                 .expectD3(  0x12345602 ).notZero().notNegative().noCarry().noOverflow().extended();
@@ -133,6 +204,18 @@ public class CPUTest extends TestCase
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345680,d3",
                 "rol.b #1,d3")
                 .expectD3(  0x12345601 ).notZero().carry().notNegative().noOverflow().extended();
+    }
+
+    public void testAslWord() {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12340001,d3",
+                 "asl.w #1,d3")
+                .expectD3(  0x12340002 ).notZero().notNegative().noCarry().noOverflow().notExtended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12340000,d3",
+                 "asl.w #1,d3")
+                .expectD3(  0x12340000 ).zero().notNegative().noCarry().noOverflow().notExtended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12348000,d3",
+                 "asl.w #1,d3")
+                .expectD3(  0x12340000 ).zero().carry().notNegative().overflow().extended();
     }
 
     public void testLslWord() {
@@ -164,6 +247,21 @@ public class CPUTest extends TestCase
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12348000,d3",
             "rol.w #1,d3")
             .expectD3(  0x12340001 ).notZero().carry().notNegative().noOverflow().extended();
+    }
+
+    public void testAslLong()
+    {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$80000000,d3",
+                 "move.l #1,d1", // hack to clear N flag set by move #$80000000
+                 "asl.l #1,d3")
+                .expectD3(  0x00000000 ).zero().carry().notNegative().overflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$00000001,d3",
+                 "asl.l #1,d3")
+                .expectD3(  0x00000002 ).notZero().notNegative().noCarry().noOverflow().notExtended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$00000000,d3",
+                 "asl.l #1,d3")
+                .expectD3(  0x00000000 ).zero().notNegative().noCarry().noOverflow().notExtended();
     }
 
     public void testLslLong()
@@ -198,6 +296,18 @@ public class CPUTest extends TestCase
 
     public void testLsrByte()
     {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_CARRY | CPU.FLAG_EXTENDED),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "lsr.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_CARRY),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "lsr.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().notExtended();
+
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345601,d3",
                 "lsr.b #1,d3")
                 .expectD3(  0x12345600 ).zero().notNegative().carry().noOverflow().extended();
@@ -211,6 +321,12 @@ public class CPUTest extends TestCase
 
     public void testRorByte()
     {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_CARRY | CPU.FLAG_EXTENDED),
+                 "move.l #0,d2",
+                 "move.l #0,d3",
+                 "ror.b d2,d3")
+                .expectD3( 0 ).zero().notNegative().noCarry().noOverflow().extended();
+
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345601,d3",
             "ror.b #1,d3")
             .expectD3(  0x12345680 ).notZero().negative().carry().noOverflow().extended();
@@ -220,6 +336,25 @@ public class CPUTest extends TestCase
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12345680,d3",
             "ror.b #1,d3")
             .expectD3(  0x12345640 ).notZero().noCarry().notNegative().noOverflow().extended();
+    }
+
+    public void testAsrWord()
+    {
+        final int adr = PROGRAM_START_ADDRESS+ 128;
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12340002,"+adr,
+                 "asr "+(adr+2))
+                .expectMemoryLong( adr,0x12340001 )
+                .noCarry().notExtended().notZero().notNegative();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12340001,d3",
+                 "asr.w #1,d3")
+                .expectD3(  0x12340000 ).zero().notNegative().carry().noOverflow().extended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12340000,d3",
+                 "asr.w #1,d3")
+                .expectD3(  0x12340000 ).zero().notNegative().noCarry().noOverflow().notExtended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12348000,d3",
+                 "asr.w #1,d3")
+                .expectD3(  0x1234c000 ).notZero().noCarry().negative().noOverflow().notExtended();
     }
 
     public void testLsrWord()
@@ -241,6 +376,52 @@ public class CPUTest extends TestCase
                 .expectD3(  0x12344000 ).notZero().noCarry().notNegative().noOverflow().notExtended();
     }
 
+    public void testChkWord() {
+
+        // $ffff < 0 || $ffff > $0a
+        execute( cpu -> {},
+                  "move.l #$ffffffff,d5", // value to check
+                 "move.l #$0000000a,d4", // upper bound
+                 "chk d4,d5")
+                .negative().irqActive(CPU.IRQ.CHK_CHK2);
+
+        // $b < 0 || $b > $0a
+        execute( cpu -> {},
+                 "move.l #$0000000b,d5", // value to check
+                 "move.l #$0000000a,d4", // upper bound
+                 "chk d4,d5").notNegative().irqActive(CPU.IRQ.CHK_CHK2);
+
+        // $9 < 0 || $9 > $0a
+        execute( cpu -> cpu.setFlags(CPU.FLAG_NEGATIVE),
+                 "move.l #$00000009,d5", // value to check
+                 "move.l #$0000000a,d4", // upper bound
+                 "chk d4,d5")
+                .negative().noIrqActive();
+    }
+
+    public void testChkLong() { // MC68020+
+
+        // $ffff < 0 || $ffff > $0a
+        execute( cpu -> cpu.setFlags(CPU.FLAG_NEGATIVE),
+                 "move.l #$1234ffff,d5", // value to check
+                 "move.l #$2234000a,d4", // upper bound
+                 "chk.l d4,d5")
+                .negative().noIrqActive();
+
+        // $b < 0 || $b > $0a
+        execute( cpu -> {},
+                 "move.l #$1234000b,d5", // value to check
+                 "move.l #$2234000a,d4", // upper bound
+                 "chk.l d4,d5").notNegative().noIrqActive();
+
+        // $9 < 0 || $9 > $0a
+        execute( cpu -> cpu.setFlags(CPU.FLAG_NEGATIVE),
+                 "move.l #$12340009,d5", // value to check
+                 "move.l #$2234000a,d4", // upper bound
+                 "chk.l d4,d5")
+                .negative().noIrqActive();
+    }
+
     public void testRorWord()
     {
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12340001,d3",
@@ -252,6 +433,20 @@ public class CPUTest extends TestCase
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$12348000,d3",
             "ror.w #1,d3")
             .expectD3(  0x12344000 ).notZero().noCarry().notNegative().noOverflow().extended();
+    }
+
+    public void testAsrLong()
+    {
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$80000000,d3",
+                 "asr.l #1,d3")
+                .expectD3(  0xc0000000 ).notZero().noCarry().negative().noOverflow().notExtended();
+
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$00000001,d3",
+                 "asr.l #1,d3")
+                .expectD3(  0x00000000 ).zero().notNegative().carry().noOverflow().extended();
+        execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$00000000,d3",
+                 "asr.l #1,d3")
+                .expectD3(  0x00000000 ).zero().notNegative().noCarry().noOverflow().notExtended();
     }
 
     public void testLsrLong()

@@ -88,6 +88,12 @@ public class DisassemblerTest extends TestCase
         compile("BLE loop\nloop:","00000000: ble $2");
     }
 
+    public void testChk()
+    {
+        compile("chk.w $1200,d3");
+        compile("chk.l (a4),d7");
+    }
+
     public void testCLR() {
         compile("clr.b d3");
         compile("clr.w d3");

@@ -80,10 +80,7 @@ public class InstructionEncoding
         if ( decorator == null ) {
             throw new IllegalArgumentException("Decorator must not be NULL");
         }
-        final IValueDecorator newDecorator = (field, value) ->
-        {
-            return decorator.getBits( field, this.valueDecorator.getBits( field,value ) );
-        };
+        final IValueDecorator newDecorator = (field, value) -> decorator.getBits( field, this.valueDecorator.getBits( field,value ) );
         return new InstructionEncoding(this.patterns, this.bitMappings, newDecorator );
     }
 

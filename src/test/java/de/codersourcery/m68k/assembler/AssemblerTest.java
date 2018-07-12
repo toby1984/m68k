@@ -217,16 +217,18 @@ public class AssemblerTest extends TestCase
         assertFailsToCompile("swap.l d3");
     }
 
-    /*
-   0:   0xe3,0xf8,0x1234);
-   4:   0xe7,0x4a,0x    );
-   6:   0xe1,0x4a,0x    );
-   8:   0xe3,0x6a,0x    );
-   a:   0xe3,0x2a,0x    );
-   c:   0xe3,0xaa,0x    );
-   e:   0xe7,0x0a,0x    );
-  10:   0xe7,0x8a,0x    );
-     */
+    public void testAsl()
+    {
+        assertArrayEquals(compile("asl $1234"  ),0xe1,0xf8,0x12,0x34);
+        assertArrayEquals(compile("asl.w #3,d2"),0xe7,0x42);
+        assertArrayEquals(compile("asl.w #8,d2"),0xe1,0x42);
+        assertArrayEquals(compile("asl.w d1,d2"),0xe3,0x62);
+        assertArrayEquals(compile("asl.b d1,d2"),0xe3,0x22);
+        assertArrayEquals(compile("asl.l d1,d2"),0xe3,0xa2);
+        assertArrayEquals(compile("asl.b #3,d2"),0xe7,0x02);
+        assertArrayEquals(compile("asl.l #3,d2"),0xe7,0x82);
+    }
+
     public void testLsl()
     {
         assertArrayEquals(compile("lsl $1234"  ),0xe3,0xf8,0x12,0x34);
@@ -251,6 +253,25 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("rol.l d1,d2"),0xe3,0xba);
         assertArrayEquals(compile("rol.b #3,d2"),0xe7,0x1a);
         assertArrayEquals(compile("rol.l #3,d2"),0xe7,0x9a);
+    }
+
+    public void testChk()
+    {
+        assertArrayEquals(compile("chk.w $1200,d3"),0x47,0xb8,0x12,0x00);
+        assertArrayEquals(compile("chk $1200,d3"),0x47,0xb8,0x12,0x00);
+        assertArrayEquals(compile("chk.l (a4),d7"),0x4f,0x14);
+    }
+
+    public void testAsr()
+    {
+        assertArrayEquals(compile("asr $1234"  ),0xe0,0xf8,0x12,0x34);
+        assertArrayEquals(compile("asr.w #3,d2"),0xe6,0x42);
+        assertArrayEquals(compile("asr.w #8,d2"),0xe0,0x42);
+        assertArrayEquals(compile("asr.w d1,d2"),0xe2,0x62);
+        assertArrayEquals(compile("asr.b d1,d2"),0xe2,0x22);
+        assertArrayEquals(compile("asr.l d1,d2"),0xe2,0xa2);
+        assertArrayEquals(compile("asr.b #3,d2"),0xe6,0x02);
+        assertArrayEquals(compile("asr.l #3,d2"),0xe6,0x82);
     }
 
     public void testLsr()

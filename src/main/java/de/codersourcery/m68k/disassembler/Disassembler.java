@@ -160,12 +160,38 @@ public class Disassembler
     {
         switch( insn )
         {
-            case NOT:
-                appendln("not");
-                int sizeBits = (insnWord & 0b11000000) >>> 6;
-                appendOperandSize(sizeBits);
+            case CHK:
+
+                // 0100DDDSS0mmmsss
+                int sizeBits = (insnWord & 0b110000000) >>> 7;
+                int operandSize; // non-standard operand size encoding...
+                switch( sizeBits )
+                {
+                    case 0b11:
+                        operandSize = 2;
+                        appendln("chk.w ");
+                        break;
+                    case 0b10:
+                        operandSize = 4;
+                        appendln("chk.l ");
+                        break;
+                    default:
+                        illegalOperation(insnWord);
+                        return;
+                }
                 int eaMode     = (insnWord & 0b111000) >>> 3;
                 int eaRegister = (insnWord & 0b000111);
+                decodeOperand(operandSize,eaMode,eaRegister);
+                append(",");
+                int regNum = (insnWord & 0b111000000000) >>> 9;
+                appendDataRegister(regNum );
+                return;
+            case NOT:
+                appendln("not");
+                sizeBits = (insnWord & 0b11000000) >>> 6;
+                appendOperandSize(sizeBits);
+                eaMode     = (insnWord & 0b111000) >>> 3;
+                eaRegister = (insnWord & 0b000111);
                 decodeOperand(1<<sizeBits,eaMode,eaRegister);
                 return;
             case TRAPV:
@@ -252,14 +278,39 @@ public class Disassembler
                     return;
                 }
                 throw new RuntimeException("Unreachable code reached");
-                // ====
+            case ASL:
+                appendln("asl");
+                if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100000000 )
+                {
+                    // ASL_IMMEDIATE
+                    printRotateOperands(insnWord, CPU.RotateOperandMode.IMMEDIATE);
+                    return;
+                }
+                if ( ( insnWord & 0b1111111111000000 ) == 0b1110000111000000 ) {
+                    // ASL_MEMORY
+                    printRotateOperands(insnWord,CPU.RotateOperandMode.MEMORY);
+                    return;
+                }
+                // ASL register
+                printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
+                return;
+            case ASR:
+                appendln("asr");
+                if ( ( insnWord & 0b1111000100111000 ) == 0b1110000000000000 ) {
+                    // ASR_IMMEDIATE
+                    printRotateOperands(insnWord, CPU.RotateOperandMode.IMMEDIATE);
+                    return;
+                }
+                if ( ( insnWord & 0b1111111111000000 ) == 0b1110000011000000 ) {
+                    // ASR_MEMORY_ENCODING
+                    printRotateOperands(insnWord,CPU.RotateOperandMode.MEMORY);
+                    return;
+                }
+                // ASR register
+                printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
+                return;
             case LSL:
                 appendln("lsl");
-                /*
-                1110vvv1SS001DDD
-                1110000100111000
-                1110vvv1SS001DDD
-                 */
                 if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100101000 )
                 {
                     // LSL_IMMEDIATE
@@ -289,7 +340,6 @@ public class Disassembler
                 // LSR register
                 printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
                 return;
-                // ====
             case ROL:
                 appendln("rol");
                 if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100011000 )
@@ -324,7 +374,7 @@ public class Disassembler
             case NEG:
                 appendln("neg");
                 sizeBits = (insnWord & 0b11000000) >>> 6;
-                int operandSize = 1<<sizeBits;
+                operandSize = 1<<sizeBits;
                 appendOperandSize(sizeBits);
                 eaMode     = (insnWord & 0b111000) >>> 3;
                 eaRegister = (insnWord & 0b000111);
@@ -372,7 +422,7 @@ public class Disassembler
                 eaRegister = (insnWord & 0b000111);
 
                 decodeOperand(operandSize,eaMode,eaRegister);
-                int regNum = (insnWord & 0b0000111000000000) >> 9;
+                regNum = (insnWord & 0b0000111000000000) >> 9;
                 append(",a").append( regNum );
                 return;
             case JMP:

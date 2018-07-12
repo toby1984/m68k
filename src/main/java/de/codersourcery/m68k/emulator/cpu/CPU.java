@@ -2,9 +2,11 @@ package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
+import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
 
 /**
  * M68000 cpu emulation.
@@ -13,6 +15,8 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class CPU
 {
+    private final CPUType cpuType;
+
     private enum BitOp {
         FLIP,
         CLEAR,
@@ -224,8 +228,12 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 64–255 100D3FC User Defined Vectors (192)
      */
 
-    public CPU(Memory memory) {
+    public CPU(CPUType type,Memory memory)
+    {
+        Validate.notNull(type, "type must not be null");
+        Validate.notNull(memory, "memory must not be null");
         this.memory = memory;
+        this.cpuType = type;
     }
 
     /*
@@ -284,13 +292,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
     }
 
     /**
+     * Calculates the effective address based on EA mode and EA register bit patterns.
      *
      * @param operandSize
      * @param eaMode
      * @param eaRegister
      * @return true on success, false on failure (invalid instruction,misaligned memory access)
      */
-    private boolean decodeOperand(int operandSize, int eaMode, int eaRegister)
+    private boolean calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister)
     {
         switch( eaMode )
         {
@@ -434,7 +443,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         case 0b1111: // Reserved
                             break;
                     }
-                    triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
+                    invalidInstruction();
                     return false;
                 }
 
@@ -776,11 +785,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0100_0000_0000_0000:
 
-                /*
-                01000110SSmmmsss
-                0b1111111100000000
-                0b0100011000000000
-                 */
                 if ( (instruction & 0b1111111100000000) == 0b0100011000000000) {
                     // NOT
                     final int sizeBits = (instruction &0b11000000) >> 6;
@@ -830,6 +834,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     storeValue(eaMode,eaRegister,operandSize);
                     return;
                 }
+
                 if ( (instruction & 0b1111111111111000) == 0b0100100010000000)
                 {
                     // EXT Byte -> Word
@@ -995,6 +1000,45 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     // PEA
                     decodeSourceOperand( instruction,4,true );
                     pushLong( value );
+                    return;
+                }
+                if ( ( instruction & 0b1111000001000000 ) == 0b0100000000000000 )
+                {
+                    // CHK_ENCODING
+                    int sizeBits = (instruction & 0b110000000) >>> 7;
+                    final int operandSize; // non-standard operand size encoding...
+                    int regNum = (instruction & 0b111000000000) >>> 9;
+                    int regValue = dataRegisters[regNum];
+                    switch( sizeBits )
+                    {
+                        case 0b11:
+                            operandSize = 2;
+                            break;
+                        case 0b10:
+                            if ( cpuType.isCompatibleWith(CPUType.M68020) )
+                            {
+                                operandSize = 4;
+                                break;
+                            }
+                            // $$FALL-THROUGH$$
+                        default:
+                            invalidInstruction();
+                            return;
+                    }
+                    decodeSourceOperand( instruction,operandSize,false );
+
+                    // compare
+                    final boolean lowerBoundViolated = regValue < 0;
+                    final boolean upperBoundViolated = regValue > value;
+                    final boolean outOfBounds = lowerBoundViolated | upperBoundViolated;
+                    if ( outOfBounds ) {
+                        if ( lowerBoundViolated ) {
+                            statusRegister |= FLAG_NEGATIVE;
+                        } else {
+                            statusRegister &= ~FLAG_NEGATIVE;
+                        }
+                        triggerIRQ(IRQ.CHK_CHK2,0);
+                    }
                     return;
                 }
                 break;
@@ -1165,9 +1209,17 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b1110_0000_0000_0000:
 
                 /* ---------
-                 * ROL/ ROR / LSL / LSR
+                 * ROL/ ROR / LSL / LSR / ASL / ASR
                  * ---------
                  */
+
+                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000000000 )
+                {
+                    // ASL/ASR IMMEDIATE
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    rotateImmediate(instruction,RotateMode.ARITHMETIC_SHIFT,rotateLeft);
+                    return;
+                }
                 if ( ( instruction & 0b1111000000111000) ==  0b1110000000001000 ) // LSL/LSR
                 {
                     // LSL/LSR IMMEDIATE
@@ -1182,13 +1234,27 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     rotateImmediate(instruction,RotateMode.ROTATE,rotateLeft);
                     return;
                 }
+
+                if ( ( instruction & 0b1111111011000000 ) == 0b1110000011000000 ) {
+                    // ASL/ASR MEMORY
+                    int sizeBits = (instruction & 0b11000000) >> 6;
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    int eaMode     = (instruction & 0b111000) >> 3;
+                    int eaRegister = (instruction & 0b000111);
+                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister);
+                    int value = memLoadWord( ea );
+                    value = rotate( value,2,RotateMode.ARITHMETIC_SHIFT,rotateLeft,1 );
+                    memory.writeWord(ea,value);
+                    return;
+                }
+
                 if ( ( instruction & 0b1111111011000000) == 0b1110001011000000 ) { // LSL/LSR
                     // LSL/LSR MEMORY
                     int sizeBits = (instruction & 0b11000000) >> 6;
                     final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
                     int eaMode     = (instruction & 0b111000) >> 3;
                     int eaRegister = (instruction & 0b000111);
-                    decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister);
                     int value = memLoadWord( ea );
                     value = rotate( value,2,RotateMode.LOGICAL_SHIFT,rotateLeft,1 );
                     memory.writeWord(ea,value);
@@ -1200,10 +1266,18 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
                     int eaMode     = (instruction & 0b111000) >> 3;
                     int eaRegister = (instruction & 0b000111);
-                    decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister);
                     int value = memLoadWord( ea );
                     value = rotate( value,2,RotateMode.ROTATE,rotateLeft,1 );
                     memory.writeWord(ea,value);
+                    return;
+                }
+
+                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000100000 )
+                {
+                    // ASL/ASR REGISTER
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    rotateRegister(instruction,RotateMode.ARITHMETIC_SHIFT,rotateLeft);
                     return;
                 }
                 if ( ( instruction & 0b1111000000111000) == 0b1110000000101000) { // LSL/LSR
@@ -1230,6 +1304,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             default:
                 throw new RuntimeException("Unreachable code reached");
         }
+        invalidInstruction();
+    }
+
+    private void invalidInstruction() {
         triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
     }
 
@@ -1276,12 +1354,15 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
         int rotateCount = rotateCount2 % 64;
 
-        int lastBit=0; // value serves as default (carry clear) when rotate count is 0
+        int lastBit=0; // do NOT change, value also serves as default (carry clear) when rotate count is 0
         final int msbBitNum = (operandSizeInBytes*8)-1;
         switch( mode )
         {
             case LOGICAL_SHIFT:
-                clearMask |= FLAG_EXTENDED;
+                if ( rotateCount > 0 )
+                {
+                    clearMask |= FLAG_EXTENDED;
+                }
                 if ( rotateLeft )
                 {
                     final int mask = 1 << msbBitNum;
@@ -1323,6 +1404,47 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 }
                 break;
             case ARITHMETIC_SHIFT:
+                /*
+N — Set if the most significant bit of the result is set; cleared otherwise.
+Z — Set if the result is zero; cleared otherwise.
+V — Set if the most significant bit is changed at any time during the shift operation; cleared otherwise.
+
+X — Set according to the last bit shifted out of the operand; unaffected for a shift count of zero.
+C — Set according to the last bit shifted out of the operand; cleared for a shift count of zero.
+                 */
+                clearMask |= FLAG_OVERFLOW;
+                if ( rotateCount > 0 )
+                {
+                    clearMask |= FLAG_EXTENDED;
+                }
+                final int mask = 1 << msbBitNum;
+                boolean msbChanged = false;
+                if ( rotateLeft )
+                {
+                    for ( ; rotateCount > 0 ; rotateCount-- )
+                    {
+                        lastBit = (value & mask);
+                        int currentMsb = (value &mask) >>> msbBitNum;
+                        value <<= 1;
+                        int newMsb = (value &mask) >>> msbBitNum;
+                        msbChanged |= (currentMsb != newMsb);
+                    }
+                    if ( msbChanged ) {
+                        setMask |= FLAG_OVERFLOW;
+                    }
+                }
+                else
+                {
+                    final int msb = value & mask;
+                    for ( ; rotateCount > 0 ; rotateCount-- )
+                    {
+                        lastBit = (value & 1);
+                        value = (value >>> 1) | msb;
+                    }
+                }
+                if ( lastBit != 0 ) {
+                    setMask |= FLAG_EXTENDED;
+                }
                 break;
             default:
                 throw new RuntimeException("Unhandled switch/case: "+mode);
@@ -1451,6 +1573,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b001:
                 // ADDRESS_REGISTER_DIRECT;
                 ea = value = addressRegisters[eaRegister];
+
                 cycles += 4;
                 return true;
             case 0b111:
@@ -1485,7 +1608,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 }
                 // $$FALL-THROUGH$$
             default:
-                if ( decodeOperand(operandSize, eaMode, eaRegister) )
+                if ( calculateEffectiveAddress(operandSize, eaMode, eaRegister) )
                 {
                     if ( ! calculateAddressOnly )
                     {
@@ -1591,7 +1714,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 }
                 throw new RuntimeException("Unreachable code reached");
             default:
-                if ( decodeOperand(operandSize, eaMode, eaRegister) )
+                if ( calculateEffectiveAddress(operandSize, eaMode, eaRegister) )
                 {
                     switch (operandSize)
                     {
@@ -1957,6 +2080,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         }
         // hint: decodeSourceOperand only applies operandSize parameter when
         //       accessing memory locations
+        final int eaMode = (instruction & 0b111000) >> 3;
+        final int eaRegister = (instruction & 0b111);
+        final int modeFlags = AddressingModeKind.bitsToFlags( eaMode,eaRegister );
+        final boolean isMemory = (modeFlags & AddressingModeKind.MEMORY.bits) != 0;
+        final int operandSize= isMemory ? 1 : 4;
         decodeSourceOperand( instruction,1, false );
         if ( ( value & 1<<bitNum) == 0 ) {
             statusRegister |= FLAG_ZERO;
@@ -1978,11 +2106,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 value ^= (1<<bitNum);
                 break;
         }
-        final int eaMode = (instruction & 0b111000) >> 3;
-        final int eaRegister = (instruction & 0b111);
-        final int modeFlags = AddressingModeKind.bitsToFlags( eaMode,eaRegister );
-        final boolean isMemory = (modeFlags & AddressingModeKind.MEMORY.bits) != 0;
-        final int operandSize= isMemory ? 1 : 4;
 
         switch( mode )
         {

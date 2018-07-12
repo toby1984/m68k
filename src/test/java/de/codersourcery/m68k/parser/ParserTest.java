@@ -189,6 +189,19 @@ public class ParserTest extends TestCase
         assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.destination().addressingMode );
     }
 
+    public void testParseCHK()
+    {
+        final AST ast = parseAST("chk #$1234,d3");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.CHK, insn.getInstructionType() );
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
+        assertEquals( AddressingMode.DATA_REGISTER_DIRECT, insn.destination().addressingMode );
+        assertEquals( Register.D3, insn.destination().getValue().asRegister().register );
+    }
+
     public void testParseMovea()
     {
         final AST ast = parseAST("movea #$1234,a3");
@@ -226,6 +239,13 @@ public class ParserTest extends TestCase
     public void testParseLSRImmediate() { testParseRotateImmediate(Instruction.LSR); }
     public void testParseLSRMemory() { testParseRotateMemory(Instruction.LSR); }
     public void testParseLSRRegister() { testParseRotateRegister(Instruction.LSR); }
+
+    public void testParseASLImmediate() { testParseRotateImmediate(Instruction.ASL); }
+    public void testParseASLMemory() { testParseRotateMemory(Instruction.ASL); }
+    public void testParseASLRegister() { testParseRotateRegister(Instruction.ASL); }
+    public void testParseASRImmediate() { testParseRotateImmediate(Instruction.ASR); }
+    public void testParseASRMemory() { testParseRotateMemory(Instruction.ASR); }
+    public void testParseASRRegister() { testParseRotateRegister(Instruction.ASR); }
 
     private void testParseRotateMemory(Instruction i) {
         final AST ast = parseAST(i.getMnemonic()+" $1234");
