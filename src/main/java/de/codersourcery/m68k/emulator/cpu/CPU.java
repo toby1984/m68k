@@ -359,14 +359,17 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 int extensionWord = memory.readWordNoCheck(pc);
                 pc += 2; // skip extension word
 
+                int baseRegisterValue = 0;
+                int baseDisplacement;
                 // bit 8 can be used to distinguish between brief extension words (bit = 0)
                 // and full extension words (bit =  1)
                 boolean isFullExtensionWord = (extensionWord & 0b0000_0001_0000_1000) == 0b0000_0001_0000_0000;
-
-                int baseRegisterValue = 0;
-                int baseDisplacement;
                 if ( isFullExtensionWord )
                 {
+                    if ( cpuType.isNotCompatibleWith(CPUType.M68020 ) ) {
+                        invalidInstruction();
+                        return false;
+                    }
                     /*
                      * Load base register value.
                      */
@@ -1047,7 +1050,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0101_0000_0000_0000:
-                if ( (instruction & 0b11110000_11111000 ) == 0b01010000_11001000 )
+
+                if ( (instruction & 0b1111000011111000 ) == 0b0101000011001000 )
                 {
                      // DBcc
                     final int cc = (instruction & 0b0000111100000000) >> 8;
@@ -1075,6 +1079,16 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         cycles = 12;
                     }
                     pc += 2; // skip branch offset
+                    return;
+                }
+                if ( ( instruction & 0b1111000011000000 ) == 0b0101000011000000 )
+                {
+                    // SCC
+                    final int cc = (instruction & 0b0000111100000000) >> 8;
+                    final int eaMode = (instruction & 0b111000) >> 3;
+                    final int eaRegister = (instruction & 0b111);
+                    value = Condition.isTrue(this,cc ) ? 0xff : 0x00;
+                    storeValue(eaMode,eaRegister,1);
                     return;
                 }
                 break;

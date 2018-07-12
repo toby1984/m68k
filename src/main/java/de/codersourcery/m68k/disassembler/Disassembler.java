@@ -93,11 +93,11 @@ public class Disassembler
                 List<InstructionEncoding> sortedByMaskLength = new ArrayList<>( candidates.keySet() );
                 sortedByMaskLength.sort( (b,a) -> Integer.compare( getMaskLength(a), getMaskLength(b) ) );
 
-                final InstructionEncoding shortest = sortedByMaskLength.get(0);
+                final InstructionEncoding mostSpecific = sortedByMaskLength.get(0);
                 final Set<Instruction> instructions = new HashSet<>();
                 final List<InstructionEncoding> clashes = new ArrayList<>();
                 for ( var entry : sortedByMaskLength ) {
-                    if ( getMaskLength(entry ) == getMaskLength(shortest ) ) {
+                    if ( getMaskLength(entry ) == getMaskLength(mostSpecific ) ) {
                         instructions.add( candidates.get( entry ) );
                         clashes.add( entry );
                     }
@@ -106,13 +106,13 @@ public class Disassembler
                 {
                     if ( instructions.size() > 1 )
                     {
-                        throw new RuntimeException("Same mask len: " + shortest + " <-> " + sortedByMaskLength.get(1));
+                        throw new RuntimeException("Same mask len: " + mostSpecific + " <-> " + sortedByMaskLength.get(1));
                     }
                     System.err.println("WARNING: Found multiple matching encodings for "+instructions);
                 }
                 // same instruction
-                encoding = shortest;
-                instruction = candidates.get(shortest);
+                encoding = mostSpecific;
+                instruction = candidates.get(mostSpecific);
             } else {
                 encoding = candidates.keySet().iterator().next();
                 instruction = candidates.values().iterator().next();
@@ -125,17 +125,15 @@ public class Disassembler
 
     private static int getMaskLength(InstructionEncoding encoding) {
 
-        int i = 0;
-        final int mask = encoding.getInstructionWordAndMask();
-        int bit = 1;
-        for ( ; i < 32 ; i++ )
-        {
-            if ( (mask & bit) !=  0) {
-                return 32-i;
+        int len = 0;
+        final String word0 = encoding.getPatterns()[0];
+        for ( int i = 0 ; i < word0.length();i++) {
+            final char c = word0.charAt(i);
+            if ( c == '0' || c == '1' ) {
+                len++;
             }
-            bit <<= 1;
         }
-        return 0;
+        return len;
     }
 
     /**
@@ -467,6 +465,24 @@ public class Disassembler
             case ILLEGAL:
                 appendln("illegal");
                 return;
+            // Scc
+            case SCC:
+                Condition cond = Condition.fromBits( (insnWord & 0b0000111100000000) >>> 8 );
+                if ( cond == Condition.BRT) {
+                    appendln("st");
+                }
+                else if ( cond == Condition.BSR) {
+                    appendln("sf");
+                }
+                else
+                {
+                    appendln("s" + cond.suffix.toLowerCase());
+                }
+                append(" ");
+                eaMode = (insnWord & 0b111000)>>3;
+                eaRegister = (insnWord & 0b111);
+                decodeOperand(1,eaMode,eaRegister);
+                return;
             // DBcc
             case DBT:
             case DBRA:
@@ -484,7 +500,7 @@ public class Disassembler
             case DBLT:
             case DBGT:
             case DBLE:
-                Condition cond = Condition.fromBits( (insnWord & 0b0000111100000000) >>> 8 );
+                cond = Condition.fromBits( (insnWord & 0b0000111100000000) >>> 8 );
                 int register = insnWord & 0b111;
                 int offset = readWord();
                 int destinationAdress = pcAtStartOfInstruction + offset;

@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.ConditionalInstructionType;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.Register;
@@ -18,12 +19,32 @@ public class AssemblerTest extends TestCase
     {
         super.setUp();
         asm = new Assembler();
+        asm.getOptions().cpuType=CPUType.M68020;
     }
 
     public void testTST() {
         assertArrayEquals(compile("tst.b d3")     ,0x4a,0x03);
         assertArrayEquals(compile("tst.w (a4)")   ,0x4a,0x54);
         assertArrayEquals(compile("tst.l $12(a5)"),0x4a,0xad,0x00,0x12);
+    }
+
+    public void testSCC() {
+        assertArrayEquals(compile("st  $2000"),0x50,0xf8,0x20,0x00);
+        assertArrayEquals(compile("sf  $2000"),0x51,0xf8,0x20,0x00);
+        assertArrayEquals(compile("shi $2000"),0x52,0xf8,0x20,0x00);
+        assertArrayEquals(compile("sls $2000"),0x53,0xf8,0x20,0x00);
+        assertArrayEquals(compile("scc $2000"),0x54,0xf8,0x20,0x00);
+        assertArrayEquals(compile("scs $2000"),0x55,0xf8,0x20,0x00);
+        assertArrayEquals(compile("sne $2000"),0x56,0xf8,0x20,0x00);
+        assertArrayEquals(compile("seq $2000"),0x57,0xf8,0x20,0x00);
+        assertArrayEquals(compile("svc $2000"),0x58,0xf8,0x20,0x00);
+        assertArrayEquals(compile("svs $2000"),0x59,0xf8,0x20,0x00);
+        assertArrayEquals(compile("spl $2000"),0x5a,0xf8,0x20,0x00);
+        assertArrayEquals(compile("smi $2000"),0x5b,0xf8,0x20,0x00);
+        assertArrayEquals(compile("sge $2000"),0x5c,0xf8,0x20,0x00);
+        assertArrayEquals(compile("slt $2000"),0x5d,0xf8,0x20,0x00);
+        assertArrayEquals(compile("sgt $2000"),0x5e,0xf8,0x20,0x00);
+        assertArrayEquals(compile("sle $2000"),0x5f,0xf8,0x20,0x00);
     }
 
     public void testBitInstructions()
@@ -69,10 +90,10 @@ public class AssemblerTest extends TestCase
                 "sub:\n" +
                 "move #1,d0\n" +
                 "rts")    ,         0x61,0x08,
-                0x32,0x3c,0x00,0x02,
-                0x4a,0xfc,
-                0x30,0x3c,0x00,0x01,
-                0x4e,0x75);
+            0x32,0x3c,0x00,0x02,
+            0x4a,0xfc,
+            0x30,0x3c,0x00,0x01,
+            0x4e,0x75);
     }
 
     public void testMovea() {
@@ -101,9 +122,9 @@ public class AssemblerTest extends TestCase
         testDBcc(Instruction.DBHI);
 
         Arrays.stream( Instruction.values() )
-                .filter( insn -> insn.conditionalType == ConditionalInstructionType.DBCC )
-                .peek(x->System.out.println("Testing "+x))
-                .forEach(this::testDBcc );
+            .filter( insn -> insn.conditionalType == ConditionalInstructionType.DBCC )
+            .peek(x->System.out.println("Testing "+x))
+            .forEach(this::testDBcc );
     }
 
     private void testDBcc(Instruction instruction)
@@ -182,8 +203,8 @@ public class AssemblerTest extends TestCase
                 throw new RuntimeException("Unreachable code reached: "+bits);
         }
         final String source = "B"+conditionCode+" next\n" +
-                "ORG "+offset+"\n"+
-                "next:";
+            "ORG "+offset+"\n"+
+            "next:";
         final byte[] bytes = compile(source);
         check.accept(bytes );
     }

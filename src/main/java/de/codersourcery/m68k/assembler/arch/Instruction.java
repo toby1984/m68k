@@ -346,6 +346,57 @@ public enum Instruction
         }
     },
     /*
+     * Scc instructions
+     */
+    ST("ST",1, 0b0000,Condition.BRT,ConditionalInstructionType.SCC) { // always true
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SF("SF",1, 0b0001,Condition.BSR,ConditionalInstructionType.SCC) { // always false
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SHI("SHI",1, 0b0010,Condition.BHI,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SLS("SLS",1, 0b0011,Condition.BLS,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SCC("SCC",1, 0b0100,Condition.BCC,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SCS("SCS",1, 0b0101,Condition.BCS,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SNE("SNE",1, 0b0110,Condition.BNE,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SEQ("SEQ",1, 0b0111,Condition.BEQ,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SVC("SVC",1, 0b1000,Condition.BVC,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SVS("SVS",1, 0b1001,Condition.BVS,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SPL("SPL",1, 0b1010,Condition.BPL,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SMI("SMI",1, 0b1011,Condition.BMI,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SGE("SGE",1, 0b1100,Condition.BGE,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SLT("SLT",1, 0b1101,Condition.BLT,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SGT("SGT",1, 0b1110,Condition.BGT,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    SLE("SLE",1, 0b1111,Condition.BLE,ConditionalInstructionType.SCC) {
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+    },
+    /*
      * DBcc instructions
      */
     DBT("DBT",2, 0b0000,Condition.BRT,ConditionalInstructionType.DBCC) { // aka 'always branch'
@@ -673,6 +724,12 @@ public enum Instruction
                 {
                     switch( insn.instruction.conditionalType )
                     {
+                        case SCC:
+                            if ( field == Field.CONDITION_CODE)
+                            {
+                                return condition.bits;
+                            }
+                            return getValueFor(insn,field,context);
                         case DBCC:
                             if (field == Field.SRC_BASE_REGISTER)
                             { // DBcc Dx,...
@@ -899,6 +956,33 @@ public enum Instruction
                 return RTE_ENCODING;
             case ILLEGAL:
                 return ILLEGAL_ENCODING;
+            // Scc instructions
+            case ST:
+            case SF:
+            case SHI:
+            case SLS:
+            case SCC:
+            case SCS:
+            case SNE:
+            case SEQ:
+            case SVC:
+            case SVS:
+            case SPL:
+            case SMI:
+            case SGE:
+            case SLT:
+            case SGT:
+            case SLE:
+                if ( insn.useImpliedOperandSize ) {
+                    insn.setImplicitOperandSize(OperandSize.BYTE);
+                } else if ( ! insn.hasOperandSize(OperandSize.BYTE) ) {
+                    throw new RuntimeException("Invalid operand size: "+ insn.getOperandSize());
+                }
+                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( extraSrcWords != null ) {
+                    return SCC_ENCODING.append(extraSrcWords);
+                }
+                return SCC_ENCODING;
             // DBcc instructions
             case DBRA:
             case DBT:
@@ -1207,6 +1291,11 @@ D/A   |     |   |           |
         return false;
     }
 
+    private static void checkSccInstructionValid(InstructionNode node,ICompilationContext ctx)
+    {
+        checkSourceAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+    }
+
     private static void checkDBccInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
         if ( node.source().addressingMode != AddressingMode.DATA_REGISTER_DIRECT ) {
@@ -1506,7 +1595,10 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding NOP_ENCODING = InstructionEncoding.of("0100111001110001");
 
-    public static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss","CCCCCCCC_CCCCCCCC");
+    public static final InstructionEncoding SCC_ENCODING = InstructionEncoding.of( "0101cccc11mmmsss");
+
+    public static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss",
+        "CCCCCCCC_CCCCCCCC");
 
     public static final InstructionEncoding BCC_8BIT_ENCODING =
             InstructionEncoding.of(  "0110ccccCCCCCCCC");
@@ -1685,5 +1777,6 @@ D/A   |     |   |           |
         put(TRAPV_ENCODING,TRAPV);
         put(NOT_ENCODING,NOT);
         put(CHK_ENCODING,CHK);
+        put(SCC_ENCODING,SCC);
     }};
 }

@@ -7,6 +7,8 @@ import de.codersourcery.m68k.assembler.ICompilationPhase;
 import de.codersourcery.m68k.assembler.IResource;
 import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.arch.AddressingMode;
+import de.codersourcery.m68k.assembler.arch.CPUType;
+import de.codersourcery.m68k.assembler.arch.ConditionalInstructionType;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
@@ -473,6 +475,22 @@ public class ParserTest extends TestCase
         final StatementNode stmt = ast.child(0).asStatement();
         final InstructionNode insn = stmt.child(0).asInstruction();
         assertEquals( Instruction.RTE, insn.getInstructionType() );
+    }
+
+    public void testScc()  {
+
+        for ( Instruction insn : Instruction.values() )
+        {
+            if ( insn.conditionalType == ConditionalInstructionType.SCC ) {
+                final AST ast = parseAST(insn.getMnemonic()+" $2000");
+                assertEquals(1,ast.childCount());
+                final StatementNode stmt = ast.child(0).asStatement();
+                final InstructionNode node= stmt.child(0).asInstruction();
+                assertEquals( insn, node.getInstructionType() );
+                assertEquals( AddressingMode.ABSOLUTE_SHORT_ADDRESSING, node.source().addressingMode );
+                assertEquals( Integer.valueOf(0x2000), node.source().getValue().getBits(null) );
+            }
+        }
     }
 
     public void testParseBranchInstructions()
@@ -1131,7 +1149,8 @@ public class ParserTest extends TestCase
             }
         };
 //        asm.getOptions().debug = false;
-
+        asm.getOptions().cpuType = CPUType.M68020;
+        
         this.unit = new CompilationUnit(IResource.stringResource(source) );
         final CompilationMessages messages = asm.compile(unit);
         if ( messages.hasErrors() )

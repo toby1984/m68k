@@ -7,5 +7,5 @@ package de.codersourcery.m68k.assembler.arch;
  */
 public enum ConditionalInstructionType
 {
-    NONE,BCC,DBCC;
+    NONE,BCC,DBCC,SCC;
 }

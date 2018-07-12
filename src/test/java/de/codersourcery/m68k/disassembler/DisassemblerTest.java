@@ -69,6 +69,26 @@ public class DisassemblerTest extends TestCase
         compile("loop: "+instruction.getMnemonic()+" d1,loop", expected );
     }
 
+    public void testSCC() {
+        compile("st $2000");
+        compile("shi $2000");
+        compile("sls $2000");
+        compile("scc $2000");
+        compile("scs $2000");
+        compile("sne $2000");
+        compile("seq $2000");
+        compile("svc $2000");
+        compile("svs $2000");
+        compile("spl $2000");
+        compile("smi $2000");
+        compile("sge $2000");
+        compile("slt $2000");
+        compile("sgt $2000");
+        compile("sle $2000");
+        compile("sf $2000");
+
+    }
+
     public void testRelativeBranching()
     {
         compile("BRA loop\nloop:","00000000: bra $2");
@@ -101,6 +121,14 @@ public class DisassemblerTest extends TestCase
         compile("chk.l (a4),d7");
     }
 
+    /*
+if ( ( insnWord & 0b1111000001000000 ) == 0b0100000000000000 ) {
+// CHK_ENCODING
+
+
+if ( ( insnWord & 0b1111111100000000 ) == 0b0100001000000000 ) {
+// CLR_ENCODING
+     */
     public void testCLR() {
         compile("clr.b d3");
         compile("clr.w d3");

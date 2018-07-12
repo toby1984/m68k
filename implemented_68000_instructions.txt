@@ -69,7 +69,7 @@
 [X] RTR
 [X] RTS
 [ ] SBCD
-[ ] Scc
+[X] Scc
 [ ] STOP
 [ ] SUB
 [ ] SUBA

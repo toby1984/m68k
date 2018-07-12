@@ -7,6 +7,7 @@ import de.codersourcery.m68k.assembler.CompilationUnit;
 import de.codersourcery.m68k.assembler.IResource;
 import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.arch.CPUType;
+import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.emulator.cpu.CPU;
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.utils.Misc;
@@ -656,6 +657,75 @@ C — Always cleared.
 
         execute(cpu-> {}, 3, "move.l #1,D0",
                 "loop: dbra d0,loop").expectD0(0xffff).noOverflow().notNegative().notZero().notExtended().notSupervisor();
+    }
+
+    public void testScc()
+    {
+        testScc(Instruction.ST);
+        testScc(Instruction.SF);
+        testScc(Instruction.SHI);
+        testScc(Instruction.SLS);
+        testScc(Instruction.SCC);
+        testScc(Instruction.SCS);
+        testScc(Instruction.SNE);
+        testScc(Instruction.SEQ);
+        testScc(Instruction.SVC);
+        testScc(Instruction.SVS);
+        testScc(Instruction.SPL);
+        testScc(Instruction.SMI);
+        testScc(Instruction.SGE);
+        testScc(Instruction.SLT);
+        testScc(Instruction.SGT);
+        testScc(Instruction.SLE);
+    }
+
+    private void testScc(Instruction insn) {
+
+        final int adr = PROGRAM_START_ADDRESS+128;
+        int expected = -1;
+        int flags = 0;
+        switch(insn.condition) {
+/*
+BRA* True            0000 = 1
+F*   False           0001 = 0
+BHI High             0010 = !C & !Z
+BLS Low or Same      0011 = C | Z
+BCC/BHI Carry Clear  0100 = !C
+BCS/BLO Carry Set    0101 = C
+BNE Not Equal        0110 = !Z
+BEQ Equal            0111 = Z
+BVC Overflow Clear   1000 = !V
+BVS Overflow Set     1001 = V
+BPL Plus             1010 = !N
+BMI Minus            1011 = N
+BGE Greater or Equal 1100 = (N &  V) | (!N & !V)
+BLT Less Than        1101 = (N & !V) | (!N & V)
+BGT Greater Than     1110 = ((N & V) | (!N & !V)) & !Z;
+BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
+ */
+            case BRT: break; // always true
+            case BSR: expected = 0x00; break; // always false
+            case BHI: break;
+            case BLS: flags |= CPU.FLAG_CARRY; break;
+            case BCC: break;
+            case BCS: flags |= CPU.FLAG_CARRY; break;
+            case BNE: break;
+            case BEQ: flags |= CPU.FLAG_ZERO; break;
+            case BVC: break;
+            case BVS: flags |= CPU.FLAG_OVERFLOW; break;
+            case BPL: break;
+            case BMI: flags |= CPU.FLAG_NEGATIVE ;break;
+            case BGE: flags |= CPU.FLAG_NEGATIVE | CPU.FLAG_OVERFLOW; break;
+            case BLT: flags |= CPU.FLAG_NEGATIVE ; break;
+            case BGT: flags |= CPU.FLAG_NEGATIVE | CPU.FLAG_OVERFLOW; break;
+            case BLE: flags |= CPU.FLAG_ZERO; break;
+            default:
+                throw new RuntimeException("Unreachable code reached");
+        }
+        final String source= insn.getMnemonic()+" "+adr;
+        final int finalFlags=flags;
+        execute(cpu -> cpu.setFlags(finalFlags), source )
+            .expectMemoryByte(adr,expected ).notSupervisor().noIrqActive();
     }
 
     public void testDBRA() {
