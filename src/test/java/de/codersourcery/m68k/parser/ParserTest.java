@@ -200,6 +200,17 @@ public class ParserTest extends TestCase
         assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.destination().addressingMode );
     }
 
+    public void testParseTAS()
+    {
+        final AST ast = parseAST("tas $1234");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.TAS, insn.getInstructionType() );
+        assertEquals( AddressingMode.ABSOLUTE_SHORT_ADDRESSING, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
+    }
+
     public void testParseCHK()
     {
         final AST ast = parseAST("chk #$1234,d3");

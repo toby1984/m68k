@@ -158,8 +158,12 @@ public class Disassembler
     {
         switch( insn )
         {
+            case STOP:
+                appendln("stop ");
+                int flags = readWord();
+                append("#").appendHex16Bit(flags);
+                return;
             case CHK:
-
                 // 0100DDDSS0mmmsss
                 int sizeBits = (insnWord & 0b110000000) >>> 7;
                 int operandSize; // non-standard operand size encoding...
@@ -191,6 +195,12 @@ public class Disassembler
                 eaMode     = (insnWord & 0b111000) >>> 3;
                 eaRegister = (insnWord & 0b000111);
                 decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                return;
+            case TAS:
+                appendln("tas ");
+                eaMode     = (insnWord & 0b111000) >>> 3;
+                eaRegister = (insnWord & 0b000111);
+                decodeOperand(1,eaMode,eaRegister);
                 return;
             case TRAPV:
                 appendln("trapv");
@@ -276,6 +286,39 @@ public class Disassembler
                     return;
                 }
                 throw new RuntimeException("Unreachable code reached");
+            case ROXL:
+                appendln("roxl");
+                if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100010000 ) {
+                    // ROXL_IMMEDIATE
+                    printRotateOperands(insnWord, CPU.RotateOperandMode.IMMEDIATE);
+                    return;
+                }
+                if ( ( insnWord & 0b1111111111000000 ) == 0b1110010111000000 ) {
+                    // ROXL_MEMORY
+                    printRotateOperands(insnWord,CPU.RotateOperandMode.MEMORY);
+                    return;
+                }
+                // ROXL register
+                printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
+                return;
+            case ROXR:
+                appendln("roxr");
+                if ( ( insnWord & 0b1111000100111000 ) == 0b1110000000010000 ) {
+                    // ROXR_IMMEDIATE
+                    printRotateOperands(insnWord, CPU.RotateOperandMode.IMMEDIATE);
+                    return;
+                }
+                if ( ( insnWord & 0b1111111111000000 ) == 0b1110010011000000 ) {
+                    // ROXR_MEMORY_ENCODING
+                    printRotateOperands(insnWord,CPU.RotateOperandMode.MEMORY);
+                    return;
+                }
+                // ROXR register
+                printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
+                return;
+                /*
+                 ==========
+                 */
             case ASL:
                 appendln("asl");
                 if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100000000 )

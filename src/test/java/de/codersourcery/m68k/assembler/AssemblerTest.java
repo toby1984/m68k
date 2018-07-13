@@ -253,6 +253,11 @@ public class AssemblerTest extends TestCase
         assertFailsToCompile("swap.l d3");
     }
 
+    public void testStop()
+    {
+        assertArrayEquals(compile("stop #12"),0x4e,0x72,0x00,0x0c);
+    }
+
     public void testAsl()
     {
         assertArrayEquals(compile("asl $1234"  ),0xe1,0xf8,0x12,0x34);
@@ -275,6 +280,35 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("lsl.l d1,d2"),0xe3,0xaa);
         assertArrayEquals(compile("lsl.b #3,d2"),0xe7,0x0a);
         assertArrayEquals(compile("lsl.l #3,d2"),0xe7,0x8a);
+    }
+
+    public void testRoxl()
+    {
+        assertArrayEquals(compile("roxl.w d1,d2"),  0xe3,0x72);
+        assertArrayEquals(compile("roxl.b d1,d2"),  0xe3,0x32);
+        assertArrayEquals(compile("roxl.l d1,d2"),  0xe3,0xb2);
+        assertArrayEquals(compile("roxl.w #1,d2"),  0xe3,0x52);
+        assertArrayEquals(compile("roxl.b #2,d2"),  0xe5,0x12);
+        assertArrayEquals(compile("roxl.l #8,d2"),  0xe1,0x92);
+        assertArrayEquals(compile("roxl $1234"),    0xe5,0xf8,0x12,0x34 );
+        assertArrayEquals(compile("roxl $12345678"),0xe5,0xf9,0x12,0x34,0x56,0x78);
+    }
+
+    public void testRoxr()
+    {
+        assertArrayEquals(compile("roxr.w d1,d2"),  0xe2,0x72                    );
+        assertArrayEquals(compile("roxr.b d1,d2"),  0xe2,0x32                    );
+        assertArrayEquals(compile("roxr.l d1,d2"),  0xe2,0xb2                    );
+        assertArrayEquals(compile("roxr.w #1,d2"),  0xe2,0x52                    );
+        assertArrayEquals(compile("roxr.b #2,d2"),  0xe4,0x12                    );
+        assertArrayEquals(compile("roxr.l #8,d2"),  0xe0,0x92                    );
+        assertArrayEquals(compile("roxr $1234"),    0xe4,0xf8,0x12,0x34          );
+        assertArrayEquals(compile("roxr $12345678"),0xe4,0xf9,0x12,0x34,0x56,0x78);
+    }
+
+    public void testTAS() {
+        assertArrayEquals(compile("tas $1234"  ),0x4a,0xf8,0x12,0x34);
+        assertArrayEquals(compile("tas d3"  ),0x4a,0xc3);
     }
 
     public void testRol()

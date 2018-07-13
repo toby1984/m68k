@@ -108,6 +108,10 @@ public class DisassemblerTest extends TestCase
         compile("BLE loop\nloop:","00000000: ble $2");
     }
 
+    public void testTAS() {
+        compile("tas $1234");
+        compile("tas d3"  );
+    }
     public void testBSR() {
         compile("org $2000\n" +
                         "bsr sub\n" +
@@ -115,20 +119,18 @@ public class DisassemblerTest extends TestCase
                         "sub:\n","00000000: bsr $4\n" +
                 "00000002: illegal");
     }
+
+    public void testSTOP()
+    {
+        compile("stop #$1234");
+    }
+
     public void testChk()
     {
         compile("chk.w $1200,d3");
         compile("chk.l (a4),d7");
     }
 
-    /*
-if ( ( insnWord & 0b1111000001000000 ) == 0b0100000000000000 ) {
-// CHK_ENCODING
-
-
-if ( ( insnWord & 0b1111111100000000 ) == 0b0100001000000000 ) {
-// CLR_ENCODING
-     */
     public void testCLR() {
         compile("clr.b d3");
         compile("clr.w d3");
@@ -137,15 +139,6 @@ if ( ( insnWord & 0b1111111100000000 ) == 0b0100001000000000 ) {
 
     public void testROL()
     {
-        /*
-   0:   e37a            rolw %d1,%d2
-   2:   e33a            rolb %d1,%d2
-   4:   e3ba            roll %d1,%d2
-   6:   e75a            rolw #3,%d2
-   8:   e71a            rolb #3,%d2
-   a:   e79a            roll #3,%d2
-   c:   e7f8 1234       rolw 0x1234
-         */
         compile("rol.w d1,d2");
         compile("rol.b d1,d2");
         compile("rol.l d1,d2");
@@ -156,6 +149,30 @@ if ( ( insnWord & 0b1111111100000000 ) == 0b0100001000000000 ) {
 
         compile("rol $1234");
         compile("rol $12345678");
+    }
+
+    public void testROXL()
+    {
+        compile("roxl.w d1,d2");
+        compile("roxl.b d1,d2");
+        compile("roxl.l d1,d2");
+        compile("roxl.w #1,d2");
+        compile("roxl.b #2,d2");
+        compile("roxl.l #8,d2");
+        compile("roxl $1234");
+        compile("roxl $12345678");
+    }
+
+    public void testROXR()
+    {
+        compile("roxr.w d1,d2");
+        compile("roxr.b d1,d2");
+        compile("roxr.l d1,d2");
+        compile("roxr.w #1,d2");
+        compile("roxr.b #2,d2");
+        compile("roxr.l #8,d2");
+        compile("roxr $1234");
+        compile("roxr $12345678");
     }
 
     public void testROR()

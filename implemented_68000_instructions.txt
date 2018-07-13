@@ -63,14 +63,14 @@
 [X] RESET
 [X] ROL,
 [X] ROR
-[ ] ROXL
-[ ] ROXR
+[X] ROXL
+[X] ROXR
 [X] RTE
 [X] RTR
 [X] RTS
 [ ] SBCD
 [X] Scc
-[ ] STOP
+[X] STOP
 [ ] SUB
 [ ] SUBA
 [ ] SUBI

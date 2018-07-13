@@ -41,7 +41,8 @@ public class CPU
     public enum RotateMode {
         ARITHMETIC_SHIFT,
         LOGICAL_SHIFT,
-        ROTATE;
+        ROTATE,
+        ROTATE_WITH_EXTEND;
     }
 
     /*
@@ -204,6 +205,8 @@ public class CPU
 
     private int irqStackPtr;
     public IRQ activeIrq; // currently active IRQ (if any)
+
+    private boolean stopped;
 
     private int userModeStackPtr;
     private int supervisorModeStackPtr;
@@ -611,6 +614,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             return;
         }
 
+        if ( stopped ) {
+            return;
+        }
+
         try
         {
             internalExecutionOneCycle();
@@ -688,6 +695,16 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 return;
             case 0b0100111001110000: // RESET
                 cycles = 132;
+                return;
+
+            case 0b0100111001110010: // STOP
+                if ( assertSupervisorMode() )
+                {
+                    statusRegister = memLoadWord( pc );
+                    pc += 2;
+                    cycles = 4;
+                    stopped = true;
+                }
                 return;
         }
         final int insBits = (instruction & 0b1111_0000_0000_0000);
@@ -788,6 +805,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0100_0000_0000_0000:
 
+                if ( ( instruction & 0b1111111111000000 ) == 0b0100101011000000 )
+                {
+                    // TAS_ENCODING
+                    throw new RuntimeException("TAS not implemented yet");
+                }
                 if ( (instruction & 0b1111111100000000) == 0b0100011000000000) {
                     // NOT
                     final int sizeBits = (instruction &0b11000000) >> 6;
@@ -1251,6 +1273,13 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                  * ROL/ ROR / LSL / LSR / ASL / ASR
                  * ---------
                  */
+                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000010000 )
+                {
+                    // ROXL/ROXR IMMEDIATE
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    rotateImmediate(instruction,RotateMode.ROTATE_WITH_EXTEND,rotateLeft);
+                    return;
+                }
 
                 if ( ( instruction & 0b1111000000111000 ) == 0b1110000000000000 )
                 {
@@ -1271,6 +1300,20 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     // ROL/ROR IMMEDIATE
                     final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
                     rotateImmediate(instruction,RotateMode.ROTATE,rotateLeft);
+                    return;
+                }
+
+                if ( ( instruction & 0b1111111011000000 ) == 0b1110010011000000 )
+                {
+                    // ROXL/ROXR MEMORY
+                    int sizeBits = (instruction & 0b11000000) >> 6;
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    int eaMode     = (instruction & 0b111000) >> 3;
+                    int eaRegister = (instruction & 0b000111);
+                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister);
+                    int value = memLoadWord( ea );
+                    value = rotate( value,2,RotateMode.ROTATE_WITH_EXTEND,rotateLeft,1 );
+                    memory.writeWord(ea,value);
                     return;
                 }
 
@@ -1309,6 +1352,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     int value = memLoadWord( ea );
                     value = rotate( value,2,RotateMode.ROTATE,rotateLeft,1 );
                     memory.writeWord(ea,value);
+                    return;
+                }
+
+                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000110000 )
+                {
+                     // ROXL/ROXR REGISTER
+                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+                    rotateRegister(instruction,RotateMode.ROTATE_WITH_EXTEND,rotateLeft);
                     return;
                 }
 
@@ -1442,6 +1493,49 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     }
                 }
                 break;
+            case ROTATE_WITH_EXTEND:
+                /*
+X — Set to the value of the last bit rotated out of the operand; unaffected when the
+rotate count is zero.
+N — Set if the most significant bit of the result is set; cleared otherwise.
+Z — Set if the result is zero; cleared otherwise.
+V — Always cleared.
+C — Set according to the last bit rotated out of the operand; when the rotate count is zero, set to the value of the extend bit.
+                 */
+                if ( rotateCount == 0 )
+                {
+                    if ( isExtended() ) {
+                        setMask |= FLAG_CARRY;
+                    } // else: FLAG_CARRY cleared by default
+                }
+                else
+                {
+                    clearMask |= FLAG_EXTENDED;
+                    if ( rotateLeft )
+                    {
+                        final int mask = 1 << msbBitNum;
+                        for ( ; rotateCount > 0 ; rotateCount-- )
+                        {
+                            lastBit = (value & mask) >>> msbBitNum;
+                            value = (value << 1 ) | lastBit;
+                        }
+                    }
+                    else
+                    {
+                        for ( ; rotateCount > 0 ; rotateCount-- )
+                        {
+                            lastBit = (value & 1) << msbBitNum;
+                            value = (value >>> 1) | lastBit;
+                        }
+                    }
+                    if (lastBit != 0)
+                    {
+                        // C - carry contains last bit rotated out of the operand
+                        setMask |= FLAG_CARRY;
+                        setMask |= FLAG_EXTENDED;
+                    }
+                }
+                break;
             case ARITHMETIC_SHIFT:
                 /*
 N — Set if the most significant bit of the result is set; cleared otherwise.
@@ -1512,8 +1606,12 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         if ( value == 0 ) { // Z — Set if the result is zero; cleared otherwise.
             setMask |= FLAG_ZERO;
         }
-        if ( lastBit != 0 ) { // C - carry contains last bit rotated out of the operand
-            setMask |= FLAG_CARRY;
+        if ( mode != RotateMode.ROTATE_WITH_EXTEND ) // ROXL/ROXR handle the C flag in a special way
+        {
+            if (lastBit != 0)
+            { // C - carry contains last bit rotated out of the operand
+                setMask |= FLAG_CARRY;
+            }
         }
         statusRegister = (statusRegister & ~clearMask) | setMask;
         return value;
@@ -1836,6 +1934,8 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
     private void triggerIRQ(IRQ irq, long irqData)
     {
+        stopped = false;
+
         if ( irq == IRQ.RESET )
         {
             cycles = 0;
@@ -2032,6 +2132,9 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
     public boolean isSupervisorMode() { return ( statusRegister & FLAG_SUPERVISOR_MODE) != 0; }
     public boolean isUserMode() { return ( statusRegister & FLAG_SUPERVISOR_MODE) == 0; }
+
+    public boolean isStopped() { return stopped; }
+    public boolean isNotStopped() { return ! stopped; }
 
     private void setStatusRegister(int newValue)
     {
