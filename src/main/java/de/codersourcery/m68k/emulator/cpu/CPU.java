@@ -805,11 +805,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0100_0000_0000_0000:
 
-                if ( ( instruction & 0b1111111111000000 ) == 0b0100101011000000 )
-                {
-                    // TAS_ENCODING
-                    throw new RuntimeException("TAS not implemented yet");
-                }
                 if ( (instruction & 0b1111111100000000) == 0b0100011000000000) {
                     // NOT
                     final int sizeBits = (instruction &0b11000000) >> 6;
@@ -818,11 +813,9 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     final int operandSize = 1 << sizeBits;
                     if ( decodeSourceOperand( instruction,operandSize,false ) )
                     {
-                        // operand is register
-                        cycles += (operandSize <= 2) ? 4 : 6;
+                        cycles += (operandSize <= 2) ? 4 : 6; // register operation
                     } else {
-                        // operand is memory
-                        cycles += (operandSize <= 2) ? 8 : 12;
+                        cycles += (operandSize <= 2) ? 8 : 12; // memory operation
                     }
                     value = ~value;
                     storeValue( eaMode,eaRegister,operandSize);
@@ -876,6 +869,28 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     cycles += 4;
                     return;
                 }
+//                if ( ( instruction & 0b1111111111000000 ) == 0b0100101011000000 )
+//                {
+//                    // TAS
+//                    if ( decodeSourceOperand( instruction,1,false ) ) {
+//                        cycles += 4; // register operation
+//                    } else {
+//                        cycles += 10; // memory operation
+//                    }
+//                    int setMask = 0;
+//                    if ( (value & 1<<7) != 0 ) {
+//                        setMask |= FLAG_NEGATIVE;
+//                    } else if ( (value & 0xff) != 0 ) {
+//                        setMask |= FLAG_ZERO;
+//                    }
+//                    statusRegister = (statusRegister & ~(FLAG_ZERO|FLAG_NEGATIVE|FLAG_CARRY|FLAG_OVERFLOW))
+//                            | setMask;
+//                    value |= 1<<7;
+//                    final int eaMode     = (instruction & 0b111000) >> 3;
+//                    final int eaRegister = (instruction & 0b000111);
+//                    storeValue( eaMode, eaRegister, 1 );
+//                    return;
+//                }
                 if ( (instruction & 0b1111111111111000) == 0b0100100011000000) {
                     // EXT Word -> Long
                     final int regNum = instruction & 0b111;

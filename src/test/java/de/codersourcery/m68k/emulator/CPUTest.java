@@ -1294,7 +1294,29 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
     }
 
     public void testTAS() {
-        fail("Implement TAS and this test!!");
+
+        final int adr = PROGRAM_START_ADDRESS+128;
+
+        execute(cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),
+                "move.b #0,"+adr,
+                "tas "+adr)
+                .extended()
+                .expectMemoryByte( adr,128 )
+                .zero().notNegative().notSupervisor();
+
+        execute(cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),
+                "move.b #128,"+adr,
+                "tas "+adr)
+                .extended()
+                .expectMemoryByte( adr,128 )
+                .notZero().negative().notSupervisor();
+
+        execute(cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),
+                "move.b #1,"+adr,
+                "tas "+adr)
+                .extended()
+                .expectMemoryByte( adr,129 )
+                .notZero().notNegative().notSupervisor();
     }
 
     public void testBCLR()
