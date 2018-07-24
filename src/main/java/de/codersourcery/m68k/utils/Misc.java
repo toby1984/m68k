@@ -9,7 +9,7 @@ import java.io.InputStreamReader;
 public class Misc
 {
     public static String hex(int value) {
-        return "$"+Integer.toHexString(value );
+        return "$"+Integer.toHexString(value);
     }
 
     public static String binary8Bit(int value) {

@@ -506,6 +506,60 @@ public class CPUTest extends TestCase
             .irqActive(CPU.IRQ.PRIVILEGE_VIOLATION);
     }
 
+    public void testANDI_Byte()
+    {
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ), "move.l #$ffffffff,d3",
+            "and.b #%01010101,d3")
+            .expectD3(  0xffffff55 )
+            .notZero().notNegative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ), "move.l #$ffffff00,d3",
+            "and.b #%01010101,d3")
+            .expectD3(  0xffffff00 )
+            .zero().notNegative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ), "move.l #$ffffffff,d3",
+            "and.b #%10000000,d3")
+            .expectD3(  0xffffff80 )
+            .notZero().negative().noCarry().noOverflow().extended();
+    }
+
+    public void testANDI_Word()
+    {
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ), "move.l #$ffffffff,d3",
+            "and.w #%0101010101010101,d3")
+            .expectD3(  0xffff5555 )
+            .notZero().notNegative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ), "move.l #$ffff0000,d3",
+            "and.w #%0101010101010101,d3")
+            .expectD3(  0xffff0000 )
+            .zero().notNegative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ), "move.l #$ffffffff,d3",
+            "and.w #%1000000000000000,d3")
+            .expectD3(  0xffff8000 )
+            .notZero().negative().noCarry().noOverflow().extended();
+    }
+
+    public void testANDI_Long()
+    {
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ), "move.l #$ffffffff,d3",
+            "and.l #$00800000,d3")
+            .expectD3(  0x00800000 )
+            .notZero().notNegative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ), "move.l #$ffffffff,d3",
+            "and.l #$ffffffff,d3")
+            .expectD3(  0xffffffff )
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        execute( cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ), "move.l #$0,d3",
+            "and.l #$ffffffff,d3")
+            .expectD3(  0x0 )
+            .zero().notNegative().noCarry().noOverflow().extended();
+    }
+
     public void testANDICCR()
     {
         execute( cpu -> cpu.setFlags(CPU.FLAG_ZERO),

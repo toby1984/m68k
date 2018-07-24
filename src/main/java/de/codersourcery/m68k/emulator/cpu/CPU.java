@@ -217,6 +217,8 @@ public class CPU
     private int userModeStackPtr;
     private int supervisorModeStackPtr;
 
+    private boolean addressRegisterDirectAllowed;
+
     public int pcAtStartOfLastInstruction;
     public int pc;
 
@@ -308,11 +310,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
      * @param eaRegister
      * @return true on success, false on failure (invalid instruction,misaligned memory access)
      */
-    private boolean calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister) {
-        return calculateEffectiveAddress(operandSize,eaMode,eaRegister,true);
+    private void calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister) {
+        calculateEffectiveAddress(operandSize,eaMode,eaRegister,true);
     }
 
-    private boolean calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister,boolean advancePC)
+    private void calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister,boolean advancePC)
     {
         switch( eaMode )
         {
@@ -329,7 +331,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 // ADDRESS_REGISTER_INDIRECT;
                 ea = addressRegisters[ eaRegister ];
                 cycles += operandSize == 4 ? 8 : 4;
-                return true;
+                return;
             case 0b011:
                 // ADDRESS_REGISTER_INDIRECT_POST_INCREMENT;
                 ea = addressRegisters[ eaRegister ];
@@ -342,7 +344,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     addressRegisters[eaRegister] += operandSize;
                 }
                 cycles += operandSize == 4 ? 8 : 4;
-                return true;
+                return;
             case 0b100:
                 // ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT;
                 if ( eaRegister == 7 && operandSize == 1 ) {
@@ -355,14 +357,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 }
                 addressRegisters[ eaRegister ] = ea;
                 cycles += operandSize == 4 ? 10 : 6;
-                return true;
+                return;
             case 0b101:
                 // ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
                 int offset = memLoadWord(pc);
                 pc += 2; // skip displacement
                 cycles += operandSize == 4 ? 12 : 8;
                 ea = addressRegisters[ eaRegister ] + offset; // hint: memLoad() performs sign-extension to 32 bits
-                return true;
+                return;
             case 0b110:
                 // ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT;
                 // ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT
@@ -379,9 +381,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 boolean isFullExtensionWord = (extensionWord & 0b0000_0001_0000_1000) == 0b0000_0001_0000_0000;
                 if ( isFullExtensionWord )
                 {
-                    if ( cpuType.isNotCompatibleWith(CPUType.M68020 ) ) {
-                        invalidInstruction();
-                        return false;
+                    if ( cpuType.isNotCompatibleWith(CPUType.M68020 ) )
+                    {
+                        final int insn = memLoadWord(pcAtStartOfLastInstruction);
+                        throw new IllegalInstructionException(pcAtStartOfLastInstruction,insn);
                     }
                     /*
                      * Load base register value.
@@ -400,67 +403,67 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     {
                         case 0b0000: // No Memory Indirect Action
                             ea = baseRegisterValue+decodeIndexRegisterValue(extensionWord )+ baseDisplacement;
-                            return true;
+                            return;
                         case 0b0001: // Memory Indirect Preindexed with Null Outer Displacement
                             ea = baseRegisterValue + baseDisplacement + decodeIndexRegisterValue(extensionWord );
-                            return true;
+                            return;
                         case 0b0010: // Indirect Preindexed with Word Outer Displacement
                             outerDisplacement = memLoadWord(pc);
                             pc += 2;
                             int intermediateAddress = baseRegisterValue + baseDisplacement + decodeIndexRegisterValue(extensionWord );
                             ea = memLoadLongWithCheck(intermediateAddress)+outerDisplacement;
-                            return true;
+                            return;
                         case 0b0011: // Indirect Preindexed with Long Outer Displacement
                             outerDisplacement = memLoadLong(pc);
                             pc += 4;
                             intermediateAddress = baseRegisterValue + baseDisplacement + decodeIndexRegisterValue(extensionWord );
                             ea = memLoadLongWithCheck(intermediateAddress) + outerDisplacement;
-                            return true;
+                            return;
                         case 0b0100: // Reserved
                             break;
                         case 0b0101: // Indirect Postindexed with Null Outer Displacement
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress) + decodeIndexRegisterValue(extensionWord );
-                            return true;
+                            return;
                         case 0b0110: // Indirect Postindexed with Word Outer Displacement
                             outerDisplacement = memLoadWord(pc);
                             pc += 2;
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress) + decodeIndexRegisterValue(extensionWord ) + outerDisplacement;
-                            return true;
+                            return;
                         case 0b0111: // Indirect Postindexed with Long Outer Displacement
                             outerDisplacement = memLoadLong(pc);
                             pc += 4;
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress) + decodeIndexRegisterValue(extensionWord ) + outerDisplacement;
-                            return true;
+                            return;
                         case 0b1000: // No Memory Indirect Action, Index suppressed
                             ea = baseRegisterValue + baseDisplacement;
-                            return true;
+                            return;
                         case 0b1001: // Memory Indirect with Null Outer Displacement, Index suppressed
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress);
-                            return true;
+                            return;
                         case 0b1010: // Memory Indirect with Word Outer Displacement, Index suppressed
                             outerDisplacement = memLoadWord(pc);
                             pc += 2;
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress) + outerDisplacement;
-                            return true;
+                            return;
                         case 0b1011: // Memory Indirect with Long Outer Displacement, Index suppressed
                             outerDisplacement = memLoadLong(pc);
                             pc += 4;
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress) + outerDisplacement;
-                            return true;
+                            return;
                         case 0b1100: // Reserved
                         case 0b1101: // Reserved
                         case 0b1110: // Reserved
                         case 0b1111: // Reserved
                             break;
                     }
-                    invalidInstruction();
-                    return false;
+                    final int insn = memLoadWord(pcAtStartOfLastInstruction);
+                    throw new IllegalInstructionException(pcAtStartOfLastInstruction,insn);
                 }
 
                 // brief extension word with 8-bit displacement
@@ -477,7 +480,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                  * d(An,ix)  address register indirect with index	        10(2/0)		14(3/0)
                  */
                 cycles += operandSize == 4 ? 12 : 8;
-                return true;
+                return;
             case 0b111:
                 switch(eaRegister)
                 {
@@ -487,7 +490,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         ea = baseDisplacement + pc;
                         cycles += operandSize == 4 ? 12 : 8;
                         pc += 2;
-                        return true;
+                        return;
                     case 0b011:
                      /*
                       * MOVE (d8,PC,Xn.SIZE*SCALE),... (1 extra word).
@@ -508,7 +511,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         }
                         ea = baseDisplacement + origPc + decodeIndexRegisterValue(extensionWord);
                         cycles += operandSize == 4 ? 14 : 10; // TODO: Most likely wrong ....
-                        return true;
+                        return;
 
                 /*
                          * MOVE ([bd,PC],Xn.SIZE*SCALE,od),.... (1-5 extra words).
@@ -529,7 +532,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         ea = memLoadWord(pc);
                         cycles += operandSize == 4 ? 12 : 8;
                         pc += 2;
-                        return true;
+                        return;
                     case 0b001:
                         /*
                          * MOVE (xxx).L,.... (2 extra words).
@@ -538,7 +541,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         ea = memLoadLong(pc);
                         cycles += operandSize == 4 ? 12 : 8;
                         pc += 4;
-                        return true;
+                        return;
                     case 0b100:
                         /*
                          * MOVE #xxxx,.... (1-6 extra words).
@@ -548,11 +551,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         ea = pc;
                         cycles += operandSize == 4 ? 8 : 4;
                         pc += operandSize;
-                        return true;
+                        return;
                 }
         }
-        triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
-        return false;
+        final int insn = memLoadWord(pcAtStartOfLastInstruction);
+        throw new IllegalInstructionException(pcAtStartOfLastInstruction,insn);
     }
 
     /**
@@ -624,7 +627,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             return;
         }
 
-        if ( stopped ) {
+        if ( stopped ) { // TODO: Move above "--cycles" line so that cycles does not go below zero when CPU is stopped...
             return;
         }
 
@@ -634,6 +637,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
             checkPendingIRQ();
         }
+        catch(IllegalInstructionException e)
+        {
+            e.printStackTrace();
+            illegalInstruction();
+        }
         catch(MemoryAccessException e)
         {
             badAlignment(e.offendingAddress, e.operation );
@@ -642,6 +650,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
     private void internalExecutionOneCycle()
     {
+        addressRegisterDirectAllowed = true;
+
         System.out.println(">>>> Executing instruction at 0x"+Integer.toHexString(pc));
 
         if ( ( pc & 1 ) != 0 )
@@ -730,6 +740,52 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0000_0000_0000_0000:
+                if ( ( instruction & 0b1111111100000000) == 0b0000001000000000 ) {
+                    // ANDI #xx,<ea>
+                    final int sizeBits = (instruction >>> 6) & 0b11;
+                    final int operandSize = 1<<sizeBits;
+                    final int mask;
+                    switch( operandSize)
+                    {
+                        case 1:
+                            mask = 0xffffff00 | (memLoadWord(pc) & 0xff);
+                            pc += 2;
+                            break;
+                        case 2:
+                            mask = 0xffff0000 | (memLoadWord(pc) & 0xffff);
+                            pc += 2;
+                            break;
+                        case 4:
+                            mask = memLoadLong(pc);
+                            pc += 4;
+                            break;
+                        default:
+                            throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
+                    }
+                    if ( decodeSourceOperand(instruction,operandSize,false,false) ) {
+                        // register operand
+                        switch(operandSize) {
+                            case 1:
+                            case 2:
+                                cycles += 8;
+                            default:
+                                cycles += 16;
+                        }
+                    } else {
+                        // memory operand
+                        switch(operandSize) {
+                            case 1:
+                            case 2:
+                                cycles += 12;
+                            default:
+                                cycles += 20;
+                        }
+                    }
+                    value &= mask;
+                    storeValue((instruction>>>3) & 0b111,instruction&0b111,operandSize);
+                    updateFlagsAfterMove(operandSize);
+                    return;
+                }
                 if ( (instruction & 0b1111000111000000) == 0b0000000101000000) {
                     // BCHG Dn,<ea>
                     bitOp(instruction,BitOp.FLIP,BitOpMode.REGISTER);
@@ -1077,8 +1133,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             }
                             // $$FALL-THROUGH$$
                         default:
-                            invalidInstruction();
-                            return;
+                            throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
                     }
                     decodeSourceOperand( instruction,operandSize,false );
 
@@ -1178,8 +1233,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             cycles = 18;
                             return;
                     }
-                    invalidInstruction();
-                    return;
+                    throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
                 }
                 final boolean takeBranch = Condition.isTrue(this, cc);
                 switch (instruction & 0xff)
@@ -1424,10 +1478,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             default:
                 throw new RuntimeException("Unreachable code reached");
         }
-        invalidInstruction();
+        throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
     }
 
-    private void invalidInstruction() {
+    private void illegalInstruction() {
         triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
     }
 
@@ -1722,12 +1776,24 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
      *
      * @param instruction
      * @param operandSize
+     * @param calculateAddressOnly whether to only calculate the effective address but not actually load
+     *                             the value from there
      * @return true if the operand is a register, otherwise false
      */
     private boolean decodeSourceOperand(int instruction, int operandSize,boolean calculateAddressOnly) {
         return decodeSourceOperand(instruction,operandSize,calculateAddressOnly,true);
     }
 
+    /**
+     * Decodes an 16-bit instruction word's source operand.
+     *
+     * @param instruction
+     * @param operandSize
+     * @param calculateAddressOnly whether to only calculate the effective address but not actually load
+     *                             the value from there
+     * @param advancePC whether to advance the PC after reading additional instruction words
+     * @return true if the operand is a register, otherwise false
+     */
     private boolean decodeSourceOperand(int instruction, int operandSize,boolean calculateAddressOnly,boolean advancePC)
     {
         // InstructionEncoding.of("ooooDDDMMMmmmsss");
@@ -1743,6 +1809,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 return true;
             case 0b001:
                 // ADDRESS_REGISTER_DIRECT;
+                if ( ! addressRegisterDirectAllowed )
+                {
+                    throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
+                }
                 ea = value = addressRegisters[eaRegister];
 
                 cycles += 4;
@@ -1785,12 +1855,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 }
                 // $$FALL-THROUGH$$
             default:
-                if ( calculateEffectiveAddress(operandSize, eaMode, eaRegister,advancePC) )
+                calculateEffectiveAddress(operandSize, eaMode, eaRegister,advancePC);
+                if ( ! calculateAddressOnly )
                 {
-                    if ( ! calculateAddressOnly )
-                    {
-                        value = memLoad( ea, operandSize );
-                    }
+                    value = memLoad( ea, operandSize );
                 }
         }
         return false;
@@ -1891,22 +1959,21 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 }
                 throw new RuntimeException("Unreachable code reached");
             default:
-                if ( calculateEffectiveAddress(operandSize, eaMode, eaRegister) )
+                calculateEffectiveAddress(operandSize, eaMode, eaRegister);
+                switch (operandSize)
                 {
-                    switch (operandSize)
-                    {
-                        case 1:
-                            memory.writeByte(ea, value);
-                            break;
-                        case 2:
-                            memory.writeWord(ea, value);
-                            break;
-                        case 4:
-                            memory.writeLong(ea, value);
-                            break;
-                        default:
-                            throw new RuntimeException("Unreachable code reached");
-                    }
+                    case 1:
+                        memory.writeByte(ea, value);
+                        break;
+                    case 2:
+                        memory.writeWord(ea, value);
+                        break;
+                    case 4:
+                        memory.writeLong(ea, value);
+                        break;
+                    default:
+                        final int insn = memLoadWord(pcAtStartOfLastInstruction);
+                        throw new IllegalInstructionException(pcAtStartOfLastInstruction,insn);
                 }
         }
     }

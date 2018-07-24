@@ -54,6 +54,13 @@ public class DisassemblerTest extends TestCase
         compile("move usp,a3");
     }
 
+    public void testANDI()
+    {
+        compile("and.b #$12,d1" , "00000000: andi.b #$12,d1");
+        compile("and.w #$1234,d1", "00000000: andi.w #$1234,d1");
+        compile("and.l #$123456,d1", "00000000: andi.l #$123456,d1");
+    }
+
     public void testANDISR() {
         compile("AND #$1234,sr","00000000: andi #$1234,sr");
     }

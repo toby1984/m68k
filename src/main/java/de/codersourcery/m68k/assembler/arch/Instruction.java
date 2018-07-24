@@ -353,11 +353,17 @@ public enum Instruction
     AND("AND",2)
             {
                 @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return true;
+                }
+
+                @Override
                 public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     if ( insn.source().hasAddressingMode( IMMEDIATE_VALUE ) )
                     {
-                        int allowedOperandSizeInBits = 32;
+                        int allowedOperandSizeInBits = 16;
 
                         if (insn.destination().getValue().isRegister(Register.SR))
                         {
@@ -368,7 +374,7 @@ public enum Instruction
                             }
                             allowedOperandSizeInBits = 16;
                         }
-                        if (insn.destination().getValue().isRegister(Register.CCR))
+                        else if (insn.destination().getValue().isRegister(Register.CCR))
                         {
                             // ANDI #xx,CCR
                             if ( ! insn.useImpliedOperandSize && ! insn.hasOperandSize(OperandSize.BYTE ) )
@@ -376,6 +382,25 @@ public enum Instruction
                                 throw new RuntimeException("ANDI to CCR only supports byte-sized operand");
                             }
                             allowedOperandSizeInBits = 8;
+                        }
+                        else
+                        {
+                            if ( insn.hasExplicitOperandSize() ) {
+                                switch(insn.getOperandSize()) {
+
+                                    case BYTE:
+                                        allowedOperandSizeInBits = 8;
+                                        break;
+                                    case WORD:
+                                        allowedOperandSizeInBits = 16;
+                                        break;
+                                    case LONG:
+                                        allowedOperandSizeInBits = 32;
+                                        break;
+                                    default:
+                                        throw new RuntimeException("Unreachable code reached");
+                                }
+                            }
                         }
 
                         if ( ! estimateSizeOnly )
@@ -1016,6 +1041,7 @@ public enum Instruction
             case AND:
                 if ( insn.source().hasAddressingMode( IMMEDIATE_VALUE ) )
                 {
+                    // ANDI #xx,<ea>
                     if ( insn.destination().getValue().isRegister(Register.SR) )
                     {
                         // ANDI #xx,SR
@@ -1028,6 +1054,19 @@ public enum Instruction
                         insn.setImplicitOperandSize(OperandSize.BYTE);
                         return ANDI_TO_CCR_ENCODING;
                     }
+                    insn.setImplicitOperandSize(OperandSize.WORD);
+                    if ( estimateSizeOnly ) {
+                        return ANDI_LONG_ENCODING;
+                    }
+                    final int value = insn.source().getValue().getBits(context);
+                    final int sizeInBits = NumberNode.getSizeInBitsUnsigned(value);
+                    if ( sizeInBits <= 8) {
+                        return ANDI_BYTE_ENCODING;
+                    }
+                    if ( sizeInBits <= 16 ) {
+                        return ANDI_WORD_ENCODING;
+                    }
+                    return ANDI_LONG_ENCODING;
                 }
                 // TODO: Implement the other variants of AND ...
                 throw new RuntimeException("Sorry, AND operation not fully implemented");
@@ -1643,6 +1682,13 @@ D/A   |     |   |           |
     public static final InstructionEncoding ANDI_TO_CCR_ENCODING =
         InstructionEncoding.of("0000001000111100","00000000vvvvvvvv");
 
+    public static final InstructionEncoding ANDI_BYTE_ENCODING =
+        InstructionEncoding.of("0000001000MMMDDD","00000000_vvvvvvvv");
+    public static final InstructionEncoding ANDI_WORD_ENCODING =
+        InstructionEncoding.of("0000001001MMMDDD","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding ANDI_LONG_ENCODING =
+        InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
     public static final InstructionEncoding ANDI_TO_SR_ENCODING =
             InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
@@ -1879,5 +1925,8 @@ D/A   |     |   |           |
         put(SCC_ENCODING,SCC);
         put(STOP_ENCODING,STOP);
         put(TAS_ENCODING,TAS);
+        put(ANDI_BYTE_ENCODING,AND);
+        put(ANDI_WORD_ENCODING,AND);
+        put(ANDI_LONG_ENCODING,AND);
     }};
 }

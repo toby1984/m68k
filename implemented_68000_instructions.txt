@@ -5,7 +5,7 @@
 [ ] ADDQ
 [ ] ADDX
 [ ] AND
-[ ] ANDI
+[X] ANDI
 [X] ANDI to CCR
 [X] ANDI to SR
 [X] ASL

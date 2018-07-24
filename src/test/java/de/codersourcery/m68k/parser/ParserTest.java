@@ -223,6 +223,21 @@ public class ParserTest extends TestCase
         assertEquals( Register.SR, insn.destination().getValue().asRegister().register );
     }
 
+    //         assertArrayEquals(compile("and.b #$12,d1")     ,0x02,0x01,0x00,0x12);
+
+    public void testParseANDI() {
+        final AST ast = parseAST("and.b #$12,d1");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.AND, insn.getInstructionType() );
+        assertEquals(OperandSize.BYTE,insn.getOperandSize());
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x12), insn.source().getValue().getBits(null) );
+        assertEquals( AddressingMode.DATA_REGISTER_DIRECT, insn.destination().addressingMode );
+        assertEquals( Register.D1, insn.destination().getValue().asRegister().register );
+    }
+
     public void testParseANDI_CCR() {
         final AST ast = parseAST("and #$12,ccr");
         assertEquals(1,ast.childCount());

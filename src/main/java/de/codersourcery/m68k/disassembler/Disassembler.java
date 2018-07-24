@@ -499,6 +499,24 @@ public class Disassembler
                     appendln("andi #").append( Misc.hex(word) ).append(",ccr");
                     return;
                 }
+                if ( encoding == Instruction.ANDI_BYTE_ENCODING) {
+                    final int word = readWord() & 0xff;
+                    appendln("andi.b #").append( Misc.hex(word) ).append(",");
+                    decodeOperand(1,(insnWord&0b111)>>>3,insnWord&0b111);
+                    return;
+                }
+                if ( encoding == Instruction.ANDI_WORD_ENCODING) {
+                    final int word = readWord() & 0xffff;
+                    appendln("andi.w #").append( Misc.hex(word) ).append(",");
+                    decodeOperand(1,(insnWord&0b111)>>>3,insnWord&0b111);
+                    return;
+                }
+                if ( encoding == Instruction.ANDI_LONG_ENCODING) {
+                    final int word = readLong();
+                    appendln("andi.l #").append( Misc.hex(word) ).append(",");
+                    decodeOperand(1,(insnWord&0b111)>>>3,insnWord&0b111);
+                    return;
+                }
                 // TODO: Implement other AND variants as well
                 break;
             case TRAP:

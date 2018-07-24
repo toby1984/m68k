@@ -22,6 +22,12 @@ public class AssemblerTest extends TestCase
         asm.getOptions().cpuType=CPUType.M68020;
     }
 
+    public void testANDI() {
+        assertArrayEquals(compile("and.b #$12,d1")     ,0x02,0x01,0x00,0x12);
+        assertArrayEquals(compile("and.w #$1234,d1")   ,0x02,0x41,0x12,0x34);
+        assertArrayEquals(compile("and.l #$123456,d1"),0x02,0x81,0x00,0x12,0x34,0x56);
+    }
+
     public void testTST() {
         assertArrayEquals(compile("tst.b d3")     ,0x4a,0x03);
         assertArrayEquals(compile("tst.w (a4)")   ,0x4a,0x54);
