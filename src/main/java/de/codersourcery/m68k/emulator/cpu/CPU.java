@@ -274,7 +274,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 2: return memory.readWord(address);
             case 4: return memory.readLong(address);
             default:
-                throw new RuntimeException("Unreachable code reached");
+                throw new RuntimeException("Unreachable code reached,size: "+size);
         }
     }
 
@@ -302,7 +302,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
      * @param eaRegister
      * @return true on success, false on failure (invalid instruction,misaligned memory access)
      */
-    private boolean calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister)
+    private boolean calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister) {
+        return calculateEffectiveAddress(operandSize,eaMode,eaRegister,true);
+    }
+
+    private boolean calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister,boolean advancePC)
     {
         switch( eaMode )
         {
@@ -822,6 +826,29 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     updateFlagsAfterTST( operandSize );
                     return;
                 }
+                if ( ( instruction & 0b1111111111000000 ) == 0b0100101011000000 )
+                {
+                    // TAS
+                    if ( decodeSourceOperand( instruction,1,false,false ) ) {
+                        cycles += 4; // register operation
+                    } else {
+                        cycles += 10; // memory operation
+                    }
+                    pc -= 2; // re
+                    int setMask = 0;
+                    if ( (value & 1<<7) != 0 ) {
+                        setMask |= FLAG_NEGATIVE;
+                    } else if ( (value & 0xff) != 0 ) {
+                        setMask |= FLAG_ZERO;
+                    }
+                    statusRegister = (statusRegister & ~(FLAG_ZERO|FLAG_NEGATIVE|FLAG_CARRY|FLAG_OVERFLOW))
+                            | setMask;
+                    value |= 1<<7;
+                    final int eaMode     = (instruction & 0b111000) >> 3;
+                    final int eaRegister = (instruction & 0b000111);
+                    storeValue( eaMode, eaRegister, 1 );
+                    return;
+                }
                 if ( (instruction & 0b1111111100000000) == 0b0100101000000000) {
                     // TST
                     final int operandSize = 1 << ((instruction & 0b11000000) >>> 6);
@@ -869,28 +896,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     cycles += 4;
                     return;
                 }
-//                if ( ( instruction & 0b1111111111000000 ) == 0b0100101011000000 )
-//                {
-//                    // TAS
-//                    if ( decodeSourceOperand( instruction,1,false ) ) {
-//                        cycles += 4; // register operation
-//                    } else {
-//                        cycles += 10; // memory operation
-//                    }
-//                    int setMask = 0;
-//                    if ( (value & 1<<7) != 0 ) {
-//                        setMask |= FLAG_NEGATIVE;
-//                    } else if ( (value & 0xff) != 0 ) {
-//                        setMask |= FLAG_ZERO;
-//                    }
-//                    statusRegister = (statusRegister & ~(FLAG_ZERO|FLAG_NEGATIVE|FLAG_CARRY|FLAG_OVERFLOW))
-//                            | setMask;
-//                    value |= 1<<7;
-//                    final int eaMode     = (instruction & 0b111000) >> 3;
-//                    final int eaRegister = (instruction & 0b000111);
-//                    storeValue( eaMode, eaRegister, 1 );
-//                    return;
-//                }
                 if ( (instruction & 0b1111111111111000) == 0b0100100011000000) {
                     // EXT Word -> Long
                     final int regNum = instruction & 0b111;
@@ -1709,7 +1714,11 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
      * @param operandSize
      * @return true if the operand is a register, otherwise false
      */
-    private boolean decodeSourceOperand(int instruction, int operandSize,boolean calculateAddressOnly)
+    private boolean decodeSourceOperand(int instruction, int operandSize,boolean calculateAddressOnly) {
+        return decodeSourceOperand(instruction,operandSize,calculateAddressOnly,true);
+    }
+
+    private boolean decodeSourceOperand(int instruction, int operandSize,boolean calculateAddressOnly,boolean advancePC)
     {
         // InstructionEncoding.of("ooooDDDMMMmmmsss");
         int eaMode     = (instruction & 0b111000) >> 3;
@@ -1741,7 +1750,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                         {
                             value = memLoad( ea, operandSize );
                         }
-                        pc += 2;
+                        if ( advancePC )
+                        {
+                            pc += 2;
+                        }
                         cycles += 8;
                         return false;
                     case 0b001:
@@ -1754,13 +1766,16 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                         {
                             value = memLoad( ea, operandSize );
                         }
-                        pc += 4;
+                        if ( advancePC )
+                        {
+                            pc += 4;
+                        }
                         cycles += 12;
                         return false;
                 }
                 // $$FALL-THROUGH$$
             default:
-                if ( calculateEffectiveAddress(operandSize, eaMode, eaRegister) )
+                if ( calculateEffectiveAddress(operandSize, eaMode, eaRegister,advancePC) )
                 {
                     if ( ! calculateAddressOnly )
                     {

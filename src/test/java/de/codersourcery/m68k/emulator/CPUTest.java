@@ -1438,7 +1438,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         final int exceptionHandlerAddress = PROGRAM_START_ADDRESS-128;
         memory.writeLong(4, exceptionHandlerAddress); // PC starting value
 
-        insToExecute += ( runInSuperVisorMode ? 4 : 3 ); // + number of instructions in reset handler
+        insToExecute += ( runInSuperVisorMode ? 3 : 4 ); // + number of instructions in reset handler
 
         final int mask = ~CPU.FLAG_SUPERVISOR_MODE;
         String resetHandler = "MOVE.L #"+Misc.hex(USERMODE_STACK_PTR)+",A0\n" +
