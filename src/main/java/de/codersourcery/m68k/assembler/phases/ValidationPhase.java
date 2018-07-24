@@ -45,7 +45,7 @@ public class ValidationPhase implements ICompilationPhase
             if ( node.is(NodeType.INSTRUCTION) )
             {
                 final InstructionNode insn = node.asInstruction();
-                insn.getInstructionType().checkSupports(insn,ctx);
+                insn.getInstructionType().checkSupports(insn,ctx, true);
                 if (insn.hasSource())
                 {
                     checkValueSize(insn.source(), ctx);

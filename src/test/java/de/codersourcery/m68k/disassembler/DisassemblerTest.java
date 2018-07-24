@@ -58,6 +58,10 @@ public class DisassemblerTest extends TestCase
         compile("AND #$1234,sr","00000000: andi #$1234,sr");
     }
 
+    public void testANDICCR() {
+        compile("AND #$34,ccr","00000000: andi #$34,ccr");
+    }
+
     public void testDBRA()
     {
         testDBcc(Instruction.DBHI);

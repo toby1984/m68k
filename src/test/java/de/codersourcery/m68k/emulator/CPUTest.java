@@ -495,6 +495,24 @@ public class CPUTest extends TestCase
                 .waitingForInterrupt();
     }
 
+    public void testANDISR()
+    {
+        execute( cpu -> cpu.setIRQLevel(0b111),1,true,
+            "and #"+(0xffff & ~CPU.FLAG_I0)+",sr")
+            .noIrqActive().expectIRQLevel(6);
+
+        execute( cpu -> cpu.setIRQLevel(0b111),
+            "and #"+(0xffff & ~CPU.FLAG_I0)+",sr")
+            .irqActive(CPU.IRQ.PRIVILEGE_VIOLATION);
+    }
+
+    public void testANDICCR()
+    {
+        execute( cpu -> cpu.setFlags(CPU.FLAG_ZERO),
+            "and #"+(0xff & ~CPU.FLAG_ZERO)+",ccr")
+            .notZero().noIrqActive();
+    }
+
     public void testChkWord() {
 
         // $ffff < 0 || $ffff > $0a
@@ -1521,6 +1539,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         public ExpectionBuilder expectA5(int value) { return assertHexEquals( "A5 mismatch" , value, cpu.addressRegisters[5]); }
         public ExpectionBuilder expectA6(int value) { return assertHexEquals( "A6 mismatch" , value, cpu.addressRegisters[6]); }
         public ExpectionBuilder expectA7(int value) { return assertHexEquals( "A7 mismatch" , value, cpu.addressRegisters[7]); }
+        public ExpectionBuilder expectIRQLevel(int level) { return assertHexEquals( "IRQ level mismatch" , level, cpu.getIRQLevel() ); }
 
         public ExpectionBuilder cycles(int number) {
             assertEquals("Expected CPU cycle count "+number+" but was "+cpu.cycles,number,cpu.cycles);

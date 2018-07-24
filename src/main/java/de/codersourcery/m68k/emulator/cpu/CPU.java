@@ -17,6 +17,12 @@ public class CPU
 {
     private final CPUType cpuType;
 
+    private enum BinaryLogicalOp {
+        AND,
+        OR,
+        EOR
+    }
+
     private enum BitOp {
         FLIP,
         CLEAR,
@@ -655,6 +661,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * Bit Manipulation/MOVEP/Immediate
              * ================================
              */
+            case 0b0000001000111100: // ANDI to CCR
+                decodeSourceOperand(instruction, 2,false);
+                setStatusRegister( statusRegister & (value & 0b11111) );
+                cycles = 20;
+                return;
             case 0b0000001001111100: // ANDI to SR
                 if ( assertSupervisorMode() )
                 {
@@ -2165,7 +2176,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
     public boolean isStopped() { return stopped; }
     public boolean isNotStopped() { return ! stopped; }
 
-    private void setStatusRegister(int newValue)
+    public void setStatusRegister(int newValue)
     {
         if ( isSupervisorMode() )
         {
@@ -2347,5 +2358,21 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
         statusRegister = (statusRegister &
                 ~(FLAG_NEGATIVE|FLAG_ZERO|FLAG_OVERFLOW|FLAG_CARRY)) | setMask;
+    }
+
+    public void setIRQLevel(int level) {
+        if ( level < 0 || level > 7 ) {
+            throw new IllegalArgumentException("Invalid IRQ level: "+level);
+        }
+        statusRegister = ( statusRegister & ~0b111_0000_0000) | (level<<8);
+    }
+    /**
+     * Returns the CPUs current interrupt level (0...7).
+     *
+     * @return
+     */
+    public int getIRQLevel()
+    {
+        return (statusRegister >>>8 ) & 0b111;
     }
 }

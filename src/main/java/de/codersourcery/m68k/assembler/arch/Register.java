@@ -26,6 +26,7 @@ public enum Register
     A7("a7",Type.ADDRESS,Type.STACKPTR,7),
     PC("pc",Type.PC,0),
     SR("sr",Type.SR,0),
+    CCR("ccr",Type.CCR,0),
     USP("usp",Type.STACKPTR,0); // usermode stack ptr
 
     public final String name;
@@ -93,6 +94,7 @@ public enum Register
         DATA,
         ADDRESS,
         STACKPTR,
+        CCR,
         SR,
         PC;
     }
@@ -126,8 +128,20 @@ public enum Register
             case "a5": case "A5": return Register.A5;
             case "a6": case "A6": return Register.A6;
             case "a7": case "A7": return Register.A7;
-            case "ccr": case "CCR": return Register.SR;
-            case "sr": case "SR": return Register.SR;
+            case "ccr":
+            case "ccR":
+            case "cCr":
+            case "cCR":
+            case "Ccr":
+            case "CcR":
+            case "CCr":
+            case "CCR":
+                return Register.CCR;
+            case "sr":
+            case "sR":
+            case "Sr":
+            case "SR":
+            return Register.SR;
             case "sp": case "SP": case "sP": case "Sp": return Register.A7;
             case "pc": case "PC": case "pC": case "Pc": return Register.PC;
             case "usp":

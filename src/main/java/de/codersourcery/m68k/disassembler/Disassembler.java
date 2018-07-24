@@ -490,10 +490,13 @@ public class Disassembler
                 return;
             case AND:
                 if ( encoding == Instruction.ANDI_TO_SR_ENCODING) {
-                    //     public static final InstructionEncoding ANDI_TO_SR_ENCODING =
-                    //            InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
                     final int word = readWord();
                     appendln("andi #").append( Misc.hex(word) ).append(",sr");
+                    return;
+                }
+                if ( encoding == Instruction.ANDI_TO_CCR_ENCODING) {
+                    final int word = readWord();
+                    appendln("andi #").append( Misc.hex(word) ).append(",ccr");
                     return;
                 }
                 // TODO: Implement other AND variants as well

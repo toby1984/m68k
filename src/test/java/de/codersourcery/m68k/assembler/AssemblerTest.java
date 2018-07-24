@@ -117,6 +117,12 @@ public class AssemblerTest extends TestCase
         assertFailsToCompile( "AND.b #$12,sr");
     }
 
+    public void testANDICCR() {
+        assertArrayEquals(compile("AND #$12,ccr")    ,0x02,0x3c,0x00,0x12 );
+        assertFailsToCompile( "AND.l #$12,ccr");
+        assertFailsToCompile( "AND.w #$12,ccr");
+    }
+
     public void testDBRA()
     {
         testDBcc(Instruction.DBHI);

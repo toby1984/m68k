@@ -26,9 +26,10 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+
     CHK("CHK",2) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingModeKind( node,AddressingModeKind.DATA );
             Instruction.checkDestinationAddressingMode( node,AddressingMode.DATA_REGISTER_DIRECT );
@@ -45,21 +46,21 @@ public enum Instruction
     },
     TAS("TAS",1) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingModeKind(node,AddressingModeKind.ALTERABLE);
         }
     },
     STOP("STOP",1) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingMode(node,IMMEDIATE_VALUE);
         }
     },
     NOT("NOT",1) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingModeKind( node,AddressingModeKind.ALTERABLE );
         }
@@ -72,13 +73,13 @@ public enum Instruction
     },
     TRAPV("TRAPV",0) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
         }
     },
     TST("TST",1) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             final AddressingMode mode = node.source().addressingMode;
             if ( mode == AddressingMode.PC_INDIRECT_WITH_DISPLACEMENT ||
@@ -101,7 +102,7 @@ public enum Instruction
     },
     CLR("CLR",1) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingModeKind(node,AddressingModeKind.ALTERABLE);
         }
@@ -109,28 +110,28 @@ public enum Instruction
     },
     BCHG("BCHG",2) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkBitInstructionValid( node,ctx );
         }
     },
     BSET("BSET",2) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkBitInstructionValid( node,ctx );
         }
     },
     BCLR("BCLR",2) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkBitInstructionValid( node,ctx );
         }
     },
     BTST("BTST",2) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkDestinationAddressingModeKind( node,AddressingModeKind.DATA );
             if ( node.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
@@ -153,7 +154,7 @@ public enum Instruction
     },
     EXT("EXT",1) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingMode( node,AddressingMode.DATA_REGISTER_DIRECT );
             if ( node.hasOperandSize( OperandSize.BYTE ) ) {
@@ -167,7 +168,7 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
         }
@@ -179,7 +180,7 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
         }
@@ -190,7 +191,7 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
         }
@@ -202,7 +203,7 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
         }
@@ -213,7 +214,7 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
         }
@@ -225,7 +226,7 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
         }
@@ -237,7 +238,7 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
         }
@@ -249,7 +250,7 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
         }
@@ -258,7 +259,7 @@ public enum Instruction
     },
     NEG("NEG",1) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.ALTERABLE );
         }
@@ -267,25 +268,25 @@ public enum Instruction
     },
     PEA("PEA",1) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL );
         }
     },
     RTR("RTR",0) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
         }
     },
     RESET("RESET",0)
     {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) {}
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) {}
     },
     UNLK("UNLK",1)
     {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             if ( ! node.source().getValue().isAddressRegister() ) {
                 throw new RuntimeException("Expected an address register as source operand");
@@ -295,7 +296,7 @@ public enum Instruction
     LINK("LINK",2)
     {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             if ( ! node.source().getValue().isAddressRegister() ) {
                 throw new RuntimeException("Expected an address register as source operand");
@@ -309,7 +310,7 @@ public enum Instruction
     RTS("RTS",0)
     {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
 
         }
@@ -317,7 +318,7 @@ public enum Instruction
     JSR("JSR",1)
     {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
         }
@@ -325,7 +326,7 @@ public enum Instruction
     SWAP("SWAP",1)
     {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             if ( ! node.source().getValue().isDataRegister() ) {
                 throw new RuntimeException("SWAP requires a data requires");
@@ -344,7 +345,7 @@ public enum Instruction
     JMP("JMP",1)
             {
                 @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
                 }
@@ -352,14 +353,46 @@ public enum Instruction
     AND("AND",2)
             {
                 @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
+                    if ( insn.source().hasAddressingMode( IMMEDIATE_VALUE ) )
+                    {
+                        int allowedOperandSizeInBits = 32;
+
+                        if (insn.destination().getValue().isRegister(Register.SR))
+                        {
+                            // ANDI #xx,SR
+                            if ( ! insn.useImpliedOperandSize && ! insn.hasOperandSize(OperandSize.WORD ) )
+                            {
+                                throw new RuntimeException("ANDI to SR ony supports word-sized operand");
+                            }
+                            allowedOperandSizeInBits = 16;
+                        }
+                        if (insn.destination().getValue().isRegister(Register.CCR))
+                        {
+                            // ANDI #xx,CCR
+                            if ( ! insn.useImpliedOperandSize && ! insn.hasOperandSize(OperandSize.BYTE ) )
+                            {
+                                throw new RuntimeException("ANDI to CCR only supports byte-sized operand");
+                            }
+                            allowedOperandSizeInBits = 8;
+                        }
+
+                        if ( ! estimateSizeOnly )
+                        {
+                            final int bits = insn.source().getValue().getBits(ctx);
+                            if ( NumberNode.getSizeInBitsUnsigned(bits) > allowedOperandSizeInBits ) {
+                                throw new RuntimeException( this.getMnemonic()+"needs a "+allowedOperandSizeInBits+"-" +
+                                    "bit operand, was: "+Misc.hex(bits));
+                            }
+                        }
+                    }
                 }
             },
     TRAP("TRAP",1, 0b0100)
             {
                 @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     if ( node.hasDestination() ) {
                         throw new RuntimeException("TRAP only supports one operand");
@@ -367,18 +400,26 @@ public enum Instruction
                     if ( ! node.source().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE ) ) {
                         throw new RuntimeException("TRAP requires an immediate mode value as operand but was "+node.source().addressingMode);
                     }
+
+                    if ( ! estimateSizeOnly )
+                    {
+                        final int value = node.source().getValue().getBits(ctx);
+                        if ( value < 0 || value > 15 ) {
+                            throw new RuntimeException("TRAP # out-of-range (0-15), was "+value);
+                        }
+                    }
                 }
             },
     RTE("RTE",0)
             {
                 @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                 }
             },
     ILLEGAL("ILLEGAL",0) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
         }
     },
@@ -386,160 +427,160 @@ public enum Instruction
      * Scc instructions
      */
     ST("ST",1, 0b0000,Condition.BRT,ConditionalInstructionType.SCC) { // always true
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SF("SF",1, 0b0001,Condition.BSR,ConditionalInstructionType.SCC) { // always false
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SHI("SHI",1, 0b0010,Condition.BHI,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SLS("SLS",1, 0b0011,Condition.BLS,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SCC("SCC",1, 0b0100,Condition.BCC,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SCS("SCS",1, 0b0101,Condition.BCS,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SNE("SNE",1, 0b0110,Condition.BNE,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SEQ("SEQ",1, 0b0111,Condition.BEQ,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SVC("SVC",1, 0b1000,Condition.BVC,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SVS("SVS",1, 0b1001,Condition.BVS,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SPL("SPL",1, 0b1010,Condition.BPL,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SMI("SMI",1, 0b1011,Condition.BMI,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SGE("SGE",1, 0b1100,Condition.BGE,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SLT("SLT",1, 0b1101,Condition.BLT,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SGT("SGT",1, 0b1110,Condition.BGT,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SLE("SLE",1, 0b1111,Condition.BLE,ConditionalInstructionType.SCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkSccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     /*
      * DBcc instructions
      */
     DBT("DBT",2, 0b0000,Condition.BRT,ConditionalInstructionType.DBCC) { // aka 'always branch'
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBRA("DBRA",2, 0b0001,Condition.BSR,ConditionalInstructionType.DBCC) { // ignores condition check
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBHI("DBHI",2, 0b0010,Condition.BHI,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBLS("DBLS",2, 0b0011,Condition.BLS,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBCC("DBCC",2, 0b0100,Condition.BCC,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBCS("DBCS",2, 0b0101,Condition.BCS,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBNE("DBNE",2, 0b0110,Condition.BNE,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBEQ("DBEQ",2, 0b0111,Condition.BEQ,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBVC("DBVC",2, 0b1000,Condition.BVC,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBVS("DBVS",2, 0b1001,Condition.BVS,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBPL("DBPL",2, 0b1010,Condition.BPL,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBMI("DBMI",2, 0b1011,Condition.BMI,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBGE("DBGE",2, 0b1100,Condition.BGE,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBLT("DBLT",2, 0b1101,Condition.BLT,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBGT("DBGT",2, 0b1110,Condition.BGT,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBLE("DBLE",2, 0b1111,Condition.BLE,ConditionalInstructionType.DBCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkDBccInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     /*
      * Bcc instructions.
      */
     BRA("BRA",1, 0b0000,Condition.BRT,ConditionalInstructionType.BCC) { // aka 'always branch'
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BSR("BSR",1, 0b0001,Condition.BSR,ConditionalInstructionType.BCC) { // TODO: this is essentially "never branch" .... not very useful as NOP exists as well...
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BHI("BHI",1, 0b0010,Condition.BHI,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BLS("BLS",1, 0b0011,Condition.BLS,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BCC("BCC",1, 0b0100,Condition.BCC,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BCS("BCS",1, 0b0101,Condition.BCS,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BNE("BNE",1, 0b0110,Condition.BNE,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BEQ("BEQ",1, 0b0111,Condition.BEQ,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BVC("BVC",1, 0b1000,Condition.BVC,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BVS("BVS",1, 0b1001,Condition.BVS,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BPL("BPL",1, 0b1010,Condition.BPL,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BMI("BMI",1, 0b1011,Condition.BMI,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BGE("BGE",1, 0b1100,Condition.BGE,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BLT("BLT",1, 0b1101,Condition.BLT,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BGT("BGT",1, 0b1110,Condition.BGT,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BLE("BLE",1, 0b1111,Condition.BLE,ConditionalInstructionType.BCC) {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx) { checkBranchInstructionValid(node,ctx); }
+        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     // Misc
     NOP("nop",0, 0b0100)
             {
                 @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     if ( node.hasChildren() ) {
                         throw new RuntimeException("NOP does not accept operands");
@@ -565,7 +606,7 @@ public enum Instruction
                 }
 
                 @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     final OperandNode source = node.source();
 
@@ -586,7 +627,7 @@ public enum Instruction
             },
     MOVEA("movea", 2, 0b0000) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx)
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             if ( ! node.destination().getValue().isAddressRegister() ) {
                 throw new RuntimeException("MOVEA requires an address register as destination");
@@ -605,7 +646,7 @@ public enum Instruction
     MOVEQ("moveq", 2, 0b0111)
             {
                 @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     final OperandNode source = node.source();
                     if ( ! source.hasAddressingMode(AddressingMode.IMMEDIATE_VALUE) )
@@ -641,14 +682,14 @@ public enum Instruction
                 @Override public boolean supportsExplicitOperandSize() { return true; }
 
                 @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                 }
             },
     LEA("lea", 2, 0b0100)
             {
                 @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx)
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
 
@@ -692,7 +733,7 @@ public enum Instruction
         return operationMode;
     }
 
-    public abstract void checkSupports(InstructionNode node, ICompilationContext ctx);
+    public abstract void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly);
 
     public int getOperationCode(InstructionNode insn)
     {
@@ -823,16 +864,14 @@ public enum Instruction
                                               ICompilationContext context,
                                               boolean estimateSizeOnly)
     {
-        type.checkSupports(insn, context);
+        type.checkSupports(insn, context, estimateSizeOnly);
 
         switch (type)
         {
             case STOP:
                 return STOP_ENCODING;
             case CHK:
-                if ( insn.useImpliedOperandSize ) {
-                    insn.setImplicitOperandSize(OperandSize.WORD);
-                }
+                insn.setImplicitOperandSize(OperandSize.WORD);
                 String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( extraSrcWords != null ) {
                     return CHK_ENCODING.append(extraSrcWords);
@@ -975,37 +1014,24 @@ public enum Instruction
                         throw new RuntimeException("Unsupported addressing mode for JMP: "+insn.source().addressingMode);
                 }
             case AND:
-                if ( insn.source().hasAddressingMode( IMMEDIATE_VALUE ) &&
-                        insn.destination().getValue().isRegister(Register.SR) )
+                if ( insn.source().hasAddressingMode( IMMEDIATE_VALUE ) )
                 {
-                    // ANDI #xx,SR
-                    if ( insn.useImpliedOperandSize )
+                    if ( insn.destination().getValue().isRegister(Register.SR) )
                     {
+                        // ANDI #xx,SR
                         insn.setImplicitOperandSize(OperandSize.WORD);
+                        return ANDI_TO_SR_ENCODING;
                     }
-                    else if (insn.getOperandSize() != OperandSize.WORD)
+                    if ( insn.destination().getValue().isRegister(Register.CCR) )
                     {
-                        throw new RuntimeException("ANDI to SR needs a 16-bit operand");
+                        // ANDI #xx,SR
+                        insn.setImplicitOperandSize(OperandSize.BYTE);
+                        return ANDI_TO_CCR_ENCODING;
                     }
-                    if ( ! estimateSizeOnly )
-                    {
-                        final int bits = insn.source().getValue().getBits(context);
-                        if ( NumberNode.getSizeInBitsUnsigned(bits) > 16 ) {
-                            throw new RuntimeException("ANDI to SR needs a 16-bit operand, was: "+Misc.hex(bits));
-                        }
-                    }
-                    return ANDI_TO_SR_ENCODING;
                 }
                 // TODO: Implement the other variants of AND ...
                 throw new RuntimeException("Sorry, AND operation not fully implemented");
             case TRAP:
-                if ( ! estimateSizeOnly )
-                {
-                    final int value = insn.source().getValue().getBits(context);
-                    if ( value < 0 || value > 15 ) {
-                        throw new RuntimeException("TRAP # out-of-range (0-15), was "+value);
-                    }
-                }
                 return TRAP_ENCODING;
             case RTE:
                 return RTE_ENCODING;
@@ -1028,11 +1054,6 @@ public enum Instruction
             case SLT:
             case SGT:
             case SLE:
-                if ( insn.useImpliedOperandSize ) {
-                    insn.setImplicitOperandSize(OperandSize.BYTE);
-                } else if ( ! insn.hasOperandSize(OperandSize.BYTE) ) {
-                    throw new RuntimeException("Invalid operand size: "+ insn.getOperandSize());
-                }
                 extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( extraSrcWords != null ) {
                     return SCC_ENCODING.append(extraSrcWords);
@@ -1134,14 +1155,12 @@ public enum Instruction
                     case 0b00:
                         break;
                     case 0b01:
-                        if (!insn.destination().getValue().isAddressRegister())
+                        if ( ! insn.destination().getValue().isAddressRegister() )
                         {
                             throw new RuntimeException("MOVE USP,Ax requires  an address register as destination");
                         }
-                        if ( insn.useImpliedOperandSize ) {
-                            insn.setImplicitOperandSize( OperandSize.LONG );
-                        }
-                        if (insn.getOperandSize() != OperandSize.LONG ) {
+                        if ( ! insn.setImplicitOperandSize( OperandSize.LONG ) &&  !insn.hasOperandSize(OperandSize.LONG) )
+                        {
                             throw new RuntimeException("MOVE USP,Ax only works on long-sized operands");
                         }
                         return MOVE_USP_TO_AX_ENCODING;
@@ -1150,10 +1169,8 @@ public enum Instruction
                         {
                             throw new RuntimeException("MOVE Ax,USP requires an address register as source");
                         }
-                        if ( insn.useImpliedOperandSize ) {
-                            insn.setImplicitOperandSize( OperandSize.LONG );
-                        }
-                        if (insn.getOperandSize() != OperandSize.LONG ) {
+                        if ( ! insn.setImplicitOperandSize( OperandSize.LONG ) && ! insn.hasOperandSize(OperandSize.LONG) )
+                        {
                             throw new RuntimeException("MOVE Ax,USP only works on long-sized operands");
                         }
                         return MOVE_AX_TO_USP_ENCODING;
@@ -1161,9 +1178,7 @@ public enum Instruction
                         throw new RuntimeException("MOVE USP,USP does not exist");
                 }
 
-                if ( insn.useImpliedOperandSize ) {
-                    insn.setImplicitOperandSize( OperandSize.WORD );
-                }
+                insn.setImplicitOperandSize( OperandSize.WORD );
 
                 // regular move instruction
                 extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
@@ -1349,6 +1364,11 @@ D/A   |     |   |           |
     private static void checkSccInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
         checkSourceAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+
+        if ( ! node.setImplicitOperandSize(OperandSize.BYTE) && ! node.hasOperandSize(OperandSize.BYTE) )
+        {
+            throw new RuntimeException("Invalid operand size: "+ node.getOperandSize());
+        }
     }
 
     private static void checkDBccInstructionValid(InstructionNode node,ICompilationContext ctx)
@@ -1620,6 +1640,9 @@ D/A   |     |   |           |
     public static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
     public static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
 
+    public static final InstructionEncoding ANDI_TO_CCR_ENCODING =
+        InstructionEncoding.of("0000001000111100","00000000vvvvvvvv");
+
     public static final InstructionEncoding ANDI_TO_SR_ENCODING =
             InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
@@ -1777,7 +1800,9 @@ D/A   |     |   |           |
 
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
-        put(ANDI_TO_SR_ENCODING,AND);
+        put(ANDI_TO_SR_ENCODING, AND);
+        put(ANDI_TO_CCR_ENCODING, AND);
+
         put(JMP_INDIRECT_ENCODING,JMP);
         put(JMP_SHORT_ENCODING,JMP);
         put(JMP_LONG_ENCODING,JMP);

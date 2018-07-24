@@ -6,7 +6,7 @@
 [ ] ADDX
 [ ] AND
 [ ] ANDI
-[ ] ANDI to CCR
+[X] ANDI to CCR
 [X] ANDI to SR
 [X] ASL
 [X] ASR

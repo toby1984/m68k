@@ -211,6 +211,30 @@ public class ParserTest extends TestCase
         assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
     }
 
+    public void testParseANDI_SR() {
+        final AST ast = parseAST("and #$1234,sr");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.AND, insn.getInstructionType() );
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
+        assertEquals( AddressingMode.IMPLIED, insn.destination().addressingMode );
+        assertEquals( Register.SR, insn.destination().getValue().asRegister().register );
+    }
+
+    public void testParseANDI_CCR() {
+        final AST ast = parseAST("and #$12,ccr");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.AND, insn.getInstructionType() );
+        assertEquals( AddressingMode.IMMEDIATE_VALUE, insn.source().addressingMode );
+        assertEquals( Integer.valueOf(0x12), insn.source().getValue().getBits(null) );
+        assertEquals( AddressingMode.IMPLIED, insn.destination().addressingMode );
+        assertEquals( Register.CCR, insn.destination().getValue().asRegister().register );
+    }
+
     public void testParseCHK()
     {
         final AST ast = parseAST("chk #$1234,d3");

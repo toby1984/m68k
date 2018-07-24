@@ -1,11 +1,8 @@
 package de.codersourcery.m68k.parser.ast;
 
 import de.codersourcery.m68k.assembler.ICompilationContext;
-import de.codersourcery.m68k.assembler.arch.Field;
-import de.codersourcery.m68k.assembler.arch.Operand;
 import de.codersourcery.m68k.assembler.arch.OperandSize;
 import de.codersourcery.m68k.assembler.arch.Instruction;
-import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.parser.TextRegion;
 
 public class InstructionNode extends ASTNode implements ICodeGeneratingNode
@@ -36,7 +33,14 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         return children().size();
     }
 
-    public void setImplicitOperandSize(OperandSize size)
+    /**
+     * Sets implicit operand size if the user didn't explicitly specify one.
+     *
+     * @param size
+     * @return <code>true</code> if the user did <b>NOT</b> specify an operand size
+     * and the operand size passed to this function was accepted,otherwise <code>false</code>.
+     */
+    public boolean setImplicitOperandSize(OperandSize size)
     {
         if ( size == null ) {
             throw new IllegalArgumentException("Operand size must not be NULL");
@@ -45,7 +49,9 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
         if ( useImpliedOperandSize )
         {
             this.operandSize = size;
+            return true;
         }
+        return false;
     }
 
     public OperandNode source() {
