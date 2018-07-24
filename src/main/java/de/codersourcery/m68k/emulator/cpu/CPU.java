@@ -17,10 +17,36 @@ public class CPU
 {
     private final CPUType cpuType;
 
-    private enum BinaryLogicalOp {
-        AND,
-        OR,
-        EOR
+    private enum BinaryLogicalOp
+    {
+        AND {
+            @Override
+            public int apply(int value, int mask)
+            {
+                return value & mask;
+            }
+        },
+        OR {
+            @Override
+            public int apply(int value, int mask)
+            {
+                return value | mask;
+            }
+        },
+        EOR {
+            @Override
+            public int apply(int value, int mask)
+            {
+                return value ^ mask;
+            }
+        };
+
+        public abstract int apply(int value,int mask);
+    }
+
+    private enum BinaryLogicalOpMode
+    {
+        REGULAR,IMMEDIATE,SR,CCR;
     }
 
     private enum BitOp {
@@ -672,17 +698,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0000001000111100: // ANDI to CCR
-                decodeSourceOperand(instruction, 2,false);
-                setStatusRegister( statusRegister & (value & 0b11111) );
-                cycles = 20;
+                binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.CCR);
                 return;
             case 0b0000001001111100: // ANDI to SR
-                if ( assertSupervisorMode() )
-                {
-                    decodeSourceOperand(instruction, 2,false);
-                    setStatusRegister( statusRegister & value );
-                    cycles = 20;
-                }
+                binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.SR);
                 return;
             /* ================================
              * Miscellaneous instructions
@@ -742,48 +761,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b0000_0000_0000_0000:
                 if ( ( instruction & 0b1111111100000000) == 0b0000001000000000 ) {
                     // ANDI #xx,<ea>
-                    final int sizeBits = (instruction >>> 6) & 0b11;
-                    final int operandSize = 1<<sizeBits;
-                    final int mask;
-                    switch( operandSize)
-                    {
-                        case 1:
-                            mask = 0xffffff00 | (memLoadWord(pc) & 0xff);
-                            pc += 2;
-                            break;
-                        case 2:
-                            mask = 0xffff0000 | (memLoadWord(pc) & 0xffff);
-                            pc += 2;
-                            break;
-                        case 4:
-                            mask = memLoadLong(pc);
-                            pc += 4;
-                            break;
-                        default:
-                            throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
-                    }
-                    if ( decodeSourceOperand(instruction,operandSize,false,false) ) {
-                        // register operand
-                        switch(operandSize) {
-                            case 1:
-                            case 2:
-                                cycles += 8;
-                            default:
-                                cycles += 16;
-                        }
-                    } else {
-                        // memory operand
-                        switch(operandSize) {
-                            case 1:
-                            case 2:
-                                cycles += 12;
-                            default:
-                                cycles += 20;
-                        }
-                    }
-                    value &= mask;
-                    storeValue((instruction>>>3) & 0b111,instruction&0b111,operandSize);
-                    updateFlagsAfterMove(operandSize);
+                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.IMMEDIATE);
                     return;
                 }
                 if ( (instruction & 0b1111000111000000) == 0b0000000101000000) {
@@ -1516,6 +1494,90 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 4: return toMerge;
         }
         throw new RuntimeException("Unreachable code reached");
+    }
+
+    private void binaryLogicalOpImmediate(int instruction, BinaryLogicalOp operation,BinaryLogicalOpMode mode)
+    {
+        if ( mode == BinaryLogicalOpMode.SR ) {
+            // ANDI #xx,SR
+            // ORI #xx,SR
+            // EORI #xx,SR
+            if ( assertSupervisorMode() )
+            {
+                decodeSourceOperand(instruction, 2,false);
+                setStatusRegister( operation.apply( statusRegister , value & 0xffff ) );
+                cycles = 20;
+            }
+            return;
+        }
+
+        if ( mode == BinaryLogicalOpMode.CCR ) {
+            // ANDI #xx,CCR
+            // ORI #xx,CCR
+            // EORI #xx,CCR
+            decodeSourceOperand(instruction, 2,false);
+            setStatusRegister( operation.apply( statusRegister , value & 0b11111 ) );
+            cycles = 20;
+            return;
+        }
+
+        if ( mode == BinaryLogicalOpMode.IMMEDIATE )
+        {
+            // ANDI #xx,<ea>
+            // ORI #xx,<ea>
+            // EORI #xx,<ea>
+            final int sizeBits = (instruction >>> 6) & 0b11;
+            final int operandSize = 1 << sizeBits;
+            final int mask;
+            switch (operandSize)
+            {
+                case 1:
+                    mask = 0xffffff00 | (memLoadWord(pc) & 0xff);
+                    pc += 2;
+                    break;
+                case 2:
+                    mask = 0xffff0000 | (memLoadWord(pc) & 0xffff);
+                    pc += 2;
+                    break;
+                case 4:
+                    mask = memLoadLong(pc);
+                    pc += 4;
+                    break;
+                default:
+                    throw new IllegalInstructionException(pcAtStartOfLastInstruction, instruction);
+            }
+            if (decodeSourceOperand(instruction, operandSize, false, false))
+            {
+                // register operand
+                switch (operandSize)
+                {
+                    case 1:
+                    case 2:
+                        cycles += 8;
+                        break;
+                    default:
+                        cycles += 16;
+                }
+            }
+            else
+            {
+                // memory operand
+                switch (operandSize)
+                {
+                    case 1:
+                    case 2:
+                        cycles += 12;
+                        break;
+                    default:
+                        cycles += 20;
+                }
+            }
+            value = operation.apply(value, mask);
+            storeValue((instruction >>> 3) & 0b111, instruction & 0b111, operandSize);
+            updateFlagsAfterMove(operandSize);
+            return;
+        }
+        throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
     }
 
     private int rotate(int value,int operandSizeInBytes,
