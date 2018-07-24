@@ -1289,6 +1289,23 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b1100_0000_0000_0000:
+
+                /*
+    public static final InstructionEncoding AND_SRC_EA_ENCODING =
+        InstructionEncoding.of("1100DDD0SSmmmsss"); // src eaMode/eaRegister contained in lower 6 bits
+
+    public static final InstructionEncoding AND_DST_EA_ENCODING =
+        InstructionEncoding.of("1100sss1SSMMMDDD"); // dst eaMode/eaRegister contained in lower 6 bits
+        InstructionEncoding.of("1100000100000000"); // dst eaMode/eaRegister contained in lower 6 bits
+                 */
+                if ( (instruction & 0b11110001_00000000) == 0b1100000000000000) {
+                    // TODO: Tricky as EXG and AND use almost the same bit pattern,
+                    // TODO: way to tell them apart is by looking at bits 7-3 where EXG allows only
+                    // TODO: 01000: // swap Data registers
+                    // TODO: 01001: // swap Address registers
+                    // TODO: 10001: // swap Data register and address register
+                }
+
                 if ( (instruction & 0b11110001_00000000) == 0b11000001_00000000 ) // EXG
                 {
                     // hint: variable names are a bit misleading, only apply if EXG between different register types

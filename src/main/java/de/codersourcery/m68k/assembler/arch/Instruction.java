@@ -10,6 +10,7 @@ import de.codersourcery.m68k.parser.ast.RegisterNode;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.xml.crypto.Data;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -18,6 +19,7 @@ import java.util.function.Function;
 
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.ABSOLUTE_SHORT_ADDRESSING;
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.ADDRESS_REGISTER_DIRECT;
+import static de.codersourcery.m68k.assembler.arch.AddressingMode.DATA_REGISTER_DIRECT;
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALUE;
 
 /**
@@ -564,22 +566,6 @@ public enum Instruction
             },
     EXG("exg",2, 0b1100)
             {
-                @Override
-                public int getOperationCode(InstructionNode insn)
-                {
-                /*
-01000—Data registers
-01001—Address registers
-10001—Data register and address register
-                 */
-                    boolean isData1 = insn.source().getValue().isDataRegister();
-                    boolean isData2 = insn.destination().getValue().asRegister().isDataRegister();
-                    if ( isData1 != isData2 ) {
-                        return 0b10001;
-                    }
-                    return isData1 ? 0b01000 : 0b01001;
-                }
-
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
@@ -1132,7 +1118,12 @@ public enum Instruction
             case NOP:
                 return NOP_ENCODING;
             case EXG:
-                return EXG_ENCODING;
+                final boolean isData1 = insn.source().getValue().isDataRegister();
+                final boolean isData2 = insn.destination().getValue().asRegister().isDataRegister();
+                if ( isData1 != isData2 ) {
+                    return EXG_DATA_ADR_ENCODING;
+                }
+                return isData1 ? EXG_DATA_DATA_ENCODING : EXG_ADR_ADR_ENCODING;
             case MOVEQ:
                 return MOVEQ_ENCODING;
             case LEA:
@@ -1218,7 +1209,7 @@ public enum Instruction
     }
 
     // returns any InstructionEncoding patterns
-    // needed to accomodate all operand values
+    // needed to accommodate all operand values
     private static String[] getExtraWordPatterns(OperandNode op, Operand operandKind,
                                                  InstructionNode insn,ICompilationContext ctx)
     {
@@ -1474,10 +1465,10 @@ D/A   |     |   |           |
         // no immediate mode src operand
         final boolean srcIsDataReg =
             insn.source().getValue().isDataRegister() &&
-                insn.source().hasAddressingMode(ADDRESS_REGISTER_DIRECT);
+                insn.source().hasAddressingMode(DATA_REGISTER_DIRECT);
         final boolean dstIsDataReg =
             insn.destination().getValue().isDataRegister() &&
-                insn.destination().hasAddressingMode(ADDRESS_REGISTER_DIRECT);
+                insn.destination().hasAddressingMode(DATA_REGISTER_DIRECT);
 
         if ( ! (srcIsDataReg | dstIsDataReg ) ) {
             throw new RuntimeException(insn.instruction+" needs a data register as either source or destination operand");
@@ -1539,7 +1530,7 @@ D/A   |     |   |           |
             case DST_8_BIT_DISPLACEMENT:
                 return insn.destination().getBaseDisplacement().getBits(ctx);
             case OP_CODE:
-                return insn.getInstructionType().getOperationCode(insn );
+                return insn.getInstructionType().getOperationCode(insn);
             case SRC_VALUE:
                 return insn.source().getValue().getBits(ctx);
             case SRC_BASE_REGISTER:
@@ -1727,10 +1718,10 @@ D/A   |     |   |           |
     public static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
 
     public static final InstructionEncoding AND_SRC_EA_ENCODING =
-        InstructionEncoding.of("1100DDD0SSmmmsss");
+        InstructionEncoding.of("1100DDD0SSmmmsss"); // src eaMode/eaRegister contained in lower 6 bits
 
     public static final InstructionEncoding AND_DST_EA_ENCODING =
-        InstructionEncoding.of("1100sss1SSDDDMMM");
+        InstructionEncoding.of("1100sss1SSMMMDDD"); // dst eaMode/eaRegister contained in lower 6 bits
 
     public static final InstructionEncoding ANDI_TO_CCR_ENCODING =
         InstructionEncoding.of("0000001000111100","00000000vvvvvvvv");
@@ -1768,7 +1759,9 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding ILLEGAL_ENCODING = InstructionEncoding.of( "0100101011111100");
 
-    public static final InstructionEncoding EXG_ENCODING = InstructionEncoding.of("1100kkk1ooooolll");
+    public static final InstructionEncoding EXG_DATA_DATA_ENCODING = InstructionEncoding.of("1100kkk101000lll");
+    public static final InstructionEncoding EXG_ADR_ADR_ENCODING   = InstructionEncoding.of("1100kkk101001lll");
+    public static final InstructionEncoding EXG_DATA_ADR_ENCODING  = InstructionEncoding.of("1100kkk110001lll");
 
     public static final InstructionEncoding NOP_ENCODING = InstructionEncoding.of("0100111001110001");
 
@@ -1899,31 +1892,36 @@ D/A   |     |   |           |
 
     public static final IdentityHashMap<InstructionEncoding,Instruction> ALL_ENCODINGS = new IdentityHashMap<>()
     {{
-        put(ANDI_TO_SR_ENCODING, AND);
-        put(ANDI_TO_CCR_ENCODING, AND);
-
         put(JMP_INDIRECT_ENCODING,JMP);
         put(JMP_SHORT_ENCODING,JMP);
         put(JMP_LONG_ENCODING,JMP);
         put(TRAP_ENCODING,TRAP);
         put(RTE_ENCODING,RTE);
+
         put(MOVE_BYTE_ENCODING,MOVE);
         put(MOVE_WORD_ENCODING,MOVE);
         put(MOVE_LONG_ENCODING,MOVE);
         put(MOVEQ_ENCODING,MOVEQ);
-        put(LEA_LONG_ENCODING,LEA);
-        put(LEA_WORD_ENCODING,LEA);
         put(MOVE_AX_TO_USP_ENCODING,MOVE);
         put(MOVE_USP_TO_AX_ENCODING,MOVE);
+        put(MOVEA_LONG_ENCODING,MOVEA);
+        put(MOVEA_WORD_ENCODING,MOVEA);
+
+        put(LEA_LONG_ENCODING,LEA);
+        put(LEA_WORD_ENCODING,LEA);
+
         put(ILLEGAL_ENCODING,ILLEGAL);
-        put(EXG_ENCODING,EXG);
+
+        put(EXG_DATA_DATA_ENCODING,EXG);
+        put(EXG_DATA_ADR_ENCODING,EXG);
+        put(EXG_ADR_ADR_ENCODING,EXG);
+
         put(NOP_ENCODING,NOP);
         put(DBCC_ENCODING,DBCC);
         put(BCC_8BIT_ENCODING,BCC);
         put(BCC_16BIT_ENCODING,BCC);
         put(BCC_32BIT_ENCODING,BCC);
-        put(MOVEA_LONG_ENCODING,MOVEA);
-        put(MOVEA_WORD_ENCODING,MOVEA);
+
         put(JSR_ENCODING,JSR);
         put(RTS_ENCODING,RTS);
         put(LINK_ENCODING,LINK);
@@ -1978,8 +1976,13 @@ D/A   |     |   |           |
         put(SCC_ENCODING,SCC);
         put(STOP_ENCODING,STOP);
         put(TAS_ENCODING,TAS);
+
+        put(ANDI_TO_SR_ENCODING, AND);
+        put(ANDI_TO_CCR_ENCODING, AND);
         put(ANDI_BYTE_ENCODING,AND);
         put(ANDI_WORD_ENCODING,AND);
         put(ANDI_LONG_ENCODING,AND);
+        put(AND_SRC_EA_ENCODING,AND);
+        put(AND_DST_EA_ENCODING,AND);
     }};
 }

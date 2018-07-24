@@ -38,6 +38,18 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("tst.l $12(a5)"),0x4a,0xad,0x00,0x12);
     }
 
+    public void testAND() {
+        assertArrayEquals(compile("and.b d3,$1200"),0xc7,0x38,0x12,0x00);
+        assertArrayEquals(compile("and.b $1200,d3"),0xc6,0x38,0x12,0x00);
+        assertArrayEquals(compile("and.b d2,d3   "),0xc6,0x02);
+        assertArrayEquals(compile("and.w d3,$1200"),0xc7,0x78,0x12,0x00);
+        assertArrayEquals(compile("and.w $1200,d3"),0xc6,0x78,0x12,0x00);
+        assertArrayEquals(compile("and.w d2,d3   "),0xc6,0x42);
+        assertArrayEquals(compile("and.l d3,$1200"),0xc7,0xb8,0x12,0x00);
+        assertArrayEquals(compile("and.l $1200,d3"),0xc6,0xb8,0x12,0x00);
+        assertArrayEquals(compile("and.l d2,d3   "),0xc6,0x82);
+    }
+
     public void testSCC() {
         assertArrayEquals(compile("st  $2000"),0x50,0xf8,0x20,0x00);
         assertArrayEquals(compile("sf  $2000"),0x51,0xf8,0x20,0x00);

@@ -65,6 +65,8 @@ public class Disassembler
         while ( pc < endAddress )
         {
             pcAtStartOfInstruction = pc;
+            System.out.println("Disassembling at "+Misc.hex(pc) );
+
             final int insnWord = readWord();
 
             // TODO: Performance...maybe using a prefix tree
@@ -74,9 +76,9 @@ public class Disassembler
             {
                 var encoding = entry.getKey();
                 boolean matches = matches( insnWord, encoding );
-                System.out.println( entry.getValue()+" => "+matches+" (mask: "+Misc.hex(encoding.getInstructionWordAndMask() )+", expected: "+encoding.getInstructionWordMask() );
                 if ( matches )
                 {
+                    System.out.println( entry.getValue()+" matches (mask: "+Misc.hex(encoding.getInstructionWordAndMask() )+" with len "+getMaskLength(encoding)+" , expected: "+encoding.getInstructionWordMask() );
                     candidates.put(encoding, entry.getValue());
                 }
             }
@@ -97,7 +99,7 @@ public class Disassembler
                 final Set<Instruction> instructions = new HashSet<>();
                 final List<InstructionEncoding> clashes = new ArrayList<>();
                 for ( var entry : sortedByMaskLength ) {
-                    if ( getMaskLength(entry ) == getMaskLength(mostSpecific ) ) {
+                    if ( getMaskLength(entry ) == getMaskLength(mostSpecific) ) {
                         instructions.add( candidates.get( entry ) );
                         clashes.add( entry );
                     }
@@ -127,7 +129,8 @@ public class Disassembler
 
         int len = 0;
         final String word0 = encoding.getPatterns()[0];
-        for ( int i = 0 ; i < word0.length();i++) {
+        final int wlen = word0.length();
+        for ( int i = 0 ; i < wlen ; i++) {
             final char c = word0.charAt(i);
             if ( c == '0' || c == '1' ) {
                 len++;
@@ -142,12 +145,12 @@ public class Disassembler
      */
     private void appendOperandSize(int sizeBits)
     {
-        int operandSize = 1<<sizeBits;
-        switch(operandSize){
-            case 1: append(".b "); break;
-            case 2: append(".w "); break;
-            case 4: append(".l "); break;
+        switch(sizeBits){
+            case 0: append(".b "); break;
+            case 1: append(".w "); break;
+            case 2: append(".l "); break;
             default:
+                // TODO: Print this as invalid instruction instead...
                 throw new RuntimeException("Unreachable code reached, size bits: "+sizeBits);
         }
     }
@@ -285,6 +288,7 @@ public class Disassembler
                     append(".l ").appendDataRegister( insnWord & 0b111 );
                     return;
                 }
+                // TODO: Print as illegal instruction instead of throwing RE
                 throw new RuntimeException("Unreachable code reached");
             case ROXL:
                 appendln("roxl");
@@ -517,7 +521,30 @@ public class Disassembler
                     decodeOperand(1,(insnWord&0b111)>>>3,insnWord&0b111);
                     return;
                 }
-                // TODO: Implement other AND variants as well
+                if ( encoding == Instruction.AND_SRC_EA_ENCODING || encoding == Instruction.AND_DST_EA_ENCODING ) {
+
+                    appendln("and");
+
+                    sizeBits = (insnWord & 0b11000000) >>> 6;
+                    appendOperandSize(sizeBits);
+
+                    if ( encoding == Instruction.AND_SRC_EA_ENCODING)
+                    {
+                        decodeOperand(1<<sizeBits, (insnWord & 0b111000) >>> 3, insnWord & 0b111);
+                    } else {
+                        regNum = (insnWord & 0b111000000000) >>> 9;
+                        appendDataRegister(regNum);
+                    }
+                    append(",");
+                    if ( encoding == Instruction.AND_SRC_EA_ENCODING)
+                    {
+                        regNum = (insnWord & 0b111000000000) >>> 9;
+                        appendDataRegister(regNum);
+                    } else {
+                        decodeOperand(1<<sizeBits, (insnWord & 0b111000) >>> 3, insnWord & 0b111);
+                    }
+                    return;
+                }
                 break;
             case TRAP:
                 final int no = insnWord & 0b1111;
@@ -737,7 +764,7 @@ public class Disassembler
         return this;
     }
 
-    private void decodeOperand(int operandSize,int eaMode, int eaRegister)
+    private void decodeOperand(int operandSizeInBytes,int eaMode, int eaRegister)
     {
         switch( eaMode )
         {
@@ -773,11 +800,11 @@ public class Disassembler
                 }
                 // $$FALL-THROUGH$$
             default:
-                decodeOperand2(operandSize, eaMode, eaRegister);
+                decodeOperand2(operandSizeInBytes, eaMode, eaRegister);
         }
     }
 
-    private void decodeOperand2(int operandSize, int eaMode, int eaRegister)
+    private void decodeOperand2(int operandSizeInBytes, int eaMode, int eaRegister)
     {
         switch( eaMode )
         {
@@ -1009,7 +1036,7 @@ public class Disassembler
                          * IMMEDIATE_VALUE(0b111,fixedValue(100), 6),   // move #XXXX
                          */
                         append("#");
-                        switch(operandSize) {
+                        switch(operandSizeInBytes) {
                             case 1: // instruction words always need to be word aligned,
                                 // byte values are still stored as words
                             case 2:
@@ -1018,7 +1045,7 @@ public class Disassembler
                                 break;
                             case 4:
                                 append(Misc.hex( memory.readLong( pc ) ) );
-                                pc += operandSize;
+                                pc += operandSizeInBytes;
                                 break;
                             default:
                                 throw new RuntimeException( "Unreachable code reached" );
