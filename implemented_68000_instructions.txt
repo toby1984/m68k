@@ -77,7 +77,7 @@
 [ ] SUBQ
 [ ] SUBX
 [X] SWAP
-[ ] TAS
+[X] TAS
 [X] TRAP
 [X] TRAPV
 [X] TST

@@ -278,14 +278,14 @@ public class CPUTest extends TestCase
     {
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$80000000,d3",
                  "roxr.l #1,d3")
-                .expectD3(  0x40000000 ).notZero().noCarry().notNegative().noOverflow().extended();
+                .expectD3(  0x40000000 ).notZero().noCarry().notNegative().noOverflow().noExtended();
 
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$00000001,d3",
                  "roxr.l #1,d3")
                 .expectD3(  0x80000000 ).notZero().negative().carry().noOverflow().extended();
         execute( cpu -> cpu.setFlags( CPU.FLAG_EXTENDED ), "move.l #$00000000,d3",
                  "roxr.l #1,d3")
-                .expectD3(  0x00000000 ).zero().notNegative().noCarry().noOverflow().extended();
+                .expectD3(  0x00000000 ).zero().notNegative().noCarry().noOverflow().noExtended();
     }
 
     public void testRolByte()
@@ -1301,21 +1301,21 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 "move.b #0,"+adr,
                 "tas "+adr)
                 .extended()
-                .expectMemoryByte( adr,128 )
+                .expectMemoryByte( adr,0xffffff80 )
                 .zero().notNegative().notSupervisor();
 
         execute(cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),
                 "move.b #128,"+adr,
                 "tas "+adr)
                 .extended()
-                .expectMemoryByte( adr,128 )
+                .expectMemoryByte( adr,0xffffff80 )
                 .notZero().negative().notSupervisor();
 
         execute(cpu -> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),
                 "move.b #1,"+adr,
                 "tas "+adr)
                 .extended()
-                .expectMemoryByte( adr,129 )
+                .expectMemoryByte( adr,0xffffff81 )
                 .notZero().notNegative().notSupervisor();
     }
 

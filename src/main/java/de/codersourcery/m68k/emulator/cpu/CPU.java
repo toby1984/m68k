@@ -834,11 +834,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     } else {
                         cycles += 10; // memory operation
                     }
-                    pc -= 2; // re
                     int setMask = 0;
                     if ( (value & 1<<7) != 0 ) {
                         setMask |= FLAG_NEGATIVE;
-                    } else if ( (value & 0xff) != 0 ) {
+                    } else if ( (value & 0xff) == 0 ) {
                         setMask |= FLAG_ZERO;
                     }
                     statusRegister = (statusRegister & ~(FLAG_ZERO|FLAG_NEGATIVE|FLAG_CARRY|FLAG_OVERFLOW))
