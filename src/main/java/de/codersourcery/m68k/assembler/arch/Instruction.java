@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.ABSOLUTE_SHORT_ADDRESSING;
+import static de.codersourcery.m68k.assembler.arch.AddressingMode.ADDRESS_REGISTER_DIRECT;
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALUE;
 
 /**
@@ -26,7 +27,6 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
-
     CHK("CHK",2) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -361,57 +361,7 @@ public enum Instruction
                 @Override
                 public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
-                    if ( insn.source().hasAddressingMode( IMMEDIATE_VALUE ) )
-                    {
-                        int allowedOperandSizeInBits = 16;
-
-                        if (insn.destination().getValue().isRegister(Register.SR))
-                        {
-                            // ANDI #xx,SR
-                            if ( ! insn.useImpliedOperandSize && ! insn.hasOperandSize(OperandSize.WORD ) )
-                            {
-                                throw new RuntimeException("ANDI to SR ony supports word-sized operand");
-                            }
-                            allowedOperandSizeInBits = 16;
-                        }
-                        else if (insn.destination().getValue().isRegister(Register.CCR))
-                        {
-                            // ANDI #xx,CCR
-                            if ( ! insn.useImpliedOperandSize && ! insn.hasOperandSize(OperandSize.BYTE ) )
-                            {
-                                throw new RuntimeException("ANDI to CCR only supports byte-sized operand");
-                            }
-                            allowedOperandSizeInBits = 8;
-                        }
-                        else
-                        {
-                            if ( insn.hasExplicitOperandSize() ) {
-                                switch(insn.getOperandSize()) {
-
-                                    case BYTE:
-                                        allowedOperandSizeInBits = 8;
-                                        break;
-                                    case WORD:
-                                        allowedOperandSizeInBits = 16;
-                                        break;
-                                    case LONG:
-                                        allowedOperandSizeInBits = 32;
-                                        break;
-                                    default:
-                                        throw new RuntimeException("Unreachable code reached");
-                                }
-                            }
-                        }
-
-                        if ( ! estimateSizeOnly )
-                        {
-                            final int bits = insn.source().getValue().getBits(ctx);
-                            if ( NumberNode.getSizeInBitsUnsigned(bits) > allowedOperandSizeInBits ) {
-                                throw new RuntimeException( this.getMnemonic()+"needs a "+allowedOperandSizeInBits+"-" +
-                                    "bit operand, was: "+Misc.hex(bits));
-                            }
-                        }
-                    }
+                    checkBinaryLogicalOperation(insn,estimateSizeOnly,ctx);
                 }
             },
     TRAP("TRAP",1, 0b0100)
@@ -1068,8 +1018,14 @@ public enum Instruction
                     }
                     return ANDI_LONG_ENCODING;
                 }
-                // TODO: Implement the other variants of AND ...
-                throw new RuntimeException("Sorry, AND operation not fully implemented");
+                // AND Dn,<ea>
+                // AND <ea>,Dn
+                if ( ! insn.destination().hasAddressingMode(AddressingMode.DATA_REGISTER_DIRECT) ) {
+                    final String[] patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
+                    return patterns == null ? AND_DST_EA_ENCODING : AND_DST_EA_ENCODING.append(patterns);
+                }
+                final String[] patterns = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn, context);
+                return patterns == null ? AND_SRC_EA_ENCODING : AND_SRC_EA_ENCODING.append(patterns);
             case TRAP:
                 return TRAP_ENCODING;
             case RTE:
@@ -1263,7 +1219,8 @@ public enum Instruction
 
     // returns any InstructionEncoding patterns
     // needed to accomodate all operand values
-    private static String[] getExtraWordPatterns(OperandNode op, Operand operandKind,InstructionNode insn,ICompilationContext ctx)
+    private static String[] getExtraWordPatterns(OperandNode op, Operand operandKind,
+                                                 InstructionNode insn,ICompilationContext ctx)
     {
         if ( op.addressingMode.maxExtensionWords == 0 ) {
             return null;
@@ -1457,6 +1414,76 @@ D/A   |     |   |           |
         throw new RuntimeException("Operands have unsupported addressing modes for " + node.instruction);
     }
 
+    private static void checkBinaryLogicalOperation(InstructionNode insn,boolean estimateSizeOnly, ICompilationContext ctx)
+    {
+        checkDestinationIsNotAddressRegisterDirect(insn,ctx);
+        checkSourceIsNotAddressRegisterDirect(insn,ctx);
+
+        if ( insn.source().hasAddressingMode( IMMEDIATE_VALUE ) )
+        {
+            int allowedOperandSizeInBits = 16;
+
+            if (insn.destination().getValue().isRegister(Register.SR))
+            {
+                // ANDI #xx,SR
+                if ( ! insn.useImpliedOperandSize && ! insn.hasOperandSize(OperandSize.WORD ) )
+                {
+                    throw new RuntimeException( insn.instruction+" only supports word-sized operand");
+                }
+                allowedOperandSizeInBits = 16;
+            }
+            else if (insn.destination().getValue().isRegister(Register.CCR))
+            {
+                // ANDI #xx,CCR
+                if ( ! insn.useImpliedOperandSize && ! insn.hasOperandSize(OperandSize.BYTE ) )
+                {
+                    throw new RuntimeException( insn.instruction+" only supports byte-sized operand");
+                }
+                allowedOperandSizeInBits = 8;
+            }
+            else
+            {
+                if ( insn.hasExplicitOperandSize() ) {
+                    switch(insn.getOperandSize()) {
+
+                        case BYTE:
+                            allowedOperandSizeInBits = 8;
+                            break;
+                        case WORD:
+                            allowedOperandSizeInBits = 16;
+                            break;
+                        case LONG:
+                            allowedOperandSizeInBits = 32;
+                            break;
+                        default:
+                            throw new RuntimeException("Unreachable code reached");
+                    }
+                }
+            }
+
+            if ( ! estimateSizeOnly )
+            {
+                final int bits = insn.source().getValue().getBits(ctx);
+                if ( NumberNode.getSizeInBitsUnsigned(bits) > allowedOperandSizeInBits ) {
+                    throw new RuntimeException( insn.instruction+" needs a "+allowedOperandSizeInBits+"-" +
+                        "bit operand, was: "+Misc.hex(bits));
+                }
+            }
+            return;
+        }
+        // no immediate mode src operand
+        final boolean srcIsDataReg =
+            insn.source().getValue().isDataRegister() &&
+                insn.source().hasAddressingMode(ADDRESS_REGISTER_DIRECT);
+        final boolean dstIsDataReg =
+            insn.destination().getValue().isDataRegister() &&
+                insn.destination().hasAddressingMode(ADDRESS_REGISTER_DIRECT);
+
+        if ( ! (srcIsDataReg | dstIsDataReg ) ) {
+            throw new RuntimeException(insn.instruction+" needs a data register as either source or destination operand");
+        }
+    }
+
     private static void checkBitInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
         Instruction.checkDestinationAddressingModeKind( node,AddressingModeKind.ALTERABLE );
@@ -1600,6 +1627,26 @@ D/A   |     |   |           |
         throw new RuntimeException("Invalid index register operand size "+size);
     }
 
+    private static void checkDestinationIsNotAddressRegisterDirect(InstructionNode insn, ICompilationContext ctx)
+    {
+        if ( insn.hasDestination() && insn.destination().hasAddressingMode(ADDRESS_REGISTER_DIRECT) )
+        {
+            if ( insn.destination().getValue().isAddressRegister() ) {
+                throw new RuntimeException(insn.instruction.getMnemonic()+" does not support address registers direct as destination operand");
+            }
+        }
+    }
+
+    private static void checkSourceIsNotAddressRegisterDirect(InstructionNode insn, ICompilationContext ctx)
+    {
+        if ( insn.hasSource() && insn.source().hasAddressingMode(ADDRESS_REGISTER_DIRECT) )
+        {
+            if ( insn.source().getValue().isAddressRegister() ) {
+                throw new RuntimeException(insn.instruction+" does not support address registers direct as source operand");
+            }
+        }
+    }
+
     private static void checkSourceAddressingMode(InstructionNode insn, AddressingMode mode1,AddressingMode...additional)
     {
         if ( insn.operandCount() < 1 ) {
@@ -1678,6 +1725,12 @@ D/A   |     |   |           |
 
     public static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
     public static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
+
+    public static final InstructionEncoding AND_SRC_EA_ENCODING =
+        InstructionEncoding.of("1100DDD0SSmmmsss");
+
+    public static final InstructionEncoding AND_DST_EA_ENCODING =
+        InstructionEncoding.of("1100sss1SSDDDMMM");
 
     public static final InstructionEncoding ANDI_TO_CCR_ENCODING =
         InstructionEncoding.of("0000001000111100","00000000vvvvvvvv");
