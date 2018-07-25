@@ -495,22 +495,23 @@ public class CPUTest extends TestCase
                 .waitingForInterrupt();
     }
 
-    public void testAND_Byte() {
-        /*
-            public void testAND()
-    {
-        compile("and.b d3,$1200");
-        compile("and.b $1200,d3");
-        compile("and.b d2,d3");
-
-        compile("and.w d3,$1200");
-        compile("and.w $1200,d3");
-        compile("and.w d2,d3");
-        compile("and.l d3,$1200");
-        compile("and.l $1200,d3");
-        compile("and.l d2,d3");
+    public void testBasicAND() {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "and.b d2,d3")
+            .expectD2(0x0)
+            .expectD3(0x0)
+            .zero().notNegative().noCarry().noOverflow().extended();
     }
-         */
+
+    public void testAND_Byte()
+    {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
+            "move.l #$ffffffff,d3",
+            "and.b d2,d3")
+            .expectD2(0x0)
+            .expectD3(0xffffff00)
+            .zero().notNegative().noCarry().noOverflow().extended();
+
         // ($1200) = d3 & ($1200)
         final int adr = PROGRAM_START_ADDRESS + 128;
         execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
@@ -541,22 +542,91 @@ public class CPUTest extends TestCase
             "and.b d3,d2")
             .expectD2(0xffffff12)
             .expectD3(0x12)
-            .notZero().negative().noCarry().noOverflow().extended();
+            .notZero().notNegative().noCarry().noOverflow().extended();
+    }
 
+    public void testAND_Word()
+    {
         execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
             "move.l #$ffffffff,d3",
-            "and.b d2,d3")
+            "and.w d2,d3")
+            .expectD2(0x0)
+            .expectD3(0xffff0000)
+            .zero().notNegative().noCarry().noOverflow().extended();
+
+        // ($1200) = d3 & ($1200)
+        final int adr = PROGRAM_START_ADDRESS + 128;
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.w #$12,"+adr,
+            "and.w d3,"+adr)
+            .expectD3(0xffffffff)
+            .expectMemoryWord(adr, 0x12)
+            .notZero().notNegative().noCarry().noOverflow().extended();
+
+        // d3 = ($1200) & d3
+        // d3 = $12 & 0xff
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.w #$12,"+adr,
+            "and.w "+adr+",d3")
+            .expectD3(0xffff0012)
+            .expectMemoryWord(adr, 0x12)
+            .notZero().notNegative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d2",
+            "move.l #$12,d3",
+            "and.w d2,d3")
+            .expectD2(0xffffffff)
+            .expectD3(0x12)
+            .notZero().notNegative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d2",
+            "move.l #$12,d3",
+            "and.w d3,d2")
+            .expectD2(0xffff0012)
+            .expectD3(0x12)
+            .notZero().notNegative().noCarry().noOverflow().extended();
+    }
+
+    public void testAND_Long()
+    {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
+            "move.l #$ffffffff,d3",
+            "and.l d2,d3")
             .expectD2(0x0)
             .expectD3(0x0)
             .zero().notNegative().noCarry().noOverflow().extended();
-    }
 
-    public void testAND_Word() {
-        fail("Implement me");
-    }
+        // ($1200) = d3 & ($1200)
+        final int adr = PROGRAM_START_ADDRESS + 128;
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.l #$12,"+adr,
+            "and.l d3,"+adr)
+            .expectD3(0xffffffff)
+            .expectMemoryLong(adr, 0x12)
+            .notZero().notNegative().noCarry().noOverflow().extended();
 
-    public void testAND_Long() {
-        fail("Implement me");
+        // d3 = ($1200) & d3
+        // d3 = $12 & 0xff
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.l #$12,"+adr,
+            "and.l "+adr+",d3")
+            .expectD3(0x12)
+            .expectMemoryLong(adr, 0x12)
+            .notZero().notNegative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d2",
+            "move.l #$12,d3",
+            "and.l d2,d3")
+            .expectD2(0xffffffff)
+            .expectD3(0x12)
+            .notZero().notNegative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d2",
+            "move.l #$12,d3",
+            "and.l d3,d2")
+            .expectD2(0x12)
+            .expectD3(0x12)
+            .notZero().notNegative().noCarry().noOverflow().extended();
     }
 
     public void testANDISR()

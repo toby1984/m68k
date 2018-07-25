@@ -4,6 +4,7 @@ import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
+import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
@@ -1290,23 +1291,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b1100_0000_0000_0000:
 
-                /*
-    public static final InstructionEncoding AND_SRC_EA_ENCODING =
-        InstructionEncoding.of("1100DDD0SSmmmsss"); // src eaMode/eaRegister contained in lower 6 bits
-
-    public static final InstructionEncoding AND_DST_EA_ENCODING =
-        InstructionEncoding.of("1100sss1SSMMMDDD"); // dst eaMode/eaRegister contained in lower 6 bits
-        InstructionEncoding.of("1100000100000000"); // dst eaMode/eaRegister contained in lower 6 bits
-                 */
-                if ( (instruction & 0b11110001_00000000) == 0b1100000000000000) {
-                    // TODO: Tricky as EXG and AND use almost the same bit pattern,
-                    // TODO: way to tell them apart is by looking at bits 7-3 where EXG allows only
-                    // TODO: 01000: // swap Data registers
-                    // TODO: 01001: // swap Address registers
-                    // TODO: 10001: // swap Data register and address register
-                }
-
-                if ( (instruction & 0b11110001_00000000) == 0b11000001_00000000 ) // EXG
+                // EXG and AND look almost the same so just applying the instruction encoding's AND
+                // mask is not enough
+                int masked = instruction & 0b1111000111111000;
+                if ( masked ==  0b1100000101000000 || masked == 0b1100000101001000 || masked == 0b1100000110001000 ) // EXG
                 {
                     // hint: variable names are a bit misleading, only apply if EXG between different register types
                     final int dataReg = (instruction & 0b111_000000000) >> 9;
@@ -1333,6 +1321,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             return;
                     }
                     triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
+                    return;
+                }
+
+                masked = (instruction & 0b11110001_00000000);
+                if ( masked == 0b1100000000000000 || masked == 0b1100000100000000) {
+                    // AND <ea>,Dn
+                    // AND Dn,<ea>
+                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.REGULAR);
                     return;
                 }
                 break;
@@ -1510,7 +1506,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 2: return (input & 0xffff0000) | (toMerge & 0xffff);
             case 4: return toMerge;
         }
-        throw new RuntimeException("Unreachable code reached");
+        throw new IllegalInstructionException(pcAtStartOfLastInstruction, memLoadWord(pcAtStartOfLastInstruction) );
     }
 
     private void binaryLogicalOpImmediate(int instruction, BinaryLogicalOp operation,BinaryLogicalOpMode mode)
@@ -1535,6 +1531,37 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             decodeSourceOperand(instruction, 2,false);
             setStatusRegister( operation.apply( statusRegister , value & 0b11111 ) );
             cycles = 20;
+            return;
+        }
+
+        if ( mode == BinaryLogicalOpMode.REGULAR )
+        {
+            // AND Dn,<ea> / AND Dn,<ea>
+            // OR  Dn,<ea> / OR  Dn,<ea>
+            // EOR Dn,<ea> / EOR Dn,<ea>
+            final int sizeBits = (instruction & 0b11000000) >>> 6;
+            final int operandSize = 1<<sizeBits;
+            final boolean destinationIsDataRegister = (instruction & 0b100000000) == 0;
+            final boolean sourceIsDataRegister = ! destinationIsDataRegister;
+
+            final int regNum = (instruction & 0b111000000000) >> 9;
+            final int regValue = dataRegisters[regNum];
+
+            // apply
+            if ( destinationIsDataRegister )
+            {
+                // <ea> OP Dn -> DN
+                decodeSourceOperand(instruction,operandSize,false);
+
+                value = operation.apply(value,regValue);
+                dataRegisters[regNum] = mergeValue(regValue,value,operandSize);
+            } else {
+                // Dn OP <ea> -> <ea>
+                decodeSourceOperand(instruction,operandSize,false,false);
+                value = operation.apply(regValue,value);
+                storeValue((instruction&0b111000)>>>3,instruction&0b111,operandSize);
+            }
+            updateFlagsAfterMove(operandSize);
             return;
         }
 
