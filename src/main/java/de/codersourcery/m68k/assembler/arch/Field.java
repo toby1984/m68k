@@ -36,6 +36,7 @@ public enum Field
     EXG_DATA_REGISTER('k'), // data register if EXG used with registers of different types, otherwise either the src data or src address register
     EXG_ADDRESS_REGISTER('l'), // address register if EXG used with registers of different types, otherwise either the dst data or dst address register
     CONDITION_CODE('c'), // encoded branch condition,stored as operationMode on Instruction
+    REGISTER_LIST_BITMASK('L'), // MOVEM register list bitmask
     /**
      * Dummy field that indicates
      * the {@link InstructionEncoding.IBitMapping} requires no
@@ -45,7 +46,7 @@ public enum Field
 
     public final char c;
 
-    private Field(char c) {
+    Field(char c) {
         this.c = c;
     }
 
@@ -80,6 +81,7 @@ public enum Field
             case 'l': return EXG_ADDRESS_REGISTER;
             case 'S': return SIZE;
             case 'o': return OP_CODE;
+            case 'L': return REGISTER_LIST_BITMASK;
         }
         return null;
     }

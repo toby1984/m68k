@@ -162,6 +162,11 @@ public enum AddressingMode
     public final int maxExtensionWords;
     private final int kinds;
 
+    public boolean isRegisterDirect()
+    {
+        return this == AddressingMode.DATA_REGISTER_DIRECT || this == AddressingMode.ADDRESS_REGISTER_DIRECT;
+    }
+
     public interface FieldContent
     {
         public boolean isFixedValue();

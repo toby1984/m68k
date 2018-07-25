@@ -12,6 +12,27 @@ public class Misc
         return "$"+Integer.toHexString(value);
     }
 
+    /**
+     * Reverses the lower 16 bits of an int.
+     *
+     * @param bits bits to reverse (only lower 16 bits are considered)
+     * @return lower 16 bits of input, reversed
+     */
+    public static int reverseWord(int bits) {
+
+        int out = 0;
+
+        int inMask = 0x1;
+        int outMask = 0x00008000;
+        for ( int i = 16 ; i > 0 ; i--, outMask >>>=1 , inMask <<= 1)
+        {
+            if ( (bits & inMask) != 0 ) {
+                out |= outMask;
+            }
+        }
+        return out;
+    }
+
     public static String binary8Bit(int value) {
         return "%"+StringUtils.leftPad(Integer.toBinaryString( value ),8, "0");
     }

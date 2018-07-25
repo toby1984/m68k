@@ -39,6 +39,7 @@ public class RegisterListNode extends ASTNode implements IValueNode
         {
             int bits = ((IValueNode) child).getBits(context);
             if ( child.is(NodeType.REGISTER) ) {
+                bits = 1<<bits;
                 if ( child.isAddressRegister() ) {
                     bits <<= 8;
                 }

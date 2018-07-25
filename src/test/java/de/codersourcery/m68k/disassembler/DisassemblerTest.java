@@ -40,6 +40,34 @@ public class DisassemblerTest extends TestCase
         compile(op+" #5,(a0)");
     }
 
+    public void testMOVEMToMemory()
+    {
+        compile("movem.w d3/a4-a5,-(a0)");
+        compile("movem.l d3/a4-a5,-(a0)");
+        compile("movem.w d3,$1200");
+        compile("movem.w d3-d4,$1200");
+        compile("movem.w d3/a4-a5,$1200");
+        compile("movem.w d3/d5/a4/a6,$1200");
+        compile("movem.l d3,$1200");
+        compile("movem.l d3-d4,$1200");
+        compile("movem.l d3/a4-a5,$1200");
+        compile("movem.l d3/d5/a4/a6,$1200");
+    }
+
+    public void testMOVEMFromMemory()
+    {
+        compile("movem.w $1200,d3");
+        compile("movem.w $1200,d3-d4");
+        compile("movem.w $1200,d3/a4-a5");
+        compile("movem.w $1200,d3/d5/a4/a6");
+        compile("movem.l $1200,d3");
+        compile("movem.l $1200,d3-d4");
+        compile("movem.l $1200,d3/a4-a5");
+        compile("movem.l $1200,d3/d5/a4/a6");
+        compile("movem.w (a0)+,d3/a4-a5");
+        compile("movem.l (a0)+,d3/a4-a5");
+    }
+
     public void testIllegal()
     {
         compile("illegal");

@@ -32,6 +32,34 @@ public class AssemblerTest extends TestCase
         assertFailsToCompile( "AND.L #$12,a0");
     }
 
+    public void testMOVEMToMemory()
+    {
+        assertArrayEquals(compile("movem.w d3/a4-a5,-(a0)"),     0x48,0xa0,0x10,0x0c          );
+        assertArrayEquals(compile("movem.l d3/a4-a5,-(a0)"),     0x48,0xe0,0x10,0x0c          );
+        assertArrayEquals(compile("movem.w d3,$1200"),            0x48,0xb8,0x00,0x08,0x12,0x00);
+        assertArrayEquals(compile("movem.w d3-d4,$1200"),        0x48,0xb8,0x00,0x18,0x12,0x00);
+        assertArrayEquals(compile("movem.w d3/a4-a5,$1200"),    0x48,0xb8,0x30,0x08,0x12,0x00);
+        assertArrayEquals(compile("movem.w d3/d5/a4/a6,$1200"),0x48,0xb8,0x50,0x28,0x12,0x00);
+        assertArrayEquals(compile("movem.l d3,$1200"),            0x48,0xf8,0x00,0x08,0x12,0x00);
+        assertArrayEquals(compile("movem.l d3-d4,$1200"),        0x48,0xf8,0x00,0x18,0x12,0x00);
+        assertArrayEquals(compile("movem.l d3/a4-a5,$1200"),    0x48,0xf8,0x30,0x08,0x12,0x00);
+        assertArrayEquals(compile("movem.l d3/d5/a4/a6,$1200"),0x48,0xf8,0x50,0x28,0x12,0x00);
+    }
+
+    public void testMOVEMFromMemory()
+    {
+        assertArrayEquals(compile("movem.w $1200,d3"),             0x4c,0xb8,0x00,0x08,0x12,0x00);
+        assertArrayEquals(compile("movem.w $1200,d3-d4"),         0x4c,0xb8,0x00,0x18,0x12,0x00);
+        assertArrayEquals(compile("movem.w $1200,d3/a4-a5"),     0x4c,0xb8,0x30,0x08,0x12,0x00);
+        assertArrayEquals(compile("movem.w $1200,d3/d5/a4/a6"), 0x4c,0xb8,0x50,0x28,0x12,0x00);
+        assertArrayEquals(compile("movem.l $1200,d3"),             0x4c,0xf8,0x00,0x08,0x12,0x00);
+        assertArrayEquals(compile("movem.l $1200,d3-d4"),         0x4c,0xf8,0x00,0x18,0x12,0x00);
+        assertArrayEquals(compile("movem.l $1200,d3/a4-a5"),     0x4c,0xf8,0x30,0x08,0x12,0x00);
+        assertArrayEquals(compile("movem.l $1200,d3/d5/a4/a6"), 0x4c,0xf8,0x50,0x28,0x12,0x00);
+        assertArrayEquals(compile("movem.w (a0)+,d3/a4-a5"),      0x4c,0x98,0x30,0x08);
+        assertArrayEquals(compile("movem.l (a0)+,d3/a4-a5"),      0x4c,0xd8,0x30,0x08);
+    }
+
     public void testTST() {
         assertArrayEquals(compile("tst.b d3")     ,0x4a,0x03);
         assertArrayEquals(compile("tst.w (a4)")   ,0x4a,0x54);

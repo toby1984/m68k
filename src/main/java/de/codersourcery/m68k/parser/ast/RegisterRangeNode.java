@@ -43,12 +43,12 @@ public class RegisterRangeNode extends ASTNode implements IValueNode
     public Integer getBits(ICompilationContext context)
     {
         int start = rangeStart().getBits(context);
-        int end = rangeStart().getBits(context);
+        int end = rangeEnd().getBits(context);
         if ( start > end ) {
             throw new IllegalStateException("start > end ?");
         }
         int mask = 0;
-        for ( int i = start ; i < end ; i++ ) {
+        for ( int i = start ; i <= end ; i++ ) {
             mask |= 1<<i;
         }
         final int leftShift = rangeStart().isAddressRegister() ? 8 : 0;

@@ -19,6 +19,7 @@ import java.util.function.Function;
 
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.ABSOLUTE_SHORT_ADDRESSING;
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.ADDRESS_REGISTER_DIRECT;
+import static de.codersourcery.m68k.assembler.arch.AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT;
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.DATA_REGISTER_DIRECT;
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALUE;
 
@@ -40,8 +41,57 @@ public enum Instruction
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
-            // TODO: Implement me
-            throw new UnsupportedOperationException("Method checkSupports not implemented");
+            if ( node.hasExplicitOperandSize() && !(node.hasOperandSize(OperandSize.WORD) || node.hasOperandSize(OperandSize.LONG) ) )
+            {
+                throw new RuntimeException("MOVEM supports only .w or .l");
+            }
+            // one operand needs to be a register,register list or register range
+            final boolean srcIsRegList = isRegisterList(node.source());
+            final boolean dstIsRegList = isRegisterList(node.destination());
+
+            if ( ( srcIsRegList ^ dstIsRegList) == false )
+            {
+                throw new RuntimeException("MOVEM requires exactly one register,register range or register list");
+            }
+            if ( srcIsRegList )
+            {
+                // MOVEM <registers>,<ea>
+                switch( node.destination().addressingMode )
+                {
+                    case ADDRESS_REGISTER_INDIRECT:
+                    case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT:
+                    case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
+                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                    case ABSOLUTE_SHORT_ADDRESSING:
+                    case ABSOLUTE_LONG_ADDRESSING:
+                        break;
+                    default:
+                        throw new RuntimeException("Invalid addressing mode for MOVEM destination operand");
+                }
+                // TODO: 68020+ supports more addressing modes here...
+            }
+            else
+                {
+                // MOVEM <ea>,<registers>
+                switch( node.source().addressingMode )
+                {
+                    case ADDRESS_REGISTER_INDIRECT:
+                    case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT:
+                    case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
+                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                    case PC_INDIRECT_WITH_DISPLACEMENT:
+                    case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                    case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                    case ABSOLUTE_SHORT_ADDRESSING:
+                    case ABSOLUTE_LONG_ADDRESSING:
+                        break;
+                    default:
+                        throw new RuntimeException("Invalid addressing mode for MOVEM source operand");
+                }
+                // TODO: 68020+ supports more addressing modes here...
+            }
         }
     },
     CHK("CHK",2) {
@@ -840,46 +890,41 @@ public enum Instruction
                                               ICompilationContext context,
                                               boolean estimateSizeOnly)
     {
+        String[] extraInsnWords;
         type.checkSupports(insn, context, estimateSizeOnly);
-
         switch (type)
         {
+            case MOVEM:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                if ( isRegisterList( insn.source() ) ) {
+                    // MOVEM <register list>,<ea>
+                    extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                    return MOVEM_FROM_REGISTERS_ENCODING.append(extraInsnWords);
+                }
+                // MOVEM <ea>,<register list>
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return MOVEM_TO_REGISTERS_ENCODING.append(extraInsnWords);
             case STOP:
                 return STOP_ENCODING;
             case CHK:
                 insn.setImplicitOperandSize(OperandSize.WORD);
-                String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                if ( extraSrcWords != null ) {
-                    return CHK_ENCODING.append(extraSrcWords);
-                }
-                return CHK_ENCODING;
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return CHK_ENCODING.append(extraInsnWords);
             case TAS:
-                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                if ( extraSrcWords != null ) {
-                    return TAS_ENCODING.append(extraSrcWords);
-                }
-                return TAS_ENCODING;
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return TAS_ENCODING.append(extraInsnWords);
             case TRAPV:
                 return TRAPV_ENCODING;
             case TST:
-                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                if ( extraSrcWords != null ) {
-                    return TST_ENCODING.append(extraSrcWords);
-                }
-                return TST_ENCODING;
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return TST_ENCODING.append(extraInsnWords);
             case NOT:
                 System.out.println("NOT( "+insn.source().addressingMode+")");
-                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                if ( extraSrcWords != null ) {
-                    return NOT_ENCODING.append(extraSrcWords);
-                }
-                return NOT_ENCODING;
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return NOT_ENCODING.append(extraInsnWords);
             case CLR:
-                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                if ( extraSrcWords != null ) {
-                    return CLR_ENCODING.append(extraSrcWords);
-                }
-                return CLR_ENCODING;
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return CLR_ENCODING.append(extraInsnWords);
             case BCHG:
                 if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
                     return BCHG_STATIC_ENCODING;
@@ -960,11 +1005,8 @@ public enum Instruction
             case RTS:
                 return RTS_ENCODING;
             case JSR:
-                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                if ( extraSrcWords != null ) {
-                    return JSR_ENCODING.append(extraSrcWords);
-                }
-                return JSR_ENCODING;
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return JSR_ENCODING.append(extraInsnWords);
             case SWAP:
                 return SWAP_ENCODING;
             case JMP:
@@ -1023,10 +1065,10 @@ public enum Instruction
                 // AND <ea>,Dn
                 if ( ! insn.destination().hasAddressingMode(AddressingMode.DATA_REGISTER_DIRECT) ) {
                     final String[] patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
-                    return patterns == null ? AND_DST_EA_ENCODING : AND_DST_EA_ENCODING.append(patterns);
+                    return AND_DST_EA_ENCODING.append(patterns);
                 }
                 final String[] patterns = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn, context);
-                return patterns == null ? AND_SRC_EA_ENCODING : AND_SRC_EA_ENCODING.append(patterns);
+                return AND_SRC_EA_ENCODING.append(patterns);
             case TRAP:
                 return TRAP_ENCODING;
             case RTE:
@@ -1050,11 +1092,8 @@ public enum Instruction
             case SLT:
             case SGT:
             case SLE:
-                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                if ( extraSrcWords != null ) {
-                    return SCC_ENCODING.append(extraSrcWords);
-                }
-                return SCC_ENCODING;
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return SCC_ENCODING.append(extraInsnWords);
             // DBcc instructions
             case DBRA:
             case DBT:
@@ -1182,12 +1221,12 @@ public enum Instruction
                 insn.setImplicitOperandSize( OperandSize.WORD );
 
                 // regular move instruction
-                extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( insn.instruction == MOVEA )
                 {
                     final InstructionEncoding encoding =
                             insn.getOperandSize() == OperandSize.WORD ? MOVEA_WORD_ENCODING : MOVEA_LONG_ENCODING;
-                    return extraSrcWords != null ? encoding.append( extraSrcWords ) : encoding;
+                    return encoding.append( extraInsnWords );
                 }
                 final String[] extraDstWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
 
@@ -1205,17 +1244,17 @@ public enum Instruction
                     default:
                         throw new RuntimeException("MOVE without operand size?");
                 }
-                if (extraSrcWords != null && extraDstWords == null)
+                if (extraInsnWords != null && extraDstWords == null)
                 {
-                    return encoding.append(extraSrcWords);
+                    return encoding.append(extraInsnWords);
                 }
-                if (extraSrcWords == null && extraDstWords != null)
+                if (extraInsnWords == null && extraDstWords != null)
                 {
                     return encoding.append(extraDstWords);
                 }
-                if (extraSrcWords != null && extraDstWords != null)
+                if (extraInsnWords != null && extraDstWords != null)
                 {
-                    return encoding.append(extraSrcWords).append(extraDstWords);
+                    return encoding.append(extraInsnWords).append(extraDstWords);
                 }
                 return encoding;
             default:
@@ -1312,10 +1351,7 @@ D/A   |     |   |           |
         }
         if ( insn.operandCount() == 1 ) {
             final String[] extraSrcWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-            if ( extraSrcWords != null ) {
-                return memory.append(extraSrcWords);
-            }
-            return memory;
+            return memory.append(extraSrcWords);
         }
         if (insn.source().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE))
         {
@@ -1613,9 +1649,30 @@ D/A   |     |   |           |
                 return 0;
             case CONDITION_CODE: // encoded branch condition,stored as operationMode on Instruction
                 return insn.getInstructionType().getOperationMode();
+            case REGISTER_LIST_BITMASK:
+                if ( isRegisterList(insn.source() ) )
+                {
+                    // MOVEM <register list>,<ea>
+                    final AddressingMode mode = insn.destination().addressingMode;
+                    final int bits = getMoveMRegisterBitmask( insn.source().getValue(), ctx );
+                    return mode == ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT ? Misc.reverseWord(bits) : bits;
+                }
+                // MOVEM <ea>,<register list>
+                return getMoveMRegisterBitmask( insn.destination().getValue(), ctx);
             default:
                 throw new RuntimeException("Internal error,unhandled field "+field);
         }
+    }
+
+    private static int getMoveMRegisterBitmask(IValueNode node,ICompilationContext ctx)
+    {
+        int bits = node.getBits(ctx );
+        if ( node.is(NodeType.REGISTER) )
+        {
+            // turn register number into bit mask
+            return node.isDataRegister() ? 1<<bits: 1 << (8+bits);
+        }
+        return bits;
     }
 
     public static int getIndexRegisterSizeBit(RegisterNode register)
@@ -1718,6 +1775,14 @@ D/A   |     |   |           |
         }
     }
 
+    private static boolean isRegisterList(OperandNode operand)
+    {
+        final IValueNode value = operand.getValue();
+        return (value.is(NodeType.REGISTER) && operand.addressingMode.isRegisterDirect() ) ||
+            value.is(NodeType.REGISTER_RANGE) ||
+            value.is(NodeType.REGISTER_LIST);
+    }
+
     private static InstructionEncoding.IValueDecorator fieldDecorator(Field f, Function<Integer, Integer> func)
     {
         return (field, inputValue) ->
@@ -1742,10 +1807,28 @@ D/A   |     |   |           |
     public static final InstructionEncoding ANDI_LONG_ENCODING   = InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding ANDI_TO_SR_ENCODING  = InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
+    private static final InstructionEncoding.IValueDecorator MOVEM_SIZE_DECORATOR = (field, origValue) ->
+    {
+        // MOVEM uses a non-standard one-bit size encoding
+        if (field == Field.SIZE)
+        {
+            switch (origValue)
+            {
+                case 0b01: return 0; // word transfer
+                case 0b10: return 1; // long transfer
+            }
+            throw new RuntimeException("Unreachable code reached");
+        }
+        return origValue;
+    };
+
     public static final InstructionEncoding MOVEM_FROM_REGISTERS_ENCODING =
-        InstructionEncoding.of("010010001SMMMDDD");
+        InstructionEncoding.of("010010001SMMMDDD","LLLLLLLL_LLLLLLLL")
+            .decorateWith(MOVEM_SIZE_DECORATOR);
+
     public static final InstructionEncoding MOVEM_TO_REGISTERS_ENCODING   =
-        InstructionEncoding.of("010011001Smmmsss");
+        InstructionEncoding.of("010011001Smmmsss","LLLLLLLL_LLLLLLLL")
+            .decorateWith(MOVEM_SIZE_DECORATOR);
 
     public static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
 
