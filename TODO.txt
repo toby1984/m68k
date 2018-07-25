@@ -1,0 +1,2 @@
+- implement CPU trace support
+- implement missing instructions
