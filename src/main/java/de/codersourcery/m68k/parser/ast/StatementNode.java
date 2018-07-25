@@ -21,7 +21,7 @@ public class StatementNode extends ASTNode
     public List<LabelNode> getLabels()
     {
         List<LabelNode> result = null;
-        for ( ASTNode child : children() ) {
+        for ( IASTNode child : children() ) {
             if ( child.is(NodeType.LABEL) ) {
                 if ( result == null ) {
                     result = new ArrayList<>();
@@ -36,7 +36,7 @@ public class StatementNode extends ASTNode
     public void toString(StringBuilder buffer, int depth)
     {
         buffer.append(indent(depth)).append("Statement\n");
-        for (ASTNode child : children() )
+        for (IASTNode child : children() )
         {
             child.toString(buffer,depth+1);
         }

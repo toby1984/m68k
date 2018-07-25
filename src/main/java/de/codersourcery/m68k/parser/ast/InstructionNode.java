@@ -88,7 +88,7 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
     public void toString(StringBuilder buffer, int depth)
     {
         buffer.append(indent(depth)).append("Instruction [").append(instruction).append("]\n");
-        for (ASTNode child : children() )
+        for (IASTNode child : children() )
         {
             child.toString(buffer,depth+1);
         }

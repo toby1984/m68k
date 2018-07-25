@@ -7,7 +7,7 @@ import de.codersourcery.m68k.assembler.phases.ParsePhase;
 import de.codersourcery.m68k.assembler.phases.ValidationPhase;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
-import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.parser.ast.IASTNode;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
 
@@ -289,13 +289,13 @@ public class Assembler
         }
 
         @Override
-        public void error(String message, ASTNode node)
+        public void error(String message, IASTNode node)
         {
             messages.error(getCompilationUnit(),message,node);
         }
 
         @Override
-        public void error(String message, ASTNode node, Throwable t)
+        public void error(String message, IASTNode node, Throwable t)
         {
             if ( t != null ) {
                 t.printStackTrace();
@@ -322,7 +322,7 @@ public class Assembler
         }
 
         @Override
-        public void warn(String message, ASTNode node)
+        public void warn(String message, IASTNode node)
         {
             messages.warn(getCompilationUnit(),message,node);
         }
@@ -346,7 +346,7 @@ public class Assembler
         }
 
         @Override
-        public void info(String message, ASTNode node)
+        public void info(String message, IASTNode node)
         {
             messages.info(getCompilationUnit(),message,node);
         }

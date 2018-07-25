@@ -45,6 +45,10 @@ public enum Register
         this.bits = index;
     }
 
+    public int index() {
+        return bits;
+    }
+
     /**
      * Returns whether this register is a data register.
      *
@@ -97,6 +101,21 @@ public enum Register
         CCR,
         SR,
         PC;
+    }
+
+    public boolean hasType(Type t) {
+        return t == this.type1 || t == this.type2;
+    }
+
+    public boolean hasSameType(Register o)
+    {
+        if ( o.hasType(this.type1 ) ) {
+            return true;
+        }
+        if ( this.type2 != null ) {
+            return o.hasType(this.type2);
+        }
+        return false;
     }
 
     /**

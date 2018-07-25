@@ -52,24 +52,28 @@ public interface IASTNode
 
     public  int childCount();
 
-    public List<ASTNode> children();
+    public List<IASTNode> children();
 
-    public  ASTNode child(int idx);
+    public  IASTNode child(int idx);
 
     public  boolean hasParent();
 
     public  boolean hasNoParent();
 
-    public  ASTNode getParent();
+    public  void setParent(IASTNode node);
+
+    public  IASTNode getParent();
 
     // tree mutation
-    public void add(ASTNode child);
+    public void add(IASTNode child);
 
-    public void remove(ASTNode child);
+    public void remove(IASTNode child);
+
+    public void removeAllChildren();
 
     // tree traversal
 
-    public  <T> T visitInOrder(BiConsumer<ASTNode,IterationCtx<T>> visitor);
+    public  <T> T visitInOrder(BiConsumer<IASTNode,IterationCtx<T>> visitor);
 
     // source text locations
     public  TextRegion getRegion();
@@ -106,6 +110,10 @@ public interface IASTNode
     public StringNode asString();
 
     public RegisterNode asRegister();
+
+    public RegisterRangeNode asRegisterRange();
+
+    public RegisterListNode asRegisterList();
 
     // utility
     public void toString(StringBuilder buffer,int depth);

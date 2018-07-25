@@ -4,6 +4,7 @@ import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.ICompilationPhase;
 import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.parser.ast.IASTNode;
 import de.codersourcery.m68k.parser.ast.IValueNode;
 import de.codersourcery.m68k.parser.ast.IdentifierNode;
 import de.codersourcery.m68k.parser.ast.InstructionNode;
@@ -18,7 +19,7 @@ public class ValidationPhase implements ICompilationPhase
     @Override
     public void run(ICompilationContext ctx) throws Exception
     {
-        final BiConsumer<ASTNode, ASTNode.IterationCtx<Void>> visitor = (node, itCtx) ->
+        final BiConsumer<IASTNode, ASTNode.IterationCtx<Void>> visitor = (node, itCtx) ->
         {
             if ( node instanceof IValueNode)
             {

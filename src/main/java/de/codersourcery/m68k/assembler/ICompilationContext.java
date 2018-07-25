@@ -4,6 +4,7 @@ import de.codersourcery.m68k.assembler.phases.FixAddressingModesPhase;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
 import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.parser.ast.IASTNode;
 
 import java.io.IOException;
 import java.util.Map;
@@ -72,20 +73,20 @@ public interface ICompilationContext
 
     // errors
     public void error(String message);
-    public void error(String message, ASTNode node);
-    public void error(String message, ASTNode node,Throwable t);
+    public void error(String message, IASTNode node);
+    public void error(String message, IASTNode node,Throwable t);
     public void error(String message, Token token);
     public void error(String message, TextRegion region);
 
     // warnings
     public void warn(String message);
-    public void warn(String message, ASTNode node);
+    public void warn(String message, IASTNode node);
     public void warn(String message, Token token);
     public void warn(String message, TextRegion region);
 
     // info
     public void info(String message);
-    public void info(String message, ASTNode node);
+    public void info(String message, IASTNode node);
     public void info(String message, Token token);
     public void info(String message, TextRegion region);
 }

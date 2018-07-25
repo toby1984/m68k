@@ -17,7 +17,7 @@ public class OperandNode extends ASTNode
 {
     public AddressingMode addressingMode;
 
-    private List<ASTNode> children = new ArrayList<>();
+    private List<IASTNode> children = new ArrayList<>();
 
     private int childCount = 0;
     private IValueNode baseDisplacement; // displacement relative to base register
@@ -94,7 +94,7 @@ public class OperandNode extends ASTNode
     }
 
     @Override
-    public List<ASTNode> children()
+    public List<IASTNode> children()
     {
         return children;
     }
@@ -124,13 +124,13 @@ public class OperandNode extends ASTNode
     }
 
     @Override
-    public void add(ASTNode child)
+    public void add(IASTNode child)
     {
         throw new UnsupportedOperationException("Use setXXX(null) methods instead");
     }
 
     @Override
-    public void remove(ASTNode child)
+    public void remove(IASTNode child)
     {
         if ( child == null )
         {

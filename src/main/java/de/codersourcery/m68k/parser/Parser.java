@@ -330,6 +330,13 @@ public class Parser
         {
             // expecting inner displacement value outside parens
             baseDisplacement = parseExpression(false,false,true);
+            if ( baseDisplacement.is(NodeType.REGISTER_RANGE) ||
+                 baseDisplacement.is(NodeType.REGISTER_LIST) )
+            {
+                final OperandNode op = new OperandNode(AddressingMode.IMPLIED,Token.getMergedRegion(tokens));
+                op.setValue(baseDisplacement);
+                return op;
+            }
             if ( baseDisplacement.isRegister() ) // MOVE D3,D4
             {
                 final Register r = baseDisplacement.asRegister().register;
@@ -620,7 +627,7 @@ public class Parser
 
             if ( registerNameSupported )
             {
-                result = parseRegister(operandSizeSupported, registerScalingSupported);
+                result = parseRegisterList(operandSizeSupported, registerScalingSupported);
                 if (result != null)
                 {
                     return result;
@@ -635,6 +642,88 @@ public class Parser
         }
         return parseString();
     }
+
+    private IValueNode parseRegisterList(boolean operandSizeSuffixSupported,boolean scalingSupported) {
+
+        IValueNode start = parseRegisterOrRegisterRange(operandSizeSuffixSupported,scalingSupported);
+        if ( start != null )
+        {
+            while ( lexer.peek(TokenType.SLASH) )
+            {
+                final Token slash = lexer.next();
+                IValueNode next = parseRegisterOrRegisterRange(operandSizeSuffixSupported,scalingSupported);
+                if ( next == null ) {
+                    fail("Incomplete register range", lexer.peek() ); // never returns
+                }
+                if ( ! start.is(NodeType.REGISTER_LIST ) ) {
+                    IValueNode tmp = start;
+                    start = new RegisterListNode(slash.getRegion());
+                    start.add(tmp);
+                } else {
+                    start.getRegion().merge(slash.getRegion() );
+                }
+                start.add( next );
+            }
+        }
+        return start;
+    }
+
+    private IValueNode parseRegisterOrRegisterRange(boolean operandSizeSuffixSupported,boolean scalingSupported)
+    {
+        IValueNode start = parseRegister(operandSizeSuffixSupported,scalingSupported);
+        if ( start != null )
+        {
+            if ( lexer.peek(TokenType.MINUS ) )
+            {
+                final Token minus = lexer.next();
+
+                if ( ((RegisterNode) start).hasScaling() ) {
+                    fail("Register range does not support scaling", start ); // never returns
+                }
+
+                if ( ((RegisterNode) start).hasOperandSize() )
+                {
+                    fail("Register range does not support register size", start ); // never returns
+                }
+
+                RegisterNode end = parseRegister(false,false);
+                if ( end == null ) {
+                    fail("Incomplete register range", lexer.peek() ); // never returns
+                }
+                final Register startReg = start.asRegister().register;
+
+                if ( !(startReg.isData() || startReg.isAddress() ) ) {
+                    fail("Register range only supported for address or data registers", start ); // never returns
+                }
+
+                final Register endReg = end.asRegister().register;
+                if ( !( endReg.isData() || endReg.isAddress() ) ) {
+                    fail("Register range only supported for address or data registers", end ); // never returns
+                }
+
+                if ( startReg == endReg )
+                {
+                    start.getRegion().merge(minus.getRegion());
+                    start.getRegion().merge(end.getRegion());
+                    return start;
+                }
+
+                if ( ! startReg.hasSameType(endReg ) ) {
+                    fail("Register range can only span registers of the same type", minus ); // never returns
+                }
+
+                if ( startReg.index() > endReg.index() ) {
+                    fail("Start register in register range must come before end register", minus ); // never returns
+                }
+
+                final RegisterRangeNode range = new RegisterRangeNode(minus.getRegion());
+                range.setRange((RegisterNode) start,end);
+                return range;
+            }
+        }
+        return start;
+    }
+
 
     private RegisterNode parseRegister(boolean operandSizeSuffixSupported,boolean scalingSupported)
     {

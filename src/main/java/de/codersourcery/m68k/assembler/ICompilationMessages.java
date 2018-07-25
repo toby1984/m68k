@@ -3,6 +3,7 @@ package de.codersourcery.m68k.assembler;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
 import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.parser.ast.IASTNode;
 
 import java.util.Arrays;
 import java.util.List;
@@ -66,9 +67,9 @@ public interface ICompilationMessages
     // errors
     void error(CompilationUnit unit,String message);
 
-    void error(CompilationUnit unit,String message, ASTNode node);
+    void error(CompilationUnit unit,String message, IASTNode node);
 
-    void error(CompilationUnit unit,String message, ASTNode node,Throwable t);
+    void error(CompilationUnit unit,String message, IASTNode node,Throwable t);
 
     void error(CompilationUnit unit,String message, Token token);
 
@@ -77,7 +78,7 @@ public interface ICompilationMessages
     // warnings
     void warn(CompilationUnit unit,String message);
 
-    void warn(CompilationUnit unit,String message, ASTNode node);
+    void warn(CompilationUnit unit,String message, IASTNode node);
 
     void warn(CompilationUnit unit,String message, Token token);
 
@@ -86,7 +87,7 @@ public interface ICompilationMessages
     // info
     void info(CompilationUnit unit,String message);
 
-    void info(CompilationUnit unit,String message, ASTNode node);
+    void info(CompilationUnit unit,String message, IASTNode node);
 
     void info(CompilationUnit unit,String message, Token token);
 

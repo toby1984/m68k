@@ -23,7 +23,7 @@ public class GatherSymbolsPhase implements ICompilationPhase
     {
         final AST ast = ctx.getCompilationUnit().getAST();
         final SymbolTable table = ctx.symbolTable();
-        final BiConsumer<ASTNode, IASTNode.IterationCtx<Object>> consumer =
+        final BiConsumer<IASTNode, IASTNode.IterationCtx<Object>> consumer =
                 (node,itCtx) ->
                 {
                   if ( node.is( NodeType.LABEL ) )

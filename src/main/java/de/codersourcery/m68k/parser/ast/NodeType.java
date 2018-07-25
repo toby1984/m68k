@@ -8,6 +8,8 @@ public enum NodeType
     LABEL,
     INSTRUCTION,
     IDENTIFIER,
+    REGISTER_LIST,
+    REGISTER_RANGE,
     STRING,
     COMMENT,
     NUMBER,

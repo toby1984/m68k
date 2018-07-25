@@ -11,7 +11,7 @@ public class AST extends ASTNode
     public void toString(StringBuilder buffer, int depth)
     {
         buffer.append("AST\n");
-        for (ASTNode child : children() )
+        for (IASTNode child : children() )
         {
             child.toString(buffer,depth+1);
         }

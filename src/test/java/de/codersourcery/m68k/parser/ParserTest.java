@@ -211,6 +211,109 @@ public class ParserTest extends TestCase
         assertEquals( Integer.valueOf(0x1234), insn.source().getValue().getBits(null) );
     }
 
+    public void testParseRegisterRange1() throws Exception
+    {
+        final AST ast = parseAST("move.w a0-a1,(a2)+");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.MOVE, insn.getInstructionType() );
+        assertEquals( AddressingMode.IMPLIED, insn.source().addressingMode );
+
+        final RegisterRangeNode range = (RegisterRangeNode) insn.source().getValue();
+        final RegisterNode startReg = range.rangeStart();
+        final RegisterNode endReg = range.rangeEnd();
+
+        assertEquals( Register.A0, startReg.register);
+        assertEquals( Register.A1, endReg.register);
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,
+            insn.destination().addressingMode );
+        assertEquals( Register.A2, insn.destination().getValue().asRegister().register );
+    }
+
+    public void testParseRegisterRange2() throws Exception
+    {
+        final AST ast = parseAST("move.w a0-a0,(a2)+");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.MOVE, insn.getInstructionType() );
+        assertEquals( AddressingMode.ADDRESS_REGISTER_DIRECT, insn.source().addressingMode );
+
+        final RegisterNode startReg = insn.source().getValue().asRegister();
+
+        assertEquals( Register.A0, startReg.register);
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,
+            insn.destination().addressingMode );
+        assertEquals( Register.A2, insn.destination().getValue().asRegister().register );
+    }
+
+    public void testParseRegisterRange3() throws Exception
+    {
+        final AST ast = parseAST("move.w d0-d3,(a2)+");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.MOVE, insn.getInstructionType() );
+        assertEquals( AddressingMode.IMPLIED, insn.source().addressingMode );
+
+        final RegisterRangeNode range = (RegisterRangeNode) insn.source().getValue();
+        final RegisterNode startReg = range.rangeStart();
+        final RegisterNode endReg = range.rangeEnd();
+
+        assertEquals( Register.D0, startReg.register);
+        assertEquals( Register.D3, endReg.register);
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,
+            insn.destination().addressingMode );
+        assertEquals( Register.A2, insn.destination().getValue().asRegister().register );
+    }
+
+    public void testParseRegisterRange4() throws Exception
+    {
+        final AST ast = parseAST("move.w d0/a0,(a2)+");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.MOVE, insn.getInstructionType() );
+        assertEquals( AddressingMode.IMPLIED, insn.source().addressingMode );
+
+        final RegisterListNode list = (RegisterListNode) insn.source().getValue();
+        final RegisterNode reg1 = list.child(0).asRegister();
+        final RegisterNode reg2 = list.child(1).asRegister();
+
+        assertEquals( Register.D0, reg1.register);
+        assertEquals( Register.A0, reg2.register);
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,
+            insn.destination().addressingMode );
+        assertEquals( Register.A2, insn.destination().getValue().asRegister().register );
+    }
+
+    public void testParseRegisterRange5() throws Exception
+    {
+        final AST ast = parseAST("move.w a0/d0-d2,(a2)+");
+        assertEquals(1,ast.childCount());
+        final StatementNode stmt = ast.child(0).asStatement();
+        final InstructionNode insn = stmt.child(0).asInstruction();
+        assertEquals( Instruction.MOVE, insn.getInstructionType() );
+        assertEquals( AddressingMode.IMPLIED, insn.source().addressingMode );
+
+        final RegisterListNode list = insn.source().getValue().asRegisterList();
+        final RegisterNode reg1 = list.child(0).asRegister();
+        final RegisterRangeNode reg2 = list.child(1).asRegisterRange();
+
+        assertEquals( Register.A0, reg1.register);
+        assertEquals( Register.D0, reg2.rangeStart().register);
+        assertEquals( Register.D2, reg2.rangeEnd().register);
+
+        assertEquals( AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT,
+            insn.destination().addressingMode );
+        assertEquals( Register.A2, insn.destination().getValue().asRegister().register );
+    }
+
     public void testParseANDI_SR() {
         final AST ast = parseAST("and #$1234,sr");
         assertEquals(1,ast.childCount());

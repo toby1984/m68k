@@ -2,6 +2,7 @@ package de.codersourcery.m68k.assembler;
 
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.parser.ast.IASTNode;
 
 public class Symbol
 {
@@ -19,7 +20,7 @@ public class Symbol
     }
 
     public final Identifier identifier;
-    public ASTNode declarationSite;
+    public IASTNode declarationSite;
     public SymbolType type;
     public Object value;
 
@@ -48,7 +49,7 @@ public class Symbol
                 '}';
     }
 
-    public void setDeclarationSite(ASTNode declaration)
+    public void setDeclarationSite(IASTNode declaration)
     {
         if ( declaration == null ) {
             throw new IllegalArgumentException("Declaration AST node must not be NULL");
@@ -56,7 +57,7 @@ public class Symbol
         this.declarationSite = declaration;
     }
 
-    public ASTNode getDeclarationSite()
+    public IASTNode getDeclarationSite()
     {
         return declarationSite;
     }

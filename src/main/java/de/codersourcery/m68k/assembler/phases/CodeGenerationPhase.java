@@ -5,6 +5,7 @@ import de.codersourcery.m68k.assembler.ICompilationPhase;
 import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.parser.ast.ASTNode;
 import de.codersourcery.m68k.parser.ast.DirectiveNode;
+import de.codersourcery.m68k.parser.ast.IASTNode;
 import de.codersourcery.m68k.parser.ast.ICodeGeneratingNode;
 import de.codersourcery.m68k.parser.ast.StatementNode;
 
@@ -40,7 +41,7 @@ public class CodeGenerationPhase implements ICompilationPhase
 
         final boolean debug = ctx.isDebugModeEnabled();
 
-        final BiConsumer<ASTNode, ASTNode.IterationCtx<Void>> visitor = (node,itCtx) ->
+        final BiConsumer<IASTNode, ASTNode.IterationCtx<Void>> visitor = (node, itCtx) ->
         {
             if ( node instanceof DirectiveNode )
             {

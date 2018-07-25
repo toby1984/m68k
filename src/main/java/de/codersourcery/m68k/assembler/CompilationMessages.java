@@ -3,6 +3,7 @@ package de.codersourcery.m68k.assembler;
 import de.codersourcery.m68k.parser.TextRegion;
 import de.codersourcery.m68k.parser.Token;
 import de.codersourcery.m68k.parser.ast.ASTNode;
+import de.codersourcery.m68k.parser.ast.IASTNode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,12 +40,12 @@ public class CompilationMessages implements ICompilationMessages
     }
 
     @Override
-    public void error(CompilationUnit unit,String message, ASTNode node) {
+    public void error(CompilationUnit unit,String message, IASTNode node) {
         error(unit,message,node == null ? null : node.getMergedRegion());
     }
 
     @Override
-    public void error(CompilationUnit unit,String message, ASTNode node, Throwable t)
+    public void error(CompilationUnit unit,String message, IASTNode node, Throwable t)
     {
         if ( t != null ) {
             t.printStackTrace();
@@ -69,7 +70,7 @@ public class CompilationMessages implements ICompilationMessages
     }
 
     @Override
-    public void warn(CompilationUnit unit,String message, ASTNode node) {
+    public void warn(CompilationUnit unit,String message, IASTNode node) {
         warn(unit,message,node == null ? null : node.getMergedRegion());
     }
 
@@ -90,7 +91,7 @@ public class CompilationMessages implements ICompilationMessages
     }
 
     @Override
-    public void info(CompilationUnit unit,String message, ASTNode node) {
+    public void info(CompilationUnit unit,String message, IASTNode node) {
         info(unit,message,node == null ? null : node.getMergedRegion());
     }
 

@@ -29,6 +29,21 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    MOVEM("MOVEM",2)
+    {
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            // TODO: Implement me
+            throw new UnsupportedOperationException("Method checkSupports not implemented");
+        }
+    },
     CHK("CHK",2) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -1717,24 +1732,20 @@ D/A   |     |   |           |
     public static final String SRC_BRIEF_EXTENSION_WORD = "riiiqee0wwwwwwww";
     public static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
 
-    public static final InstructionEncoding AND_SRC_EA_ENCODING =
-        InstructionEncoding.of("1100DDD0SSmmmsss"); // src eaMode/eaRegister contained in lower 6 bits
+    // src eaMode/eaRegister contained in lower 6 bits
+    public static final InstructionEncoding AND_SRC_EA_ENCODING  = InstructionEncoding.of("1100DDD0SSmmmsss");
+    // dst eaMode/eaRegister contained in lower 6 bits
+    public static final InstructionEncoding AND_DST_EA_ENCODING  = InstructionEncoding.of("1100sss1SSMMMDDD");
+    public static final InstructionEncoding ANDI_TO_CCR_ENCODING = InstructionEncoding.of("0000001000111100","00000000vvvvvvvv");
+    public static final InstructionEncoding ANDI_BYTE_ENCODING   = InstructionEncoding.of("0000001000MMMDDD","00000000_vvvvvvvv");
+    public static final InstructionEncoding ANDI_WORD_ENCODING   = InstructionEncoding.of("0000001001MMMDDD","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding ANDI_LONG_ENCODING   = InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding ANDI_TO_SR_ENCODING  = InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
-    public static final InstructionEncoding AND_DST_EA_ENCODING =
-        InstructionEncoding.of("1100sss1SSMMMDDD"); // dst eaMode/eaRegister contained in lower 6 bits
-
-    public static final InstructionEncoding ANDI_TO_CCR_ENCODING =
-        InstructionEncoding.of("0000001000111100","00000000vvvvvvvv");
-
-    public static final InstructionEncoding ANDI_BYTE_ENCODING =
-        InstructionEncoding.of("0000001000MMMDDD","00000000_vvvvvvvv");
-    public static final InstructionEncoding ANDI_WORD_ENCODING =
-        InstructionEncoding.of("0000001001MMMDDD","vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding ANDI_LONG_ENCODING =
-        InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
-
-    public static final InstructionEncoding ANDI_TO_SR_ENCODING =
-            InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding MOVEM_FROM_REGISTERS_ENCODING =
+        InstructionEncoding.of("010010001SMMMDDD");
+    public static final InstructionEncoding MOVEM_TO_REGISTERS_ENCODING   =
+        InstructionEncoding.of("010011001Smmmsss");
 
     public static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
 
@@ -1984,5 +1995,8 @@ D/A   |     |   |           |
         put(ANDI_LONG_ENCODING,AND);
         put(AND_SRC_EA_ENCODING,AND);
         put(AND_DST_EA_ENCODING,AND);
+
+        put(MOVEM_FROM_REGISTERS_ENCODING,MOVEM);
+        put(MOVEM_TO_REGISTERS_ENCODING,MOVEM);
     }};
 }
