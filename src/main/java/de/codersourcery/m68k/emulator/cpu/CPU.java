@@ -990,6 +990,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     cycles += 4;
                     return;
                 }
+                if ( ( instruction & 0b1111111111000000 ) == 0b0100010011000000 )
+                {
+                    // MOVE_TO_CCR_ENCODING
+                    decodeSourceOperand(instruction,2,false);
+                    statusRegister = (statusRegister & ~0b11111) | (value & 0b11111);
+                    return;
+                }
+
                 if ( ( instruction & 0b1111111110000000 ) == 0b0100100010000000 )
                 {
                     // MOVEM_FROM_REGISTERS_ENCODING

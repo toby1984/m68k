@@ -1221,6 +1221,12 @@ public enum Instruction
 
                 insn.setImplicitOperandSize( OperandSize.WORD );
 
+                if ( insn.destination().getValue().isRegister(Register.CCR ) ) {
+                    // MOVE to CCR
+                    extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                    return MOVE_TO_CCR_ENCODING.append(extraInsnWords);
+                }
+
                 // regular move instruction
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 if ( insn.instruction == MOVEA )
@@ -1848,6 +1854,9 @@ D/A   |     |   |           |
     public static final InstructionEncoding LEA_LONG_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv");
 
+    public static final InstructionEncoding MOVE_TO_CCR_ENCODING =
+        InstructionEncoding.of("0100010011mmmsss");
+
     public static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
 
     public static final InstructionEncoding MOVE_USP_TO_AX_ENCODING = InstructionEncoding.of("0100111001101DDD");
@@ -2001,6 +2010,7 @@ D/A   |     |   |           |
         put(MOVE_USP_TO_AX_ENCODING,MOVE);
         put(MOVEA_LONG_ENCODING,MOVEA);
         put(MOVEA_WORD_ENCODING,MOVEA);
+        put(MOVE_TO_CCR_ENCODING,MOVE);
 
         put(LEA_LONG_ENCODING,LEA);
         put(LEA_WORD_ENCODING,LEA);

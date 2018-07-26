@@ -41,7 +41,7 @@
 [X] LSR
 [X] MOVE
 [X] MOVEA
-[ ] MOVE to CCR
+[X] MOVE to CCR
 [ ] MOVE from SR
 [ ] MOVE to SR
 [X] MOVE USP

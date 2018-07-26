@@ -710,6 +710,12 @@ public class Disassembler
                     appendln("move usp,a"+regNum);
                     return;
                 }
+                if ( matches(insnWord,Instruction.MOVE_TO_CCR_ENCODING ) ) {
+                    appendln("move.w ");
+                    decodeOperand(2,(insnWord&0b111000)>>>3,insnWord&0b111);
+                    append(",ccr");
+                    return;
+                }
                 switch( (insnWord & 0b1111000000000000) >>> 12 ) {
                     case 0b0001:
                         appendln("move.b ");

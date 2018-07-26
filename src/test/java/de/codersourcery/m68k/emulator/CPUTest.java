@@ -45,6 +45,21 @@ public class CPUTest extends TestCase
         cpu = new CPU(CPUType.BEST,memory);
     }
 
+    public void testMoveToCCR() {
+
+        final int adr = PROGRAM_START_ADDRESS+256;
+        execute(cpu->cpu.clearFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.w #$ffff,"+adr,
+            "lea "+adr+",a0",
+            "move.w (a0)+,ccr")
+            .zero().extended().negative().overflow().carry().notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.w #$0000,"+adr,
+            "move.w "+adr+",ccr")
+            .notZero().noExtended().notNegative().noOverflow().noCarry().notSupervisor().noIrqActive();
+    }
+
     public void testMOVEMToMemoryLong()
     {
         final int adr = PROGRAM_START_ADDRESS+256;

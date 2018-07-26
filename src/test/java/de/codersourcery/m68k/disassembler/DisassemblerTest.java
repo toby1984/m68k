@@ -40,6 +40,11 @@ public class DisassemblerTest extends TestCase
         compile(op+" #5,(a0)");
     }
 
+    public void testMoveToCCR() {
+        compile("move.w (a0)+,ccr");
+        compile("move.w $1200,ccr");
+    }
+
     public void testMOVEMToMemory()
     {
         compile("movem.w d3/a4-a5,-(a0)");
