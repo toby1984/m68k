@@ -1,5 +1,7 @@
 package de.codersourcery.m68k.assembler.arch;
 
+import de.codersourcery.m68k.utils.Misc;
+
 import java.util.Arrays;
 import java.util.Set;
 
@@ -11,12 +13,12 @@ import java.util.Set;
 public enum AddressingMode
 {
     /*
-     *  Dn                           => DATA_REGISTER_DIRECT
-     *  An                           => ADDRESS_REGISTER_DIRECT
-     *  (An)                         => ADDRESS_REGISTER_INDIRECT
-     *  (An)+                        => ADDRESS_REGISTER_INDIRECT_POST_INCREMENT
-     *  -(An)                        => ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT
-     *  d16(An)                      => ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT
+     *  Dn                           => DATA_REGISTER_DIRECT (000)
+     *  An                           => ADDRESS_REGISTER_DIRECT (001)
+     *  (An)                         => ADDRESS_REGISTER_INDIRECT (010)
+     *  (An)+                        => ADDRESS_REGISTER_INDIRECT_POST_INCREMENT (011)
+     *  -(An)                        => ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT (100)
+     *  d16(An)                      => ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT (101)
      * (d8,An, Xn.SIZE*SCALE)        => ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT
      * (bd,An,Xn.SIZE*SCALE)         => ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT
      * ([bd,An],Xn.SIZE*SCALE,od)    => MEMORY_INDIRECT_POSTINDEXED

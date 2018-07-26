@@ -53,9 +53,10 @@ public enum Instruction
             {
                 throw new RuntimeException("MOVEM requires exactly one register,register range or register list");
             }
-            if ( srcIsRegList )
+            final boolean registersToMemory = srcIsRegList;
+            if ( registersToMemory )
             {
-                // MOVEM <registers>,<ea>
+                // registers -> memory
                 switch( node.destination().addressingMode )
                 {
                     case ADDRESS_REGISTER_INDIRECT:
@@ -67,13 +68,13 @@ public enum Instruction
                     case ABSOLUTE_LONG_ADDRESSING:
                         break;
                     default:
-                        throw new RuntimeException("Invalid addressing mode for MOVEM destination operand");
+                        throw new RuntimeException("Invalid addressing mode "+node.destination().addressingMode+" for MOVEM destination operand");
                 }
                 // TODO: 68020+ supports more addressing modes here...
             }
             else
                 {
-                // MOVEM <ea>,<registers>
+                // memory -> registers
                 switch( node.source().addressingMode )
                 {
                     case ADDRESS_REGISTER_INDIRECT:

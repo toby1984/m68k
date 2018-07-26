@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
@@ -313,6 +314,17 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         }
     }
 
+    private void memStore(int address,int value,int size)
+    {
+        switch(size) {
+            case 1: memory.writeByte(address,value); break;
+            case 2: memory.writeWord(address,value); break;
+            case 4: memory.writeLong(address,value); break;
+            default:
+                throw new RuntimeException("Unreachable code reached,size: "+size);
+        }
+    }
+
     private int memLoadWord(int address) {
         return memory.readWordNoCheck(address);
     }
@@ -332,16 +344,29 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
     /**
      * Calculates the effective address based on EA mode and EA register bit patterns.
      *
+     * CAREFUL: This method will increment/decrement address registers if post-increment/pre-decrement addressing is active.
+     *
      * @param operandSize
      * @param eaMode
      * @param eaRegister
-     * @return true on success, false on failure (invalid instruction,misaligned memory access)
+     * @param applyPostPre whether to increment/decrement address registers if post-increment/pre-decrement addressing is being used
      */
-    private void calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister) {
-        calculateEffectiveAddress(operandSize,eaMode,eaRegister,true);
+    private void calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister,boolean applyPostPre) {
+        calculateEffectiveAddress(operandSize,eaMode,eaRegister,true,applyPostPre);
     }
 
-    private void calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister,boolean advancePC)
+    /**
+     * Calculates the effective address based on EA mode and EA register bit patterns.
+     *
+     * CAREFUL: This method will increment/decrement address registers if post-increment/pre-decrement addressing is active.
+     *
+     * @param operandSize
+     * @param eaMode
+     * @param eaRegister
+     * @param advancePC
+     * @param applyPostPre whether to increment/decrement address registers if post-increment/pre-decrement addressing is being used
+     */
+    private void calculateEffectiveAddress(int operandSize, int eaMode, int eaRegister,boolean advancePC,boolean applyPostPre)
     {
         switch( eaMode )
         {
@@ -362,19 +387,25 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b011:
                 // ADDRESS_REGISTER_INDIRECT_POST_INCREMENT;
                 ea = addressRegisters[ eaRegister ];
-                if ( eaRegister == 7 && operandSize == 1 ) {
-                    // stack ptr always needs to be an even address
-                    addressRegisters[eaRegister] += 2;
-                }
-                else
+
+                if ( applyPostPre )
                 {
-                    addressRegisters[eaRegister] += operandSize;
+                    if (eaRegister == 7 && operandSize == 1)
+                    {
+                        // stack ptr always needs to be an even address
+                        addressRegisters[eaRegister] += 2;
+                    }
+                    else
+                    {
+                        addressRegisters[eaRegister] += operandSize;
+                    }
                 }
                 cycles += operandSize == 4 ? 8 : 4;
                 return;
             case 0b100:
                 // ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT;
-                if ( eaRegister == 7 && operandSize == 1 ) {
+                if (eaRegister == 7 && operandSize == 1)
+                {
                     // stack ptr always needs to be an even address
                     ea = addressRegisters[eaRegister] - 2;
                 }
@@ -382,7 +413,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 {
                     ea = addressRegisters[eaRegister] - operandSize;
                 }
-                addressRegisters[ eaRegister ] = ea;
+                if ( applyPostPre )
+                {
+                    addressRegisters[ eaRegister ] = ea;
+                }
                 cycles += operandSize == 4 ? 10 : 6;
                 return;
             case 0b101:
@@ -956,6 +990,18 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     cycles += 4;
                     return;
                 }
+                if ( ( instruction & 0b1111111110000000 ) == 0b0100100010000000 )
+                {
+                    // MOVEM_FROM_REGISTERS_ENCODING
+                    moveMultipleRegisters(instruction,true);
+                    return;
+                }
+                if ( ( instruction & 0b1111111110000000 ) == 0b0100110010000000 )
+                {
+                    // MOVEM_TO_REGISTERS_ENCODING
+                    moveMultipleRegisters(instruction,false);
+                    return;
+                }
                 if ( (instruction & 0b1111111111111000) == 0b0100111001011000) {
                     // UNLK
                     final int regNum = (instruction & 0b111);
@@ -1385,7 +1431,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
                     int eaMode     = (instruction & 0b111000) >> 3;
                     int eaRegister = (instruction & 0b000111);
-                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister);
+                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
                     int value = memLoadWord( ea );
                     value = rotate( value,2,RotateMode.ROTATE_WITH_EXTEND,rotateLeft,1 );
                     memory.writeWord(ea,value);
@@ -1398,7 +1444,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
                     int eaMode     = (instruction & 0b111000) >> 3;
                     int eaRegister = (instruction & 0b000111);
-                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister);
+                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
                     int value = memLoadWord( ea );
                     value = rotate( value,2,RotateMode.ARITHMETIC_SHIFT,rotateLeft,1 );
                     memory.writeWord(ea,value);
@@ -1411,7 +1457,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
                     int eaMode     = (instruction & 0b111000) >> 3;
                     int eaRegister = (instruction & 0b000111);
-                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister);
+                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
                     int value = memLoadWord( ea );
                     value = rotate( value,2,RotateMode.LOGICAL_SHIFT,rotateLeft,1 );
                     memory.writeWord(ea,value);
@@ -1423,7 +1469,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
                     int eaMode     = (instruction & 0b111000) >> 3;
                     int eaRegister = (instruction & 0b000111);
-                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister);
+                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
                     int value = memLoadWord( ea );
                     value = rotate( value,2,RotateMode.ROTATE,rotateLeft,1 );
                     memory.writeWord(ea,value);
@@ -2065,7 +2111,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 }
                 throw new RuntimeException("Unreachable code reached");
             default:
-                calculateEffectiveAddress(operandSize, eaMode, eaRegister);
+                calculateEffectiveAddress(operandSize, eaMode, eaRegister,true);
                 switch (operandSize)
                 {
                     case 1:
@@ -2365,6 +2411,164 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
             }
         }
         this.statusRegister = newValue;
+    }
+
+    private void moveMultipleRegisters(int instructionWord,boolean regsToMemory) {
+
+        final int operandSizeInBytes = (instructionWord & 1<<6) == 0 ? 2 : 4;
+        final int eaMode = (instructionWord & 0b111000)>>>3;
+        final int eaRegister = (instructionWord & 0b111);
+
+        int bitMask = memLoadWord(pc);
+        pc += 2;
+
+        final int oldCycles = cycles; // backup cycle count because calculateEffectiveAddress() will update it
+        calculateEffectiveAddress(operandSizeInBytes,eaMode,eaRegister,false);
+        cycles = oldCycles; // restore cycle count
+
+        int address = ea;
+        if ( regsToMemory )
+        {
+            // registers -> memory
+            final boolean isPreDecrement = eaMode == 0b100;
+            if ( isPreDecrement )
+            {
+                // note: register bitmask is reversed when -(An) is being used
+
+                // increment address by operandSize as
+                // calculateEffectiveAddress() already set EA to (actual-operandSize)
+                // but we do this ourselves inside the loop
+                address += operandSizeInBytes;
+
+                // process address registers with predecrement
+                for ( int bit = 0 , mask = 1 ; bit < 8 ; bit++,mask<<=1)
+                {
+                    if ( (bitMask & mask) != 0 )
+                    {
+                        address -= operandSizeInBytes;
+                        memStore(address,addressRegisters[7-bit],operandSizeInBytes);
+                    }
+                }
+
+                // process data registers
+                for ( int bit = 0 , mask = 1<<8 ; bit < 8 ; bit++,mask<<=1)
+                {
+                    if ( (bitMask & mask) != 0 )
+                    {
+                        address -= operandSizeInBytes;
+                        memStore(address,dataRegisters[7-bit],operandSizeInBytes);
+                    }
+                }
+                addressRegisters[ eaRegister ] = address;
+            }
+            else
+            {
+                // process data registers (no predecrement)
+                for ( int bit = 0 , mask = 1 ; bit < 8 ; bit++,mask<<=1)
+                {
+                    if ( (bitMask & mask) != 0 )
+                    {
+                        memStore(address,dataRegisters[bit],operandSizeInBytes);
+                        address += operandSizeInBytes;
+                    }
+                }
+
+                // process address registers
+                for ( int bit = 0 , mask = 1<<8 ; bit < 8 ; bit++,mask<<=1)
+                {
+                    if ( (bitMask & mask) != 0 )
+                    {
+                        memStore(address,addressRegisters[bit],operandSizeInBytes);
+                        address += operandSizeInBytes;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // memory -> registers
+
+            // process data registers
+            for ( int bit = 0 , mask = 1 ; bit < 8 ; bit++,mask<<=1)
+            {
+                if ( (bitMask & mask) != 0 )
+                {
+                    dataRegisters[bit] = memLoad(address,operandSizeInBytes);
+                    address += operandSizeInBytes;
+                }
+            }
+
+            // process address registers
+            for ( int bit = 0 , mask = 1<<8 ; bit < 8 ; bit++,mask<<=1)
+            {
+                if ( (bitMask & mask) != 0 )
+                {
+                    addressRegisters[bit] = memLoad(address,operandSizeInBytes);
+                    address += operandSizeInBytes;
+                }
+            }
+
+            final boolean isPostIncrement = eaMode == 0b011;
+            if ( isPostIncrement ) {
+                addressRegisters[ eaRegister ] = address;
+            }
+        }
+
+        /*
+        Calculate cycles.
+
+                    110       111/000    111/001      111/010     111/011    010      011      100      101
+                 d(An,ix)     xxx.W      xxx.L      d(pc)      d(pc,ix)   (An)     (An)+    -(An)     d(An)
+MOVEM	word	   14+4n      12+4n      16+4n	    -		-              8+4n	   -		  8+4n	  12+4n
+R->M    long	   14+8n      12+8n      16+8n	    -		-              8+8n	   -		  8+8n	  12+8n
+
+MOVEM	word	   18+4n      16+4n      20+4n	    16+4n      18+4n      12+4n	   12+4n	  -	      16+4n
+M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   12+8n	  -	      16+8n
+         */
+
+        final int regsMovedCount = Integer.bitCount(bitMask & 0xffff); // need to do &0xffff because of memLoad() sign extension
+        if ( operandSizeInBytes == 2 ) {
+            cycles += 4*regsMovedCount;
+        } else {
+            cycles += 8*regsMovedCount;
+        }
+
+        if ( regsToMemory )
+        {
+            // REGS -> MEMORY
+            switch( eaMode )
+            {
+                case 0b110: cycles += 14;break;case 0b111:
+                    switch(eaRegister)
+                    {
+                        case 0b000: cycles += 12;break;
+                        case 0b001: cycles += 16;break;
+                        default: throw new RuntimeException("Unreachable code reached");
+                    }
+                case 0b010:
+                case 0b100: cycles += 8;break;
+                case 0b101: cycles += 12;break;
+                default: throw new RuntimeException("Unreachable code reached");
+            }
+        } else {
+            // MEMORY -> REGS
+            switch( eaMode )
+            {
+                case 0b110: cycles+=18;break;
+                case 0b111:
+                    switch(eaRegister)
+                    {
+                        case 0b000: cycles += 16;break;
+                        case 0b001: cycles += 20;break;
+                        case 0b011: cycles += 18;break;
+                        default: throw new RuntimeException("Unreachable code reached");
+                    }
+                case 0b011: // (a0)+
+                case 0b010: cycles+=12;break; // (a0)
+                case 0b101: cycles+=16;break; // d(An)
+                default: throw new RuntimeException("Unreachable code reached, eaMode = "+Misc.binary8Bit(eaMode ) );
+            }
+        }
     }
 
     @Override

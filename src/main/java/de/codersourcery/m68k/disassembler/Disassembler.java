@@ -1,11 +1,13 @@
 package de.codersourcery.m68k.disassembler;
 
 import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.emulator.cpu.CPU;
 import de.codersourcery.m68k.utils.Misc;
+import jdk.jshell.execution.DirectExecutionControl;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
@@ -223,6 +225,42 @@ public class Disassembler
                 eaMode     = (insnWord & 0b111000) >>> 3;
                 eaRegister = (insnWord & 0b000111);
                 decodeOperand(1<<sizeBits,eaMode,eaRegister);
+                return;
+            case MOVEM:
+                /*
+    public static final InstructionEncoding MOVEM_FROM_REGISTERS_ENCODING =
+        InstructionEncoding.of("010010001SMMMDDD","LLLLLLLL_LLLLLLLL") .decorateWith(MOVEM_SIZE_DECORATOR);
+    public static final InstructionEncoding MOVEM_TO_REGISTERS_ENCODING   =
+        InstructionEncoding.of("010011001Smmmsss","LLLLLLLL_LLLLLLLL") .decorateWith(MOVEM_SIZE_DECORATOR);
+                 */
+                appendln("movem");
+                if ( ( insnWord & 1<<6) == 0) {
+                    append(".w ");
+                    operandSize = 2;
+                } else {
+                    append(".l ");
+                    operandSize = 4;
+                }
+                eaMode = (insnWord & 0b111000)>>>3;
+                eaRegister = insnWord & 0b111;
+                int registerMask = readWord();
+
+                if ( (insnWord & 0b1111111110000000) == 0b0100110010000000) {
+                    // MOVEM <ea>,<register list>
+                    decodeOperand(operandSize,eaMode,eaRegister);
+                    append(",");
+                    printRegisterList(registerMask);
+                    return;
+                }
+                // MOVEM <register list>,<ea>
+                final boolean isPredecrement = eaMode == AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT.eaModeField;
+                if ( isPredecrement ) {
+                    // printRegisterList() always assumes bitmask bits in A7-A0|D7-D0 order
+                    registerMask = Misc.reverseWord(registerMask);
+                }
+                printRegisterList(registerMask);
+                append(",");
+                decodeOperand(operandSize,eaMode,eaRegister);
                 return;
             case BCHG:
                 appendln("bchg ");
@@ -701,6 +739,65 @@ public class Disassembler
                 return;
         }
         illegalOperation(insnWord);
+    }
+
+    // print MOVEM register list
+    private void printRegisterList(int registerMask)
+    {
+       // Always assumes bitmask bits in A7-A0|D7-D0 order
+        // print data registers first
+        String list1 = printRegisterList("d",0,registerMask);
+        String list2 = printRegisterList("a",8,registerMask);
+
+        if ( list1.isEmpty() )
+        {
+            append(list2);
+        }
+        else
+        {
+            append(list1);
+            if ( ! list2.isEmpty() ) {
+                append("/");
+                append(list2);
+            }
+        }
+    }
+
+    public static String printRegisterList(String registerPrefix,int startBit,int registerMask)
+    {
+        // Always assumes bitmask bits in A7-A0|D7-D0 order
+        // print data registers first
+        final StringBuilder buffer = new StringBuilder();
+        int firstSetBit = -1;
+
+        final int end = startBit+8;
+        for ( int bit = 0,mask = 1<<startBit ; bit <= end ; bit++, mask <<= 1)
+        {
+            final boolean bitSet = (registerMask & mask) != 0;
+            if ( bitSet && bit < end )
+            {
+                if ( firstSetBit == -1 ) {
+                    firstSetBit = bit;
+                }
+            }
+            else
+            {
+                if ( firstSetBit != -1 )
+                {
+                    if ( buffer.length() > 0 ) {
+                        buffer.append("/");
+                    }
+                    if ( firstSetBit == bit-1 ) {
+                        buffer.append(registerPrefix).append(firstSetBit);
+                    } else
+                    {
+                        buffer.append(registerPrefix).append(firstSetBit).append("-").append(registerPrefix).append(bit - 1);
+                    }
+                    firstSetBit = -1;
+                }
+            }
+        }
+        return buffer.toString();
     }
 
     private void illegalOperation(int insnWord ) {

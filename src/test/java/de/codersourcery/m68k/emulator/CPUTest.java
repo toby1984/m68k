@@ -45,6 +45,124 @@ public class CPUTest extends TestCase
         cpu = new CPU(CPUType.BEST,memory);
     }
 
+    public void testMOVEMToMemoryLong()
+    {
+        final int adr = PROGRAM_START_ADDRESS+256;
+        final int adrExpected = adr - 6*4;
+
+        System.out.println("Address: "+Misc.hex(adr) );
+        System.out.println("Expected address: "+Misc.hex(adrExpected) );
+        execute(cpu->{},
+            "lea "+adr+",a3",
+            "move.l #1,d0",
+            "move.l #2,d1",
+            "move.l #3,d2",
+            "move.l #4,a0",
+            "move.l #5,a1",
+            "move.l #6,a2",
+            "movem.l d0-d2/a0-a2,-(a3)"
+        ).notSupervisor().noIrqActive()
+            .expectA3( adrExpected )
+            .expectMemoryLongs(adrExpected,1,2,3,4,5,6);
+    }
+
+    public void testMOVEMToMemoryWord()
+    {
+        final int adr = PROGRAM_START_ADDRESS+256;
+        final int expectedAdr = adr - 6*2;
+
+        execute(cpu->{},
+            "lea "+adr+",a3",
+            "move.l #1,d0",
+            "move.l #2,d1",
+            "move.l #3,d2",
+            "move.l #4,a0",
+            "move.l #5,a1",
+            "move.l #6,a2",
+            "movem.w d0-d2/a0-a2,-(a3)"
+        ).notSupervisor().noIrqActive()
+            .expectMemoryWords(expectedAdr,1,2,3,4,5,6)
+            .expectA3( expectedAdr );
+    }
+
+    public void testMOVEMToMemoryWord2()
+    {
+        final int adr = PROGRAM_START_ADDRESS+128;
+
+        execute(cpu->{},
+            "lea "+adr+",a3",
+            "move.l #1,d0",
+            "move.l #2,d1",
+            "move.l #3,d2",
+            "move.l #4,a0",
+            "move.l #5,a1",
+            "move.l #6,a2",
+            "movem.w d0-d2/a0-a2,"+adr
+        ).notSupervisor().noIrqActive()
+            .expectMemoryWords(adr,1,2,3,4,5,6)
+            .expectA3( adr );
+    }
+
+    public void testMOVEMFromMemoryWords()
+    {
+        final int adr = PROGRAM_START_ADDRESS+128;
+
+        execute(cpu-> writeWords(adr,1,2,3,4,5,6),
+            "movem.w "+adr+",d0-d2/a0-a2"
+        ).notSupervisor().noIrqActive()
+            .expectD0(1)
+            .expectD1(2)
+            .expectD2(3)
+            .expectA0(4)
+            .expectA1(5)
+            .expectA2(6);
+    }
+
+    public void testMOVEMFromMemoryLong()
+    {
+        final int adr = PROGRAM_START_ADDRESS+128;
+
+        execute(cpu-> writeLongs(adr,1,2,3,4,5,6),
+            "movem.l "+adr+",d0-d2/a0-a2"
+        ).notSupervisor().noIrqActive()
+            .expectD0(1)
+            .expectD1(2)
+            .expectD2(3)
+            .expectA0(4)
+            .expectA1(5)
+            .expectA2(6);
+    }
+
+    public void testMoveMRoundTrip()
+    {
+        final int adr = PROGRAM_START_ADDRESS+256;
+
+        execute(cpu->{},
+            "lea "+adr+",a3",
+            "move.l #1,d0",
+            "move.l #2,d1",
+            "move.l #3,d2",
+            "move.l #4,a0",
+            "move.l #5,a1",
+            "move.l #6,a2",
+            "movem.l d0-d2/a0-a2,-(a3)",
+            "clr.l d0",
+            "clr.l d1",
+            "clr.l d2",
+            "clr.l a0",
+            "clr.l a1",
+            "clr.l a2",
+            "movem.l (a3)+,d0-d2/a0-a2"
+        ).notSupervisor().noIrqActive()
+            .expectD0(1)
+            .expectD1(2)
+            .expectD2(3)
+            .expectA0(4)
+            .expectA1(5)
+            .expectA2(6)
+            .expectA3(adr);
+    }
+
     public void testLEA()
     {
         execute("lea $12345678,a0", cpu -> cpu.setFlags(ALL_USR_FLAGS))
@@ -1710,6 +1828,37 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             return assertHexEquals( "value on top of stack mismatch" , expected, actual);
         }
 
+        public ExpectionBuilder expectMemoryWords(int startAddress,int expect1,int...additional)
+        {
+            int adr = startAddress;
+            expectMemoryWord(adr,expect1);
+            if ( additional != null )
+            {
+                adr+=2;
+                for ( int exp : additional ) {
+                    expectMemoryWord(adr,exp);
+                    adr+=2;
+                }
+            }
+            return this;
+        }
+
+        public ExpectionBuilder expectMemoryLongs(int startAddress,int expect1,int...additional)
+        {
+            final int len = 1 + ( (additional==null) ? 0 : additional.length);
+            int adr = startAddress;
+            expectMemoryLong(adr,expect1);
+            if ( additional != null )
+            {
+                adr+=4;
+                for ( int exp : additional ) {
+                    expectMemoryLong(adr,exp);
+                    adr+=4;
+                }
+            }
+            return this;
+        }
+
         public ExpectionBuilder expectD0(int value) { return assertHexEquals( "D0 mismatch" , value, cpu.dataRegisters[0]); }
         public ExpectionBuilder expectD1(int value) { return assertHexEquals( "D1 mismatch" , value, cpu.dataRegisters[1]); }
         public ExpectionBuilder expectD2(int value) { return assertHexEquals( "D2 mismatch" , value, cpu.dataRegisters[2]); }
@@ -1811,6 +1960,32 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 
         private String hex32(int value) {
             return "$"+StringUtils.leftPad(Integer.toHexString(value), 8 , '0' );
+        }
+    }
+
+    private void writeWords(int startAddress,int word1,int...additional)
+    {
+        memory.writeWord(startAddress,word1);
+        if ( additional != null )
+        {
+            for (int anAdditional : additional)
+            {
+                startAddress += 2;
+                memory.writeWord(startAddress, anAdditional);
+            }
+        }
+    }
+
+    private void writeLongs(int startAddress,int word1,int...additional)
+    {
+        memory.writeLong(startAddress,word1);
+        if ( additional != null )
+        {
+            for (int anAdditional : additional)
+            {
+                startAddress += 4;
+                memory.writeLong(startAddress, anAdditional);
+            }
         }
     }
 }

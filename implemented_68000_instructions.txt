@@ -45,7 +45,7 @@
 [ ] MOVE from SR
 [ ] MOVE to SR
 [X] MOVE USP
-[ ] MOVEM
+[X] MOVEM
 [ ] MOVEP
 [X] MOVEQ
 [ ] MULS
