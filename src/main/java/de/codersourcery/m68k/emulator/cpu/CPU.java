@@ -889,6 +889,28 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b0100_0000_0000_0000:
 
+                if ( ( instruction & 0b1111111111000000 ) == 0b0100000011000000 )
+                {
+                    // MOVE_FROM_SR_ENCODING
+                    if ( assertSupervisorMode() )
+                    {
+                        value = statusRegister;
+                        storeValue( (instruction & 0b111000) >>> 3, instruction & 0b111, 2 );
+                        cycles += 12;
+                    }
+                    return;
+                }
+
+                if ( ( instruction & 0b1111111111000000 ) == 0b0100011011000000 ) {
+                    // MOVE_TO_SR_ENCODING
+                    if ( assertSupervisorMode() )
+                    {
+                        decodeSourceOperand( instruction,2,false );
+                        setStatusRegister( value & 0xffff );
+                        cycles += 12;
+                    }
+                    return;
+                }
                 if ( (instruction & 0b1111111100000000) == 0b0100011000000000) {
                     // NOT
                     final int sizeBits = (instruction &0b11000000) >> 6;
@@ -2215,7 +2237,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
             addressRegisters[7] = supervisorModeStackPtr;
             pc = memLoadLong(4 );
             // enter supervisor mode, disable tracing, set interrupt level 7
-            statusRegister = ( (FLAG_I2|FLAG_I1|FLAG_I0) | FLAG_SUPERVISOR_MODE ) & ~(FLAG_T0|FLAG_T1);
+            statusRegister = FLAG_I2|FLAG_I1|FLAG_I0|FLAG_SUPERVISOR_MODE;
             return;
         }
 

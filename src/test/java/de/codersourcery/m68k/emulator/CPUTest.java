@@ -1635,13 +1635,29 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
     public void testMoveFromSR()
     {
         final int adr = PROGRAM_START_ADDRESS+128;
-        execute( cpu-> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),"move.w sr,"+adr)
-                .expectMemoryByte( adr,0b11111 ).notSupervisor().noIrqActive();
+        execute( cpu->
+                {
+                    cpu.setFlags( CPU.ALL_USERMODE_FLAGS );
+                },1,true,
+                "move.w sr,"+adr)
+                .expectMemoryWord( adr,CPU.ALL_USERMODE_FLAGS | CPU.FLAG_SUPERVISOR_MODE|CPU.FLAG_I0|CPU.FLAG_I1|CPU.FLAG_I2)
+                .supervisor();
     }
 
-    public void testMoveToSR() {
-        fail("Implement me");
-        compile("move.w $1200,sr");
+    public void testMoveToSR()
+    {
+        final int adr = PROGRAM_START_ADDRESS+128;
+        execute( cpu-> {},2,true,
+                "move.w #"+(CPU.FLAG_SUPERVISOR_MODE|CPU.ALL_USERMODE_FLAGS|CPU.FLAG_I1)+","+adr,
+                "move.w "+adr+",sr"
+        )
+                .expectIRQLevel( 2 )
+                .zero()
+                .overflow()
+                .carry()
+                .extended()
+                .negative()
+                .supervisor();
     }
 
     public void testTAS() {

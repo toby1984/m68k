@@ -42,8 +42,8 @@
 [X] MOVE
 [X] MOVEA
 [X] MOVE to CCR
-[ ] MOVE from SR
-[ ] MOVE to SR
+[X] MOVE from SR
+[X] MOVE to SR
 [X] MOVE USP
 [X] MOVEM
 [ ] MOVEP
