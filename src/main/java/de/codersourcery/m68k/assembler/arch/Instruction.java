@@ -1223,8 +1223,26 @@ public enum Instruction
 
                 if ( insn.destination().getValue().isRegister(Register.CCR ) ) {
                     // MOVE to CCR
+                    assertOperandSize(insn,OperandSize.WORD);
+                    checkSourceAndDestinationNotSameRegister(insn);
                     extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                     return MOVE_TO_CCR_ENCODING.append(extraInsnWords);
+                }
+
+                if ( insn.source().getValue().isRegister(Register.SR) ) {
+                    // MOVE from SR
+                    assertOperandSize(insn,OperandSize.WORD);
+                    checkSourceAndDestinationNotSameRegister(insn);
+                    extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                    return MOVE_FROM_SR_ENCODING.append(extraInsnWords);
+                }
+
+                if ( insn.destination().getValue().isRegister(Register.SR) ) {
+                    // MOVE to SR
+                    assertOperandSize(insn,OperandSize.WORD);
+                    checkSourceAndDestinationNotSameRegister(insn);
+                    extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                    return MOVE_TO_SR_ENCODING.append(extraInsnWords);
                 }
 
                 // regular move instruction
@@ -1266,6 +1284,12 @@ public enum Instruction
                 return encoding;
             default:
                 throw new RuntimeException("Internal error,unhandled instruction type " + type);
+        }
+    }
+
+    protected static void assertOperandSize(InstructionNode insn, OperandSize word) {
+        if ( ! insn.hasOperandSize( word ) ) {
+            throw new RuntimeException("Unsupported operand size "+insn.getOperandSize()+", only "+word+" is supported");
         }
     }
 
@@ -1774,6 +1798,15 @@ D/A   |     |   |           |
         }
     }
 
+    private static void checkSourceAndDestinationNotSameRegister(InstructionNode node) {
+
+        Register src=node.source().getValue().isRegister() ? node.source().getValue().asRegister().register : null;
+        Register dst=node.destination().getValue().isRegister() ? node.destination().getValue().asRegister().register : null;
+        if ( src != null && src == dst ) {
+            throw new RuntimeException("Source and destination register must be different");
+        }
+    }
+
     private static void checkDestinationAddressingModeKind(InstructionNode insn, AddressingModeKind kind)
     {
         if( ! insn.destination().addressingMode.hasKind( kind ) )
@@ -1884,6 +1917,9 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding MOVEA_WORD_ENCODING = InstructionEncoding.of(  "0011DDD001mmmsss");
     public static final InstructionEncoding MOVEA_LONG_ENCODING = InstructionEncoding.of(  "0010DDD001mmmsss");
+
+    public static final InstructionEncoding MOVE_FROM_SR_ENCODING = InstructionEncoding.of(  "0100000011MMMDDD");
+    public static final InstructionEncoding MOVE_TO_SR_ENCODING   = InstructionEncoding.of(  "0100011011mmmsss");
 
     public static final InstructionEncoding SWAP_ENCODING = InstructionEncoding.of(  "0100100001000sss");
 
@@ -2011,6 +2047,10 @@ D/A   |     |   |           |
         put(MOVEA_LONG_ENCODING,MOVEA);
         put(MOVEA_WORD_ENCODING,MOVEA);
         put(MOVE_TO_CCR_ENCODING,MOVE);
+        put(MOVE_FROM_SR_ENCODING,MOVE);
+        put(MOVE_TO_SR_ENCODING,MOVE);
+        put(MOVEM_FROM_REGISTERS_ENCODING,MOVEM);
+        put(MOVEM_TO_REGISTERS_ENCODING,MOVEM);
 
         put(LEA_LONG_ENCODING,LEA);
         put(LEA_WORD_ENCODING,LEA);
@@ -2089,8 +2129,5 @@ D/A   |     |   |           |
         put(ANDI_LONG_ENCODING,AND);
         put(AND_SRC_EA_ENCODING,AND);
         put(AND_DST_EA_ENCODING,AND);
-
-        put(MOVEM_FROM_REGISTERS_ENCODING,MOVEM);
-        put(MOVEM_TO_REGISTERS_ENCODING,MOVEM);
     }};
 }

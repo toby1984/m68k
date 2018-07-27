@@ -716,6 +716,20 @@ public class Disassembler
                     append(",ccr");
                     return;
                 }
+                if ( matches(insnWord,Instruction.MOVE_TO_SR_ENCODING ) ) {
+                    appendln("move.w ");
+                    decodeOperand(2,(insnWord&0b111000)>>>3,insnWord&0b111);
+                    append(",sr");
+                    return;
+                }
+
+                if ( matches(insnWord,Instruction.MOVE_FROM_SR_ENCODING ) ) {
+                    appendln("move.w ");
+                    append("sr,");
+                    decodeOperand(2,(insnWord&0b111000)>>>3,insnWord&0b111);
+                    return;
+                }
+
                 switch( (insnWord & 0b1111000000000000) >>> 12 ) {
                     case 0b0001:
                         appendln("move.b ");

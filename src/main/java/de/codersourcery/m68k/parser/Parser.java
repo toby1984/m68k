@@ -330,6 +330,9 @@ public class Parser
         {
             // expecting inner displacement value outside parens
             baseDisplacement = parseExpression(false,false,true);
+            if ( baseDisplacement == null ) {
+                fail( "Expected operand but got garbage",lexer.peek() );
+            }
             if ( baseDisplacement.is(NodeType.REGISTER_RANGE) ||
                  baseDisplacement.is(NodeType.REGISTER_LIST) )
             {

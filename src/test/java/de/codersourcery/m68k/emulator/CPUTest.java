@@ -1632,6 +1632,18 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 .zero().notSupervisor();
     }
 
+    public void testMoveFromSR()
+    {
+        final int adr = PROGRAM_START_ADDRESS+128;
+        execute( cpu-> cpu.setFlags( CPU.ALL_USERMODE_FLAGS ),"move.w sr,"+adr)
+                .expectMemoryByte( adr,0b11111 ).notSupervisor().noIrqActive();
+    }
+
+    public void testMoveToSR() {
+        fail("Implement me");
+        compile("move.w $1200,sr");
+    }
+
     public void testTAS() {
 
         final int adr = PROGRAM_START_ADDRESS+128;

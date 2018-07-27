@@ -285,6 +285,11 @@ public class DisassemblerTest extends TestCase
         compile("not.l d3");
     }
 
+    public void testMove_SR() {
+        compile("move.w $1200,sr");
+        compile("move.w sr,$1200");
+    }
+
     public void testLink()
     {
         compile("link a3,#$4");
