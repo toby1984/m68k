@@ -45,6 +45,13 @@ public class DisassemblerTest extends TestCase
         compile("move.w $1200,ccr");
     }
 
+    public void testMoveP() {
+        compile("movep.w d3,$80(a4)");
+        compile("movep.l d3,$80(a4)");
+        compile("movep.w $80(a4),d3");
+        compile("movep.l $80(a4),d3");
+    }
+
     public void testMOVEMToMemory()
     {
         compile("movem.w d3/a4-a5,-(a0)");

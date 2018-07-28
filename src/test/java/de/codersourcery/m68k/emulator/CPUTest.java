@@ -45,6 +45,86 @@ public class CPUTest extends TestCase
         cpu = new CPU(CPUType.BEST,memory);
     }
 
+    public void testMovePWordToMemory()
+    {
+        final int adr = PROGRAM_START_ADDRESS+256;
+        final int adrPlusOffset = adr + 10;
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$12345678,d4",
+            "lea "+adr+",a3",
+            "movep.w d4,10(a3)")
+            .zero()
+            .extended()
+            .negative()
+            .overflow()
+            .carry()
+            .expectMemoryByte(adrPlusOffset, 0x56)
+            .expectMemoryByte(adrPlusOffset+2, 0x78)
+            .notSupervisor().noIrqActive();
+    }
+
+    public void testMovePLongToMemory()
+    {
+        final int adr = PROGRAM_START_ADDRESS+256;
+        final int adrPlusOffset = adr + 10;
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$12345678,d4",
+            "lea "+adr+",a3",
+            "movep.l d4,10(a3)")
+            .zero()
+            .extended()
+            .negative()
+            .overflow()
+            .carry()
+            .expectMemoryByte(adrPlusOffset, 0x12)
+            .expectMemoryByte(adrPlusOffset+2, 0x34)
+            .expectMemoryByte(adrPlusOffset+4, 0x56)
+            .expectMemoryByte(adrPlusOffset+6, 0x78)
+            .notSupervisor().noIrqActive();
+    }
+
+    public void testMovePWordFromMemory()
+    {
+        final int adr = PROGRAM_START_ADDRESS+256;
+        final int adrPlusOffset = adr + 10;
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.b #$12,"+(adrPlusOffset),
+            "move.b #$34,"+(adrPlusOffset+2),
+            "move.b #$56,"+(adrPlusOffset+4),
+            "move.b #$78,"+(adrPlusOffset+6),
+            "move.l #$ffffffff,d4",
+            "lea "+adr+",a3",
+            "movep.w 10(a3),d4")
+            .expectD4(0xffff1234)
+            .zero()
+            .extended()
+            .negative()
+            .overflow()
+            .carry()
+            .notSupervisor().noIrqActive();
+    }
+
+    public void testMovePLongFromMemory()
+    {
+        final int adr = PROGRAM_START_ADDRESS+256;
+        final int adrPlusOffset = adr + 10;
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.b #$12,"+(adrPlusOffset),
+            "move.b #$34,"+(adrPlusOffset+2),
+            "move.b #$56,"+(adrPlusOffset+4),
+            "move.b #$78,"+(adrPlusOffset+6),
+            "move.l #$ffffffff,d4",
+            "lea "+adr+",a3",
+            "movep.l 10(a3),d4")
+            .expectD4(0x12345678)
+            .zero()
+            .extended()
+            .negative()
+            .overflow()
+            .carry()
+            .notSupervisor().noIrqActive();
+    }
+
     public void testMoveToCCR() {
 
         final int adr = PROGRAM_START_ADDRESS+256;

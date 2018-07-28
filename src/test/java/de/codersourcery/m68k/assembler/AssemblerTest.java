@@ -22,6 +22,13 @@ public class AssemblerTest extends TestCase
         asm.getOptions().cpuType=CPUType.M68020;
     }
 
+    public void testMoveP() {
+        assertArrayEquals(compile("movep.w d3,$80(a4)"),0x07,0x8c,0x00,0x80);
+        assertArrayEquals(compile("movep.l d3,$80(a4)"),0x07,0xcc,0x00,0x80);
+        assertArrayEquals(compile("movep.w $80(a4),d3"),0x07,0x0c,0x00,0x80);
+        assertArrayEquals(compile("movep.l $80(a4),d3"),0x07,0x4c,0x00,0x80);
+    }
+
     public void testMoveSR() {
        assertArrayEquals(compile("move.w $1200,sr"),0x46,0xf8,0x12,0x00);
        assertArrayEquals(compile("move.w sr,$1200"),0x40,0xf8,0x12,0x00);

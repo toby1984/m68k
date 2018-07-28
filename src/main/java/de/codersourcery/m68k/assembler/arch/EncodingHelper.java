@@ -13,7 +13,7 @@ public class EncodingHelper
 {
     public static void main(String[] args) throws IllegalAccessException
     {
-        final Predicate<String> pred = name -> name.contains("sr");
+        final Predicate<String> pred = name -> name.contains("movep");
         final Map<String,String> entries = new TreeMap<>();
         for ( Field f : Instruction.class.getFields() )
         {
@@ -25,7 +25,7 @@ public class EncodingHelper
                 final InstructionEncoding encoding = (InstructionEncoding) f.get(null);
                 final String andMask = "0b"+StringUtils.leftPad(Integer.toBinaryString(encoding.getInstructionWordAndMask()),16,'0');
                 final String value = "0b"+StringUtils.leftPad(Integer.toBinaryString(encoding.getInstructionWordMask()),16,'0');
-                final String s = "if ( ( insnWord & "+andMask+" ) == "+value+" ) {\n// "+name+" \n\n";
+                final String s = "if ( ( insnWord & "+andMask+" ) == "+value+" ) {\n    // "+name+" \n}\n";
                 entries.put(name,s);
             }
         }

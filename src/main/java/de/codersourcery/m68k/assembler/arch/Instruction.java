@@ -30,6 +30,36 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    MOVEP("MOVEP",2)
+    {
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            if ( node.hasExplicitOperandSize() ) {
+                if ( node.hasOperandSize(OperandSize.BYTE) ) {
+                    throw new RuntimeException("MOVEP only supports .w or .l operand sizes");
+                }
+            }
+            if ( node.source().getValue().isDataRegister() )
+            {
+                Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_INDIRECT,AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT);
+                Instruction.checkOperandSizeSigned(node.destination().getValue(),16,ctx);
+            }
+            else if ( node.destination().getValue().isDataRegister() ) {
+                Instruction.checkSourceAddressingMode(node,AddressingMode.ADDRESS_REGISTER_INDIRECT,AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT);
+                Instruction.checkOperandSizeSigned(node.source().getValue(),16,ctx);
+            }
+            else {
+                throw new UnsupportedOperationException("Method checkSupports not implemented");
+            }
+        }
+    },
     MOVEM("MOVEM",2)
     {
         @Override
@@ -905,6 +935,20 @@ public enum Instruction
                 // MOVEM <ea>,<register list>
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 return MOVEM_TO_REGISTERS_ENCODING.append(extraInsnWords);
+            case MOVEP:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+
+                if ( insn.hasOperandSize(OperandSize.WORD ) ) {
+                    if ( insn.source().getValue().isDataRegister() ) {
+                        return MOVEP_WORD_TO_MEMORY_ENCODING;
+                    }
+                    return MOVEP_WORD_FROM_MEMORY_ENCODING;
+                }
+                // operandSize == OperandSize.LONG
+                if ( insn.source().getValue().isDataRegister() ) {
+                    return MOVEP_LONG_TO_MEMORY_ENCODING;
+                }
+                return MOVEP_LONG_FROM_MEMORY_ENCODING;
             case STOP:
                 return STOP_ENCODING;
             case CHK:
@@ -1878,6 +1922,15 @@ D/A   |     |   |           |
     public static final InstructionEncoding JMP_SHORT_ENCODING = InstructionEncoding.of(    "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of(     "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
+    public static final InstructionEncoding MOVEP_WORD_FROM_MEMORY_ENCODING = // MOVEP.W d16(An),Dx
+        InstructionEncoding.of("0000DDD100001sss", "bbbbbbbb_bbbbbbbb");
+    public static final InstructionEncoding MOVEP_LONG_FROM_MEMORY_ENCODING = // // MOVEP.L d16(An),Dx
+        InstructionEncoding.of("0000DDD101001sss","bbbbbbbb_bbbbbbbb");
+    public static final InstructionEncoding MOVEP_WORD_TO_MEMORY_ENCODING   = // MOVEP.W Dx,d16(An)
+        InstructionEncoding.of("0000sss110001DDD","BBBBBBBB_BBBBBBBB");
+    public static final InstructionEncoding MOVEP_LONG_TO_MEMORY_ENCODING   = // MOVEP.L Dx,d16(An)
+        InstructionEncoding.of("0000sss111001DDD","BBBBBBBB_BBBBBBBB");
+
     public static final InstructionEncoding MOVE_BYTE_ENCODING = InstructionEncoding.of("0001DDDMMMmmmsss");
     public static final InstructionEncoding MOVE_WORD_ENCODING = InstructionEncoding.of("0011DDDMMMmmmsss");
     public static final InstructionEncoding MOVE_LONG_ENCODING = InstructionEncoding.of("0010DDDMMMmmmsss");
@@ -2051,6 +2104,10 @@ D/A   |     |   |           |
         put(MOVE_TO_SR_ENCODING,MOVE);
         put(MOVEM_FROM_REGISTERS_ENCODING,MOVEM);
         put(MOVEM_TO_REGISTERS_ENCODING,MOVEM);
+        put(MOVEP_WORD_FROM_MEMORY_ENCODING,MOVEP);
+        put(MOVEP_LONG_FROM_MEMORY_ENCODING,MOVEP);
+        put(MOVEP_WORD_TO_MEMORY_ENCODING,MOVEP);
+        put(MOVEP_LONG_TO_MEMORY_ENCODING,MOVEP);
 
         put(LEA_LONG_ENCODING,LEA);
         put(LEA_WORD_ENCODING,LEA);

@@ -698,6 +698,39 @@ public class Disassembler
                 regNum = (insnWord & 0b0000111000000000) >>> 9;
                 appendln("moveq #").append( value ).append(",").appendDataRegister(regNum);
                 return;
+            case MOVEP:
+                appendln("movep");
+                offset = readWord();
+                int adrReg = insnWord & 0b111;
+                int dataReg = (insnWord & 0b111000000000)>>>9;
+                if ( ( insnWord & 0b1111000111111000 ) == 0b0000000101001000 ) {
+                    // MOVEP_LONG_FROM_MEMORY_ENCODING
+                    append(".l ").appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append("),")
+                        .appendDataRegister(dataReg );
+                    return;
+                }
+
+                if ( ( insnWord & 0b1111000111111000 ) == 0b0000000111001000 ) {
+                    // MOVEP_LONG_TO_MEMORY_ENCODING
+                    append(".l ").appendDataRegister(dataReg ).append(",")
+                        .appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append(")");
+                    return;
+                }
+
+                if ( ( insnWord & 0b1111000111111000 ) == 0b0000000100001000 ) {
+                    // MOVEP_LONG_FROM_MEMORY_ENCODING
+                    append(".w ").appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append("),")
+                        .appendDataRegister(dataReg );
+                    return;
+                }
+
+                if ( ( insnWord & 0b1111000111111000 ) == 0b0000000110001000 ) {
+                    // MOVEP_WORD_TO_MEMORY_ENCODING
+                    append(".w ").appendDataRegister(dataReg ).append(",")
+                        .appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append(")");
+                    return;
+                }
+                break;
             case MOVE:
                 if ( matches(insnWord,Instruction.MOVE_AX_TO_USP_ENCODING ) )
                 {

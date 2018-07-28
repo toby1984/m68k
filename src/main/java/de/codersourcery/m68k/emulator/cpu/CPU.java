@@ -1,11 +1,9 @@
 package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
-import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
-import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
@@ -794,6 +792,27 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0000_0000_0000_0000:
+
+                switch(instruction & 0b1111000111111000)
+                {
+                    case 0b0000000100001000:
+                        // MOVEP_WORD_FROM_MEMORY_ENCODING
+                        movepFromMemoryToRegister(instruction,2);
+                        return;
+                    case 0b0000000101001000:
+                        // MOVEP_LONG_FROM_MEMORY_ENCODING
+                        movepFromMemoryToRegister(instruction,4);
+                        return;
+                    case 0b0000000110001000:
+                        // MOVEP_WORD_TO_MEMORY_ENCODING
+                        movepFromRegisterToMemory(instruction,2);
+                        return;
+                    case 0b0000000111001000:
+                        // MOVEP_LONG_TO_MEMORY_ENCODING
+                        movepFromRegisterToMemory(instruction,4);
+                        return;
+                }
+
                 if ( ( instruction & 0b1111111100000000) == 0b0000001000000000 ) {
                     // ANDI #xx,<ea>
                     binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.IMMEDIATE);
@@ -809,6 +828,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     bitOp(instruction,BitOp.FLIP,BitOpMode.IMMEDIATE);
                     return;
                 }
+
                 if ( (instruction & 0b1111000111000000) == 0b0000000111000000) {
                     // BSET Dn,<ea>
                     bitOp(instruction,BitOp.SET,BitOpMode.REGISTER);
@@ -2624,6 +2644,44 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
                         ( ( statusRegister & FLAG_OVERFLOW ) != 0 ? "X" : "-" )+"|"+
                         ( ( statusRegister & FLAG_CARRY    ) != 0 ? "X" : "-" )+"|";
         return "CPU[ pc = "+ Misc.hex(pc)+" , insn="+binaryInsn+", sp="+Misc.hex(addressRegisters[7])+",IRQ="+activeIrq+"]\n"+flagHelp+"\n"+flags;
+    }
+
+    private void movepFromMemoryToRegister(int instruction, int operandSizeInBytes)
+    {
+        final int dstDataRegNum = (instruction & 0b111000000000) >>> 9;
+        final int address = addressRegisters[(instruction & 0b111)] + memLoadWord(pc);
+        pc+=2;
+        if ( operandSizeInBytes == 2 )
+        {
+            final int value = ((memory.readByte(address) & 0xff) << 8) | (memory.readByte(address+2) & 0xff);
+            dataRegisters[dstDataRegNum] = (dataRegisters[dstDataRegNum] & 0xffff0000) | value;
+        } else {
+            final int value =
+                ((memory.readByte(address)           & 0xff) << 24) |
+                ((memory.readByte(address+2) & 0xff) << 16) |
+                ((memory.readByte(address+4) & 0xff) <<  8) |
+                ( memory.readByte(address+6) & 0xff);
+            dataRegisters[dstDataRegNum] = value;
+        }
+    }
+
+    private void movepFromRegisterToMemory(int instruction, int operandSizeInBytes)
+    {
+        final int value = dataRegisters[(instruction & 0b111000000000) >>> 9];
+
+        final int address = addressRegisters[(instruction & 0b111)] + memLoadWord(pc);
+        pc+=2;
+
+        if ( operandSizeInBytes == 2 )
+        {
+            memory.writeByte(address,(value & 0xff00) >>> 8);
+            memory.writeByte(address+2,value & 0xff);
+        } else {
+            memory.writeByte(address,(value & 0xff000000) >>> 24);
+            memory.writeByte(address+2,(value & 0x00ff0000) >>> 16);
+            memory.writeByte(address+4,(value & 0x0000ff00) >>> 8);
+            memory.writeByte(address+6,value  & 0x000000ff);
+        }
     }
 
     private static boolean isOverflow8Bit(int a,int b,int result) {
