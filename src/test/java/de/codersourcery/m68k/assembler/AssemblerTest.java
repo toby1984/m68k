@@ -98,6 +98,15 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("tst.l $12(a5)"),0x4a,0xad,0x00,0x12);
     }
 
+    public void testEOR() {
+        assertArrayEquals(compile("eor.l d2,d3"),   0xb5,0x83);
+        assertArrayEquals(compile("eor.b d3,$1200"),0xb7,0x38,0x12,0x00);
+        assertArrayEquals(compile("eor.w d3,$1200"),0xb7,0x78,0x12,0x00);
+        assertArrayEquals(compile("eor.l d3,$1200"),0xb7,0xb8,0x12,0x00);
+        assertArrayEquals(compile("eor.w d2,d3"),   0xb5,0x43);
+        assertArrayEquals(compile("eor.b d2,d3"),   0xb5,0x03);
+    }
+
     public void testAND() {
         assertArrayEquals(compile("and.b d3,$1200"),0xc7,0x38,0x12,0x00);
         assertArrayEquals(compile("and.b $1200,d3"),0xc6,0x38,0x12,0x00);

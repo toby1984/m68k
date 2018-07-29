@@ -125,7 +125,7 @@ public class Disassembler
             System.out.println("Using: "+encoding+" => "+instruction);
             try
             {
-                disassemble(instruction, encoding, insnWord);
+                disassemble(instruction, insnWord);
                 commit();
             }
             catch(Exception e)
@@ -171,9 +171,7 @@ public class Disassembler
         }
     }
 
-    private void disassemble(Instruction insn,
-                             InstructionEncoding encoding,
-                             int insnWord)
+    private void disassemble(Instruction insn,int insnWord)
     {
         switch( insn )
         {
@@ -241,12 +239,6 @@ public class Disassembler
                 decodeOperand(1<<sizeBits,eaMode,eaRegister);
                 return;
             case MOVEM:
-                /*
-    public static final InstructionEncoding MOVEM_FROM_REGISTERS_ENCODING =
-        InstructionEncoding.of("010010001SMMMDDD","LLLLLLLL_LLLLLLLL") .decorateWith(MOVEM_SIZE_DECORATOR);
-    public static final InstructionEncoding MOVEM_TO_REGISTERS_ENCODING   =
-        InstructionEncoding.of("010011001Smmmsss","LLLLLLLL_LLLLLLLL") .decorateWith(MOVEM_SIZE_DECORATOR);
-                 */
                 appendln("movem");
                 if ( ( insnWord & 1<<6) == 0) {
                     append(".w ");
@@ -544,101 +536,65 @@ public class Disassembler
                     decodeOperand(0,eaMode,eaRegister);
                 }
                 return;
+            case EOR:
+                appendln("eor");
+                // 11000000
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                switch( sizeBits ) {
+                    case 0b00:
+                        append(".b "); break;
+                    case 0b01:
+                        append(".w "); break;
+                    case 0b10:
+                        append(".l "); break;
+                    default:
+                        throw new RuntimeException("Invalid size");
+                }
+                appendDataRegister((insnWord & 0b0000111000000000) >> 9);
+                append(",");
+                decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
+                return;
             case EORI:
                 appendln("eori");
-                sizeBits = (insnWord & 0b11000000) >>> 6;
-                switch(sizeBits)
-                {
-                    case 0b00:
-                        int value = readWord() & 0xff;
-                        append(".b #").appendHex(value).append(",");
-                        break;
-                    case 0b01:
-                        value = readWord() & 0xffff;
-                        append(".w #").appendHex(value).append(",");
-                        break;
-                    case 0b10:
-                        value = readLong();
-                        append(".l #").appendHex(value).append(",");
-                        break;
-                    default:
-                        throw new RuntimeException("Unreachable code reached");
-                }
-                decodeOperand(1<<sizeBits,(insnWord&0b111000)>>>3,insnWord&0b111);
+                decodeImmediateBinaryLogicalOp(insnWord);
                 return;
             case ORI:
                 appendln("ori");
-                sizeBits = (insnWord & 0b11000000) >>> 6;
-                switch(sizeBits)
-                {
-                    case 0b00:
-                        int value = readWord() & 0xff;
-                        append(".b #").appendHex(value).append(",");
-                        break;
-                    case 0b01:
-                        value = readWord() & 0xffff;
-                        append(".w #").appendHex(value).append(",");
-                        break;
-                    case 0b10:
-                        value = readLong();
-                        append(".l #").appendHex(value).append(",");
-                        break;
-                    default:
-                        throw new RuntimeException("Unreachable code reached");
-                }
-                decodeOperand(1<<sizeBits,(insnWord&0b111000)>>>3,insnWord&0b111);
+                decodeImmediateBinaryLogicalOp(insnWord);
                 return;
             case AND:
-                if ( encoding == Instruction.ANDI_TO_SR_ENCODING) {
+                if ( matches(insnWord, Instruction.ANDI_TO_SR_ENCODING) ) {
                     final int word = readWord();
                     appendln("andi #").append( Misc.hex(word) ).append(",sr");
                     return;
                 }
-                if ( encoding == Instruction.ANDI_TO_CCR_ENCODING) {
+                if ( matches(insnWord, Instruction.ANDI_TO_CCR_ENCODING) ) {
                     final int word = readWord();
                     appendln("andi #").append( Misc.hex(word) ).append(",ccr");
                     return;
                 }
-                if ( encoding == Instruction.ANDI_BYTE_ENCODING) {
+                if ( matches(insnWord, Instruction.ANDI_BYTE_ENCODING) ) {
                     final int word = readWord() & 0xff;
                     appendln("andi.b #").append( Misc.hex(word) ).append(",");
                     decodeOperand(1,(insnWord&0b111)>>>3,insnWord&0b111);
                     return;
                 }
-                if ( encoding == Instruction.ANDI_WORD_ENCODING) {
+
+                // TODO: Make ANDI encoding similar to ORI/EORI and use decodeImmediateBinaryLogicalOp(insnWord) here...
+                if ( matches(insnWord, Instruction.ANDI_WORD_ENCODING) ) {
                     final int word = readWord() & 0xffff;
                     appendln("andi.w #").append( Misc.hex(word) ).append(",");
                     decodeOperand(1,(insnWord&0b111)>>>3,insnWord&0b111);
                     return;
                 }
-                if ( encoding == Instruction.ANDI_LONG_ENCODING) {
+                if ( matches(insnWord, Instruction.ANDI_LONG_ENCODING) ) {
                     final int word = readLong();
                     appendln("andi.l #").append( Misc.hex(word) ).append(",");
                     decodeOperand(1,(insnWord&0b111)>>>3,insnWord&0b111);
                     return;
                 }
-                if ( encoding == Instruction.AND_SRC_EA_ENCODING || encoding == Instruction.AND_DST_EA_ENCODING ) {
-
-                    appendln("and");
-
-                    sizeBits = (insnWord & 0b11000000) >>> 6;
-                    appendOperandSize(sizeBits);
-
-                    if ( encoding == Instruction.AND_SRC_EA_ENCODING)
-                    {
-                        decodeOperand(1<<sizeBits, (insnWord & 0b111000) >>> 3, insnWord & 0b111);
-                    } else {
-                        regNum = (insnWord & 0b111000000000) >>> 9;
-                        appendDataRegister(regNum);
-                    }
-                    append(",");
-                    if ( encoding == Instruction.AND_SRC_EA_ENCODING)
-                    {
-                        regNum = (insnWord & 0b111000000000) >>> 9;
-                        appendDataRegister(regNum);
-                    } else {
-                        decodeOperand(1<<sizeBits, (insnWord & 0b111000) >>> 3, insnWord & 0b111);
-                    }
+                if ( decodeRegularBinaryLogicalOp("and", insnWord,Instruction.AND_SRC_EA_ENCODING,Instruction.AND_DST_EA_ENCODING) )
+                {
                     return;
                 }
                 break;
@@ -717,12 +673,12 @@ public class Disassembler
                     suffix = "ra";
                 }
                 appendln("b").append( suffix ).append(" ");
-                if ( encoding == Instruction.BCC_8BIT_ENCODING ) {
+                if ( matches(insnWord, Instruction.BCC_8BIT_ENCODING ) ) {
                     offset = insnWord & 0xff;
                     offset = (offset<<24) >> 24;
-                } else if ( encoding == Instruction.BCC_16BIT_ENCODING ) {
+                } else if ( matches(insnWord, Instruction.BCC_16BIT_ENCODING ) ) {
                     offset = readWord();
-                } else if ( encoding == Instruction.BCC_32BIT_ENCODING ) {
+                } else if ( matches(insnWord, Instruction.BCC_32BIT_ENCODING ) ) {
                     offset = readLong();
                 } else {
                     break;
@@ -850,6 +806,66 @@ public class Disassembler
                 return;
         }
         illegalOperation(insnWord);
+    }
+
+    /**
+     *
+     * @param mnemonic
+     * @param insnWord
+     * @param srcEaEncoding
+     * @param dstEaEncoding
+     * @return <code>true</code> if decoding was successful, otherwise false
+     */
+    private boolean decodeRegularBinaryLogicalOp(String mnemonic,int insnWord,InstructionEncoding srcEaEncoding,InstructionEncoding dstEaEncoding)
+    {
+        if ( matches(insnWord, srcEaEncoding) || matches(insnWord, dstEaEncoding ) ) {
+
+            appendln(mnemonic);
+
+            int sizeBits = (insnWord & 0b11000000) >>> 6;
+            appendOperandSize(sizeBits);
+
+            if ( matches(insnWord, srcEaEncoding) )
+            {
+                decodeOperand(1<<sizeBits, (insnWord & 0b111000) >>> 3, insnWord & 0b111);
+            } else {
+                int regNum = (insnWord & 0b111000000000) >>> 9;
+                appendDataRegister(regNum);
+            }
+            append(",");
+            if ( matches(insnWord, srcEaEncoding) )
+            {
+                int regNum = (insnWord & 0b111000000000) >>> 9;
+                appendDataRegister(regNum);
+            } else {
+                decodeOperand(1<<sizeBits, (insnWord & 0b111000) >>> 3, insnWord & 0b111);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private void decodeImmediateBinaryLogicalOp(int insnWord)
+    {
+        int sizeBits = (insnWord & 0b11000000) >>> 6;
+        switch(sizeBits)
+        {
+            case 0b00:
+                int value = readWord() & 0xff;
+                append(".b #").appendHex(value).append(",");
+                break;
+            case 0b01:
+                value = readWord() & 0xffff;
+                append(".w #").appendHex(value).append(",");
+                break;
+            case 0b10:
+                value = readLong();
+                append(".l #").appendHex(value).append(",");
+                break;
+            default:
+                throw new RuntimeException("Unreachable code reached");
+        }
+        decodeOperand(1<<sizeBits,(insnWord&0b111000)>>>3,insnWord&0b111);
     }
 
     // print MOVEM register list

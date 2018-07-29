@@ -478,6 +478,20 @@ public enum Instruction
                     Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
                 }
             },
+    EOR("EOR",2)
+    {
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+
+        @Override
+        public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkSourceAddressingMode(insn,AddressingMode.DATA_REGISTER_DIRECT);
+        }
+    },
     AND("AND",2)
             {
                 @Override
@@ -1025,6 +1039,9 @@ public enum Instruction
                     return EXTW_ENCODING;
                 }
                 return EXTL_ENCODING;
+            case EOR:
+                String[] patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
+                return EOR_DST_EA_ENCODING.append(patterns);
             case ORI:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(),Operand.DESTINATION,insn,context);
@@ -1157,10 +1174,10 @@ public enum Instruction
                 // AND Dn,<ea>
                 // AND <ea>,Dn
                 if ( ! insn.destination().hasAddressingMode(AddressingMode.DATA_REGISTER_DIRECT) ) {
-                    final String[] patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
+                    patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
                     return AND_DST_EA_ENCODING.append(patterns);
                 }
-                final String[] patterns = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn, context);
+                patterns = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn, context);
                 return AND_SRC_EA_ENCODING.append(patterns);
             case TRAP:
                 return TRAP_ENCODING;
@@ -1941,17 +1958,14 @@ D/A   |     |   |           |
     public static final InstructionEncoding ANDI_LONG_ENCODING   = InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding ANDI_TO_SR_ENCODING  = InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
-    public static final InstructionEncoding ORI_16_BIT_ENCODING  =
-        InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding ORI_16_BIT_ENCODING  = InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding ORI_32_BIT_ENCODING  = InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
-    public static final InstructionEncoding ORI_32_BIT_ENCODING  =
-        InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    // dst eaMode/eaRegister contained in lower 6 bits
+    public static final InstructionEncoding EOR_DST_EA_ENCODING  = InstructionEncoding.of("1011sss1SSMMMDDD");
 
-    public static final InstructionEncoding EORI_16_BIT_ENCODING  =
-        InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv");
-
-    public static final InstructionEncoding EORI_32_BIT_ENCODING  =
-        InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding EORI_16_BIT_ENCODING  = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding EORI_32_BIT_ENCODING  = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
     private static final InstructionEncoding.IValueDecorator MOVEM_SIZE_DECORATOR = (field, origValue) ->
     {
@@ -2254,5 +2268,7 @@ D/A   |     |   |           |
 
         put(EORI_16_BIT_ENCODING,EORI);
         put(EORI_32_BIT_ENCODING,EORI);
+
+        put(EOR_DST_EA_ENCODING,EOR);
     }};
 }

@@ -1393,6 +1393,17 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b1011_0000_0000_0000:
+
+                if ( ( instruction & 0b1111000100000000 ) == 0b1011000100000000 ) {
+                    // EOR_DST_EA_ENCODING
+                    final int dataRegNum = (instruction&0b111000000000) >> 9;
+                    final int sizeInBytes= 1 << ( (instruction&0b11000000) >> 6);
+                    decodeSourceOperand(instruction, sizeInBytes,false,false);
+                    value = dataRegisters[dataRegNum] ^ value;
+                    storeValue((instruction&0b111000)>>3, instruction&0b111, sizeInBytes);
+                    updateFlagsAfterMove(sizeInBytes);
+                    return;
+                }
                 break;
             /* ================================
              * AND/MUL/ABCD/EXG
@@ -2031,13 +2042,13 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
      * Decodes an 16-bit instruction word's source operand.
      *
      * @param instruction
-     * @param operandSize
+     * @param operandSizeInBytes
      * @param calculateAddressOnly whether to only calculate the effective address but not actually load
      *                             the value from there
      * @param advancePC whether to advance the PC after reading additional instruction words
      * @return true if the operand is a register, otherwise false
      */
-    private boolean decodeSourceOperand(int instruction, int operandSize,boolean calculateAddressOnly,boolean advancePC)
+    private boolean decodeSourceOperand(int instruction, int operandSizeInBytes,boolean calculateAddressOnly,boolean advancePC)
     {
         // InstructionEncoding.of("ooooDDDMMMmmmsss");
         int eaMode     = (instruction & 0b111000) >> 3;
@@ -2071,7 +2082,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                         ea = memLoadWord(pc);
                         if ( ! calculateAddressOnly )
                         {
-                            value = memLoad( ea, operandSize );
+                            value = memLoad( ea, operandSizeInBytes );
                         }
                         if ( advancePC )
                         {
@@ -2087,7 +2098,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                         ea = memLoadLong(pc);
                         if ( ! calculateAddressOnly )
                         {
-                            value = memLoad( ea, operandSize );
+                            value = memLoad( ea, operandSizeInBytes );
                         }
                         if ( advancePC )
                         {
@@ -2098,10 +2109,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 }
                 // $$FALL-THROUGH$$
             default:
-                calculateEffectiveAddress(operandSize, eaMode, eaRegister,advancePC);
+                calculateEffectiveAddress(operandSizeInBytes, eaMode, eaRegister,advancePC);
                 if ( ! calculateAddressOnly )
                 {
-                    value = memLoad( ea, operandSize );
+                    value = memLoad( ea, operandSizeInBytes );
                 }
         }
         return false;
@@ -2128,15 +2139,15 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
      *
      * @param eaMode
      * @param eaRegister
-     * @param operandSize
+     * @param operandSizeInBytes
      */
-    private void storeValue(int eaMode,int eaRegister,int operandSize)
+    private void storeValue(int eaMode,int eaRegister,int operandSizeInBytes)
     {
         switch( eaMode )
         {
             case 0b000:
                 // DATA_REGISTER_DIRECT;
-                switch( operandSize )
+                switch( operandSizeInBytes )
                 {
                     case 1:
                         dataRegisters[eaRegister] = (dataRegisters[eaRegister] & 0xffffff00) | (value & 0xff);
@@ -2154,8 +2165,8 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 throw new RuntimeException("Unreachable code reached");
             case 0b001:
                 // ADDRESS_REGISTER_DIRECT;
-                if ( operandSize != 4 ) {
-                    throw new IllegalArgumentException("Unexpected operand size "+operandSize+" for address register");
+                if ( operandSizeInBytes != 4 ) {
+                    throw new IllegalArgumentException("Unexpected operand size "+operandSizeInBytes+" for address register");
                 }
                 addressRegisters[eaRegister] = value;
                 cycles += 2;
@@ -2188,7 +2199,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                         triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
                         return;
                 }
-                switch(operandSize)
+                switch(operandSizeInBytes)
                 {
                     case 1:
                         memory.writeByte(address,value);
@@ -2202,8 +2213,8 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 }
                 throw new RuntimeException("Unreachable code reached");
             default:
-                calculateEffectiveAddress(operandSize, eaMode, eaRegister,true);
-                switch (operandSize)
+                calculateEffectiveAddress(operandSizeInBytes, eaMode, eaRegister,true);
+                switch (operandSizeInBytes)
                 {
                     case 1:
                         memory.writeByte(ea, value);

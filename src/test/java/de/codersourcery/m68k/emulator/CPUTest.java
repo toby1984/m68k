@@ -80,6 +80,45 @@ public class CPUTest extends TestCase
             .notSupervisor().noIrqActive();
     }
 
+    public void testEOR() {
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #0,d2",
+            "move.l #0,d3",
+            "eor.b d2,d3")
+            .expectD2(0x00)
+            .expectD3(0x00)
+            .zero()
+            .noCarry()
+            .noOverflow()
+            .notNegative()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$ffff,d2",
+            "move.l #$12340000,d3",
+            "eor.w d2,d3")
+            .expectD2(0xffff)
+            .expectD3(0x1234ffff)
+            .notZero()
+            .negative()
+            .noCarry()
+            .noOverflow()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$0,d2",
+            "move.l #$ffffffff,d3",
+            "eor.l d2,d3")
+            .expectD2(0)
+            .expectD3(0xffffffff)
+            .notZero()
+            .negative()
+            .noCarry()
+            .noOverflow()
+            .notSupervisor().noIrqActive();
+    }
+
     public void testEORI() {
 
         execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffff55,d3",

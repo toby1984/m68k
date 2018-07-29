@@ -26,7 +26,7 @@
 [X] DBcc
 [ ] DIVS
 [ ] DIVU
-[ ] EOR
+[X] EOR
 [X] EORI
 [ ] EORI to CCR
 [ ] EORI to SR
