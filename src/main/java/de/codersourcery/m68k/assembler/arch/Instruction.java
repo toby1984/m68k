@@ -43,11 +43,19 @@ public enum Instruction
             {
                 Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
 
-                if ( node.destination().getValue().isRegister(Register.CCR) ) {
-                    if ( node.hasExplicitOperandSize() ) {
-                        if ( node.getOperandSize() != OperandSize.BYTE ) {
-                            throw new RuntimeException("Unsupported operand size "+node.getOperandSize()+" for EORI to CCR");
-                        }
+                if ( node.destination().getValue().isRegister(Register.CCR) )
+                {
+                    if (node.hasExplicitOperandSize() && node.getOperandSize() != OperandSize.BYTE)
+                    {
+                        throw new RuntimeException("Unsupported operand size " + node.getOperandSize() + " for EORI to CCR");
+                    }
+                    return;
+                }
+                if ( node.destination().getValue().isRegister(Register.SR) )
+                {
+                    if (node.hasExplicitOperandSize() && node.getOperandSize() != OperandSize.WORD)
+                    {
+                        throw new RuntimeException("Unsupported operand size " + node.getOperandSize() + " for EORI to SR");
                     }
                     return;
                 }
@@ -1067,6 +1075,11 @@ public enum Instruction
                     insn.setImplicitOperandSize(OperandSize.BYTE);
                     return EORI_TO_CCR_ENCODING;
                 }
+                if ( insn.destination().getValue().isRegister(Register.SR) )
+                {
+                    insn.setImplicitOperandSize(OperandSize.WORD);
+                    return EORI_TO_SR_ENCODING;
+                }
 
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(),Operand.DESTINATION,insn,context);
@@ -1983,6 +1996,9 @@ D/A   |     |   |           |
     public static final InstructionEncoding EORI_TO_CCR_ENCODING = InstructionEncoding.of("0000101000111100",
         "00000000_vvvvvvvv");
 
+    public static final InstructionEncoding EORI_TO_SR_ENCODING = InstructionEncoding.of("0000101001111100",
+        "vvvvvvvv_vvvvvvvv");
+
     public static final InstructionEncoding EORI_16_BIT_ENCODING  = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding EORI_32_BIT_ENCODING  = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
@@ -2290,5 +2306,6 @@ D/A   |     |   |           |
 
         put(EOR_DST_EA_ENCODING,EOR);
         put(EORI_TO_CCR_ENCODING,EORI);
+        put(EORI_TO_SR_ENCODING,EORI);
     }};
 }

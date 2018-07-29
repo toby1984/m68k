@@ -931,6 +931,17 @@ public class CPUTest extends TestCase
             .notZero().notNegative().noCarry().noOverflow().extended();
     }
 
+    public void testEORI_SR()
+    {
+        execute( cpu -> cpu.setIRQLevel(0b111),1,true,
+            "eori.w #"+(CPU.FLAG_I1)+",sr")
+            .noIrqActive().expectIRQLevel(5);
+
+        execute( cpu -> cpu.setIRQLevel(0b111),
+            "eori.w #$ffff,sr")
+            .irqActive(CPU.IRQ.PRIVILEGE_VIOLATION);
+    }
+
     public void testANDISR()
     {
         execute( cpu -> cpu.setIRQLevel(0b111),1,true,

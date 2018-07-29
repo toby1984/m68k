@@ -104,6 +104,10 @@ public class DisassemblerTest extends TestCase
         compile("eori.b #$ff,ccr");
     }
 
+    public void testEORIToSR() {
+        compile("eori.w #$ffff,sr");
+    }
+
     public void testEOR()
     {
         compile("eor.b d3,$1200");

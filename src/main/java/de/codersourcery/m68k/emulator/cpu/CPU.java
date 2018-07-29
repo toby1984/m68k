@@ -816,10 +816,18 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
                 if ( instruction == 0b0000101000111100 )
                 {
-                    // EORI Dn,CCR
-                    final int value = memLoadWord(pc);
-                    pc += 2;
-                    statusRegister = (statusRegister & ~ALL_USERMODE_FLAGS) | (value & ALL_USERMODE_FLAGS);
+                    // EORI #xx,CCR
+                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.IMMEDIATE);
+                    return;
+                }
+
+                if ( instruction == 0b0000101001111100)
+                {
+                    // EORI #xx,SR
+                    if ( assertSupervisorMode() )
+                    {
+                        binaryLogicalOpImmediate(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.SR);
+                    }
                     return;
                 }
 
@@ -1675,8 +1683,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             // EORI #xx,SR
             if ( assertSupervisorMode() )
             {
-                decodeSourceOperand(instruction, 2,false);
-                setStatusRegister( operation.apply( statusRegister , value & 0xffff ) );
+                int value = memLoadWord(pc) & 0xffff;
+                pc += 2;
+                final int result = operation.apply( value, statusRegister);
+                statusRegister = result & 0xffff;
                 cycles = 20;
             }
             return;
@@ -1686,8 +1696,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             // ANDI #xx,CCR
             // ORI #xx,CCR
             // EORI #xx,CCR
-            decodeSourceOperand(instruction, 2,false);
-            setStatusRegister( operation.apply( statusRegister , value & 0b11111 ) );
+            int value = memLoadWord(pc) & 0b11111;
+            pc += 2;
+            final int result = operation.apply( value, statusRegister & ALL_USERMODE_FLAGS);
+            statusRegister = (statusRegister & ~ALL_USERMODE_FLAGS) | result;
             cycles = 20;
             return;
         }

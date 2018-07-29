@@ -29,7 +29,7 @@
 [X] EOR
 [X] EORI
 [X] EORI to CCR
-[ ] EORI to SR
+[X] EORI to SR
 [X] EXG
 [X] EXT
 [X] ILLEGAL

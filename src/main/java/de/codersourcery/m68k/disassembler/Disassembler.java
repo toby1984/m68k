@@ -561,6 +561,13 @@ public class Disassembler
                     appendHex(readWord() & 0xff).append(",ccr");
                     return;
                 }
+                if ( insnWord == 0b0000101001111100)
+                {
+                    appendln("eori.w #");
+                    appendHex(readWord() & 0xffff).append(",sr");
+                    return;
+                }
+
                 appendln("eori");
                 decodeImmediateBinaryLogicalOp(insnWord);
                 return;
