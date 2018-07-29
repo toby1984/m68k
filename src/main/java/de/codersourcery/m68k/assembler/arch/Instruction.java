@@ -42,6 +42,15 @@ public enum Instruction
             public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
             {
                 Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+
+                if ( node.destination().getValue().isRegister(Register.CCR) ) {
+                    if ( node.hasExplicitOperandSize() ) {
+                        if ( node.getOperandSize() != OperandSize.BYTE ) {
+                            throw new RuntimeException("Unsupported operand size "+node.getOperandSize()+" for EORI to CCR");
+                        }
+                    }
+                    return;
+                }
                 Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
             }
         },
@@ -1052,6 +1061,13 @@ public enum Instruction
                 }
                 return ORI_32_BIT_ENCODING.append(extraInsnWords);
             case EORI:
+
+                if ( insn.destination().getValue().isRegister(Register.CCR) )
+                {
+                    insn.setImplicitOperandSize(OperandSize.BYTE);
+                    return EORI_TO_CCR_ENCODING;
+                }
+
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(),Operand.DESTINATION,insn,context);
                 if ( ! estimateSizeOnly && insn.getOperandSize() != OperandSize.LONG)
@@ -1964,6 +1980,9 @@ D/A   |     |   |           |
     // dst eaMode/eaRegister contained in lower 6 bits
     public static final InstructionEncoding EOR_DST_EA_ENCODING  = InstructionEncoding.of("1011sss1SSMMMDDD");
 
+    public static final InstructionEncoding EORI_TO_CCR_ENCODING = InstructionEncoding.of("0000101000111100",
+        "00000000_vvvvvvvv");
+
     public static final InstructionEncoding EORI_16_BIT_ENCODING  = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding EORI_32_BIT_ENCODING  = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
@@ -2270,5 +2289,6 @@ D/A   |     |   |           |
         put(EORI_32_BIT_ENCODING,EORI);
 
         put(EOR_DST_EA_ENCODING,EOR);
+        put(EORI_TO_CCR_ENCODING,EORI);
     }};
 }

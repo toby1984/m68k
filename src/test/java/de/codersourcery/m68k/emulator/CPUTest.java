@@ -996,6 +996,14 @@ public class CPUTest extends TestCase
             .zero().notNegative().noCarry().noOverflow().extended();
     }
 
+    public void testEORIToCCR()
+    {
+        execute( cpu -> cpu.clearFlags(CPU.ALL_USERMODE_FLAGS),
+            "eori #$ff,ccr")
+            .zero().extended().negative().carry().overflow()
+            .noIrqActive();
+    }
+
     public void testANDICCR()
     {
         execute( cpu -> cpu.setFlags(CPU.FLAG_ZERO),

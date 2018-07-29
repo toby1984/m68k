@@ -555,6 +555,12 @@ public class Disassembler
                 decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
             case EORI:
+                if ( insnWord == 0b0000101000111100)
+                {
+                    appendln("eori.b #");
+                    appendHex(readWord() & 0xff).append(",ccr");
+                    return;
+                }
                 appendln("eori");
                 decodeImmediateBinaryLogicalOp(insnWord);
                 return;

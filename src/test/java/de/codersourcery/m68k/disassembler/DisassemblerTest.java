@@ -100,6 +100,10 @@ public class DisassemblerTest extends TestCase
         compile("ori.l #$12345678,-(a3)");
     }
 
+    public void testEORIToCCR() {
+        compile("eori.b #$ff,ccr");
+    }
+
     public void testEOR()
     {
         compile("eor.b d3,$1200");

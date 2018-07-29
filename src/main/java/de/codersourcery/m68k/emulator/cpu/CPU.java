@@ -711,10 +711,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
     {
         addressRegisterDirectAllowed = true;
 
-        System.out.println(">>>> Executing instruction at 0x"+Integer.toHexString(pc));
 
         if ( ( pc & 1 ) != 0 )
         {
+            System.out.println(">>>> Executing instruction "+memory.readWordNoCheck(pc)+" at 0x"+Integer.toHexString(pc));
             badAlignment(pc,MemoryAccessException.Operation.READ_WORD);
             return;
         }
@@ -722,6 +722,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         pcAtStartOfLastInstruction = pc;
 
         int instruction= memory.readWordNoCheck(pc);
+        System.out.println(">>>> Executing instruction "+Misc.hex(instruction)+" ("+Misc.binary16Bit(instruction)+") at 0x"+Integer.toHexString(pc));
         pc += 2;
 
         switch(instruction)
@@ -811,6 +812,15 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         // MOVEP_LONG_TO_MEMORY_ENCODING
                         movepFromRegisterToMemory(instruction,4);
                         return;
+                }
+
+                if ( instruction == 0b0000101000111100 )
+                {
+                    // EORI Dn,CCR
+                    final int value = memLoadWord(pc);
+                    pc += 2;
+                    statusRegister = (statusRegister & ~ALL_USERMODE_FLAGS) | (value & ALL_USERMODE_FLAGS);
+                    return;
                 }
 
                 if ( ( instruction & 0b1111111100000000 ) == 0b0000101000000000 ) {
