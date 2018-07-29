@@ -1699,7 +1699,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 int value = memLoadWord(pc) & 0xffff;
                 pc += 2;
                 final int result = operation.apply( value, statusRegister);
-                statusRegister = result & 0xffff;
+                setStatusRegister(result & 0xffff);
                 cycles = 20;
             }
             return;

@@ -1238,8 +1238,9 @@ C — Always cleared.
 
     public void testLink()
     {
-        execute( "link a3,#$fffe" )
-                .expectA3(USERMODE_STACK_PTR-4)
+        System.out.println("USP = "+Misc.hex(USERMODE_STACK_PTR));
+        execute( "link a4,#$fffe" )
+                .expectA4(USERMODE_STACK_PTR-4)
                 .expectA7(USERMODE_STACK_PTR-6).noOverflow().notNegative().notZero().noExtended().notSupervisor();
     }
 
