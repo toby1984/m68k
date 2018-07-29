@@ -94,6 +94,12 @@ public class DisassemblerTest extends TestCase
         compile("move usp,a3");
     }
 
+    public void testORI() {
+        compile("ori.w #$1234,$1200");
+        compile("ori.b #$12,(a3)+");
+        compile("ori.l #$12345678,-(a3)");
+    }
+
     public void testAND()
     {
         compile("and.b d3,$1200");

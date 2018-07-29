@@ -7,7 +7,6 @@ import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.emulator.cpu.CPU;
 import de.codersourcery.m68k.utils.Misc;
-import jdk.jshell.execution.DirectExecutionControl;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
@@ -21,7 +20,8 @@ public class Disassembler
 {
     private final Memory memory;
 
-    private final StringBuilder output = new StringBuilder();
+    private final StringBuilder outputBuffer = new StringBuilder();
+    private final StringBuilder tmpOutputBuffer = new StringBuilder();
 
     private int pcAtStartOfInstruction;
     private int pc;
@@ -37,7 +37,7 @@ public class Disassembler
     {
         pc = startAddress;
         endAddress = startAddress + bytes;
-        output.setLength(0);
+        tmpOutputBuffer.setLength(0);
 
         try {
             disassemble();
@@ -45,7 +45,7 @@ public class Disassembler
         catch(EndOfMemoryAccess e) {
             append("<...>");
         }
-        return output.toString();
+        return tmpOutputBuffer.toString();
     }
 
     private void disassemble() throws EndOfMemoryAccess
@@ -123,8 +123,22 @@ public class Disassembler
             }
 
             System.out.println("Using: "+encoding+" => "+instruction);
-            disassemble(instruction,encoding,insnWord);
+            try
+            {
+                disassemble(instruction, encoding, insnWord);
+                commit();
+            }
+            catch(Exception e)
+            {
+                outputBuffer.append("dc.w ").append( Misc.hex(insnWord) ).append(" ; ").append(Misc.binary16Bit(insnWord) );
+                pc = pcAtStartOfInstruction+2;
+            }
         }
+    }
+
+    private void commit()
+    {
+        outputBuffer.append( tmpOutputBuffer );
     }
 
     private static int getMaskLength(InstructionEncoding encoding) {
@@ -530,6 +544,28 @@ public class Disassembler
                     decodeOperand(0,eaMode,eaRegister);
                 }
                 return;
+            case ORI:
+                appendln("ori");
+                sizeBits = (insnWord & 0b11000000) >>> 6;
+                switch(sizeBits)
+                {
+                    case 0b00:
+                        int value = readWord() & 0xff;
+                        append(".b #").appendHex(value).append(",");
+                        break;
+                    case 0b01:
+                        value = readWord() & 0xffff;
+                        append(".w #").appendHex(value).append(",");
+                        break;
+                    case 0b10:
+                        value = readLong();
+                        append(".l #").appendHex(value).append(",");
+                        break;
+                    default:
+                        throw new RuntimeException("Unreachable code reached");
+                }
+                decodeOperand(1<<sizeBits,(insnWord&0b111000)>>>3,insnWord&0b111);
+                return;
             case AND:
                 if ( encoding == Instruction.ANDI_TO_SR_ENCODING) {
                     final int word = readWord();
@@ -877,7 +913,7 @@ public class Disassembler
     }
 
     private Disassembler appendln(String s) {
-        if ( output.length() > 0 )
+        if ( tmpOutputBuffer.length() > 0 || outputBuffer.length() > 0 )
         {
             append("\n");
         }
@@ -886,12 +922,12 @@ public class Disassembler
     }
 
     private Disassembler append(String s) {
-        output.append( s );
+        tmpOutputBuffer.append( s );
         return this;
     }
 
     private Disassembler append(int value) {
-        output.append( Integer.toString( value ) );
+        tmpOutputBuffer.append( Integer.toString( value ) );
         return this;
     }
 
@@ -904,13 +940,13 @@ public class Disassembler
     }
 
     private Disassembler appendHex(int value) {
-        output.append( "$").append( Integer.toHexString( value ) );
+        tmpOutputBuffer.append( "$").append( Integer.toHexString( value ) );
         return this;
     }
 
     private Disassembler appendHex16Bit(int value)
     {
-        output.append( "$").append( Integer.toHexString( value & 0xffff ) );
+        tmpOutputBuffer.append( "$").append( Integer.toHexString( value & 0xffff ) );
         return this;
     }
 

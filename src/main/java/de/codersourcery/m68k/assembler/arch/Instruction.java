@@ -30,6 +30,21 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    ORI("ORI",2)
+    {
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+            Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+        }
+    },
     MOVEP("MOVEP",2)
     {
         @Override
@@ -995,6 +1010,19 @@ public enum Instruction
                     return EXTW_ENCODING;
                 }
                 return EXTL_ENCODING;
+            case ORI:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.destination(),Operand.DESTINATION,insn,context);
+                if ( ! estimateSizeOnly )
+                { // assume worst-case
+                    final int value = insn.source().getValue().getBits(context);
+                    final int bits = NumberNode.getSizeInBitsUnsigned(value);
+                    if (bits <= 16)
+                    {
+                        return ORI_16_BIT_ENCODING.append(extraInsnWords);
+                    }
+                }
+                return ORI_32_BIT_ENCODING.append(extraInsnWords);
             case ROXL:
                 return selectRotateEncoding( insn,
                                              ROXL_MEMORY_ENCODING,
@@ -1340,7 +1368,8 @@ public enum Instruction
     // returns any InstructionEncoding patterns
     // needed to accommodate all operand values
     private static String[] getExtraWordPatterns(OperandNode op, Operand operandKind,
-                                                 InstructionNode insn,ICompilationContext ctx)
+                                                 InstructionNode insn,
+                                                 ICompilationContext ctx)
     {
         if ( op.addressingMode.maxExtensionWords == 0 ) {
             return null;
@@ -1891,6 +1920,12 @@ D/A   |     |   |           |
     public static final InstructionEncoding ANDI_LONG_ENCODING   = InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding ANDI_TO_SR_ENCODING  = InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
 
+    public static final InstructionEncoding ORI_16_BIT_ENCODING  =
+        InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding ORI_32_BIT_ENCODING  =
+        InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
     private static final InstructionEncoding.IValueDecorator MOVEM_SIZE_DECORATOR = (field, origValue) ->
     {
         // MOVEM uses a non-standard one-bit size encoding
@@ -2186,5 +2221,8 @@ D/A   |     |   |           |
         put(ANDI_LONG_ENCODING,AND);
         put(AND_SRC_EA_ENCODING,AND);
         put(AND_DST_EA_ENCODING,AND);
+
+        put(ORI_16_BIT_ENCODING,ORI);
+        put(ORI_32_BIT_ENCODING,ORI);
     }};
 }

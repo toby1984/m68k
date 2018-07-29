@@ -56,7 +56,7 @@
 [X] NOP
 [X] NOT
 [ ] OR
-[ ] ORI
+[X] ORI
 [ ] ORI to CCR
 [ ] ORI to SR
 [X] PEA

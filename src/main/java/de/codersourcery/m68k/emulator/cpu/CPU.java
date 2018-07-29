@@ -813,6 +813,35 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         return;
                 }
 
+                if ( ( instruction & 0b1111111100000000 ) == 0b0000000000000000 )
+                {
+                    // ORI #xx,<ea>
+                    final int sizeBits = (instruction&0b11000000)>>>6;
+                    final int immediateValue;
+                    switch(sizeBits)
+                    {
+                        case 0b00:
+                            immediateValue = memLoadWord(pc) & 0xff;
+                            pc += 2;
+                            break;
+                        case 0b01:
+                            immediateValue = memLoadWord(pc) & 0xffff;
+                            pc += 2;
+                            break;
+                        case 0b10:
+                            immediateValue = memLoadLong(pc);
+                            pc += 4;
+                            break;
+                        default:
+                            throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
+                    }
+                    decodeSourceOperand(instruction,1<<sizeBits,false,false);
+                    value = immediateValue | value;
+                    storeValue((instruction&0b111000)>>3, instruction&0b111,1<<sizeBits);
+                    updateFlagsAfterMove(1<<sizeBits);
+                    return;
+                }
+
                 if ( ( instruction & 0b1111111100000000) == 0b0000001000000000 ) {
                     // ANDI #xx,<ea>
                     binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.IMMEDIATE);
@@ -1937,12 +1966,12 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
     /**
      * Updates condition flags according to the current, <b>sign-extended to 32 bits</b> {@link #value}.
      */
-    private void updateFlagsAfterMove(int operandSize)
+    private void updateFlagsAfterMove(int operandSizeInBytes)
     {
         final int clearMask = ~(FLAG_ZERO|FLAG_NEGATIVE|FLAG_OVERFLOW|FLAG_CARRY);
 
         int setMask = 0;
-        switch( operandSize )
+        switch( operandSizeInBytes )
         {
             case 1:
                 if ( ( value & 0xff) == 0 ) {

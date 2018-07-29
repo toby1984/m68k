@@ -45,6 +45,21 @@ public class CPUTest extends TestCase
         cpu = new CPU(CPUType.BEST,memory);
     }
 
+    public void testORI() {
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffff00,d3",
+            "ori.b #$12,d3")
+            .expectD3(0xffffff12 ).notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffff1200,d3",
+            "ori.w #$12,d3")
+            .expectD3(0xffff1212 ).notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #0,d3",
+            "ori.l #$12345678,d3")
+            .expectD3(0x12345678 ).notSupervisor().noIrqActive();
+    }
+
     public void testMovePWordToMemory()
     {
         final int adr = PROGRAM_START_ADDRESS+256;
