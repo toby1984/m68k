@@ -57,7 +57,42 @@ public class CPUTest extends TestCase
 
         execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #0,d3",
             "ori.l #$12345678,d3")
-            .expectD3(0x12345678 ).notSupervisor().noIrqActive();
+            .expectD3(0x12345678 )
+            .notZero().notNegative()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #0,d3",
+            "ori.w #$0,d3")
+            .expectD3(0x0)
+            .zero()
+            .notNegative()
+            .noCarry()
+            .noOverflow()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$8000,d3",
+            "ori.w #$0,d3")
+            .expectD3(0x8000)
+            .notZero()
+            .negative()
+            .noCarry()
+            .noOverflow()
+            .notSupervisor().noIrqActive();
+    }
+
+    public void testEORI() {
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffff55,d3",
+            "eori.b #$00,d3")
+            .expectD3(0xffffff55 ).notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffff0055,d3",
+            "eori.w #$55,d3")
+            .expectD3(0xffff0000 ).notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #0,d3",
+            "eori.l #$55555555,d3")
+            .expectD3(0x55555555 ).notSupervisor().noIrqActive();
     }
 
     public void testMovePWordToMemory()

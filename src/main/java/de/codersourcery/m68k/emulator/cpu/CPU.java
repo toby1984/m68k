@@ -813,32 +813,16 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         return;
                 }
 
+                if ( ( instruction & 0b1111111100000000 ) == 0b0000101000000000 ) {
+                    // EORI #xx,<ea>
+                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.IMMEDIATE);
+                    return;
+                }
+
                 if ( ( instruction & 0b1111111100000000 ) == 0b0000000000000000 )
                 {
                     // ORI #xx,<ea>
-                    final int sizeBits = (instruction&0b11000000)>>>6;
-                    final int immediateValue;
-                    switch(sizeBits)
-                    {
-                        case 0b00:
-                            immediateValue = memLoadWord(pc) & 0xff;
-                            pc += 2;
-                            break;
-                        case 0b01:
-                            immediateValue = memLoadWord(pc) & 0xffff;
-                            pc += 2;
-                            break;
-                        case 0b10:
-                            immediateValue = memLoadLong(pc);
-                            pc += 4;
-                            break;
-                        default:
-                            throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
-                    }
-                    decodeSourceOperand(instruction,1<<sizeBits,false,false);
-                    value = immediateValue | value;
-                    storeValue((instruction&0b111000)>>3, instruction&0b111,1<<sizeBits);
-                    updateFlagsAfterMove(1<<sizeBits);
+                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.IMMEDIATE);
                     return;
                 }
 
@@ -1636,6 +1620,34 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
     private void binaryLogicalOpImmediate(int instruction, BinaryLogicalOp operation,BinaryLogicalOpMode mode)
     {
+        if ( mode == BinaryLogicalOpMode.IMMEDIATE )
+        {
+            final int sizeBits = (instruction&0b11000000)>>>6;
+            final int immediateValue;
+            switch(sizeBits)
+            {
+                case 0b00:
+                    immediateValue = memLoadWord(pc) & 0xff;
+                    pc += 2;
+                    break;
+                case 0b01:
+                    immediateValue = memLoadWord(pc) & 0xffff;
+                    pc += 2;
+                    break;
+                case 0b10:
+                    immediateValue = memLoadLong(pc);
+                    pc += 4;
+                    break;
+                default:
+                    throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
+            }
+            decodeSourceOperand(instruction,1<<sizeBits,false,false);
+            value = operation.apply(immediateValue,value);
+            storeValue((instruction&0b111000)>>3, instruction&0b111,1<<sizeBits);
+            updateFlagsAfterMove(1<<sizeBits);
+            return;
+        }
+
         if ( mode == BinaryLogicalOpMode.SR ) {
             // ANDI #xx,SR
             // ORI #xx,SR

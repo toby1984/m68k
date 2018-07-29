@@ -544,6 +544,28 @@ public class Disassembler
                     decodeOperand(0,eaMode,eaRegister);
                 }
                 return;
+            case EORI:
+                appendln("eori");
+                sizeBits = (insnWord & 0b11000000) >>> 6;
+                switch(sizeBits)
+                {
+                    case 0b00:
+                        int value = readWord() & 0xff;
+                        append(".b #").appendHex(value).append(",");
+                        break;
+                    case 0b01:
+                        value = readWord() & 0xffff;
+                        append(".w #").appendHex(value).append(",");
+                        break;
+                    case 0b10:
+                        value = readLong();
+                        append(".l #").appendHex(value).append(",");
+                        break;
+                    default:
+                        throw new RuntimeException("Unreachable code reached");
+                }
+                decodeOperand(1<<sizeBits,(insnWord&0b111000)>>>3,insnWord&0b111);
+                return;
             case ORI:
                 appendln("ori");
                 sizeBits = (insnWord & 0b11000000) >>> 6;

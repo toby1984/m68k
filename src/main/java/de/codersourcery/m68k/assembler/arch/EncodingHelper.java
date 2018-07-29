@@ -13,7 +13,7 @@ public class EncodingHelper
 {
     public static void main(String[] args) throws IllegalAccessException
     {
-        final Predicate<String> pred = name -> name.contains("ori");
+        final Predicate<String> pred = name -> name.contains("eori");
         final Map<String,String> entries = new TreeMap<>();
         for ( Field f : Instruction.class.getFields() )
         {

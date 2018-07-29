@@ -30,6 +30,21 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    EORI("EORI",2)
+        {
+            @Override
+            public boolean supportsExplicitOperandSize()
+            {
+                return true;
+            }
+
+            @Override
+            public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+            {
+                Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+                Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+            }
+        },
     ORI("ORI",2)
     {
         @Override
@@ -1013,16 +1028,20 @@ public enum Instruction
             case ORI:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(),Operand.DESTINATION,insn,context);
-                if ( ! estimateSizeOnly )
-                { // assume worst-case
-                    final int value = insn.source().getValue().getBits(context);
-                    final int bits = NumberNode.getSizeInBitsUnsigned(value);
-                    if (bits <= 16)
-                    {
-                        return ORI_16_BIT_ENCODING.append(extraInsnWords);
-                    }
+
+                if ( ! estimateSizeOnly && insn.getOperandSize() != OperandSize.LONG)
+                {
+                    return ORI_16_BIT_ENCODING.append(extraInsnWords);
                 }
                 return ORI_32_BIT_ENCODING.append(extraInsnWords);
+            case EORI:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.destination(),Operand.DESTINATION,insn,context);
+                if ( ! estimateSizeOnly && insn.getOperandSize() != OperandSize.LONG)
+                {
+                    return EORI_16_BIT_ENCODING.append(extraInsnWords);
+                }
+                return EORI_32_BIT_ENCODING.append(extraInsnWords);
             case ROXL:
                 return selectRotateEncoding( insn,
                                              ROXL_MEMORY_ENCODING,
@@ -1121,8 +1140,9 @@ public enum Instruction
                         return ANDI_TO_CCR_ENCODING;
                     }
                     insn.setImplicitOperandSize(OperandSize.WORD);
-                    if ( estimateSizeOnly ) {
-                        return ANDI_LONG_ENCODING;
+                    if ( estimateSizeOnly )
+                    {
+                        return ANDI_LONG_ENCODING; // TODO: Wrong size estimate if addressing mode requires additional instruction words...
                     }
                     final int value = insn.source().getValue().getBits(context);
                     final int sizeInBits = NumberNode.getSizeInBitsUnsigned(value);
@@ -1915,6 +1935,7 @@ D/A   |     |   |           |
     // dst eaMode/eaRegister contained in lower 6 bits
     public static final InstructionEncoding AND_DST_EA_ENCODING  = InstructionEncoding.of("1100sss1SSMMMDDD");
     public static final InstructionEncoding ANDI_TO_CCR_ENCODING = InstructionEncoding.of("0000001000111100","00000000vvvvvvvv");
+
     public static final InstructionEncoding ANDI_BYTE_ENCODING   = InstructionEncoding.of("0000001000MMMDDD","00000000_vvvvvvvv");
     public static final InstructionEncoding ANDI_WORD_ENCODING   = InstructionEncoding.of("0000001001MMMDDD","vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding ANDI_LONG_ENCODING   = InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
@@ -1925,6 +1946,12 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding ORI_32_BIT_ENCODING  =
         InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding EORI_16_BIT_ENCODING  =
+        InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding EORI_32_BIT_ENCODING  =
+        InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
     private static final InstructionEncoding.IValueDecorator MOVEM_SIZE_DECORATOR = (field, origValue) ->
     {
@@ -2224,5 +2251,8 @@ D/A   |     |   |           |
 
         put(ORI_16_BIT_ENCODING,ORI);
         put(ORI_32_BIT_ENCODING,ORI);
+
+        put(EORI_16_BIT_ENCODING,EORI);
+        put(EORI_32_BIT_ENCODING,EORI);
     }};
 }

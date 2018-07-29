@@ -22,6 +22,14 @@ public class AssemblerTest extends TestCase
         asm.getOptions().cpuType=CPUType.M68020;
     }
 
+    public void testEORI() {
+        assertArrayEquals(compile("eori.l #255,(a3)+     "),  0x0a,0x9b,0x00,0x00,0x00,0xff);
+        assertArrayEquals(compile("eori.b #$12,(a3)+      "), 0x0a,0x1b,0x00,0x12);
+        assertArrayEquals(compile("eori.b #$ff,(a3)+      "),0x0a,0x1b,0x00,0xff);
+        assertArrayEquals(compile("eori.w #$1234,$1200   "), 0x0a,0x78,0x12,0x34,0x12,0x00);
+        assertArrayEquals(compile("eori.l #$12345678,-(a3)"),  0x0a,0xa3,0x12,0x34,0x56,0x78);
+    }
+
     public void testORI()
     {
         assertArrayEquals(compile("ori.w #$1234,$1200"),     0x00,0x78,0x12,0x34,0x12,0x00);

@@ -27,7 +27,7 @@
 [ ] DIVS
 [ ] DIVU
 [ ] EOR
-[ ] EORI
+[X] EORI
 [ ] EORI to CCR
 [ ] EORI to SR
 [X] EXG
