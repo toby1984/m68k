@@ -805,6 +805,158 @@ public class CPUTest extends TestCase
             .zero().notNegative().noCarry().noOverflow().extended();
     }
 
+    public void testOR_Byte()
+    {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
+            "move.l #$ffffff00,d3",
+            "or.b d2,d3")
+            .expectD2(0x00)
+            .expectD3(0xffffff00)
+            .zero().notNegative().noCarry().noOverflow().extended();
+
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffff00,d2",
+            "move.l #$12,d3",
+            "or.b d2,d3")
+            .expectD2(0xffffff00)
+            .expectD3(0x12)
+            .notZero().notNegative().noCarry().noOverflow().extended();
+
+        // ($1200) = d3 & ($1200)
+        final int adr = PROGRAM_START_ADDRESS + 128;
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.b #$12,"+adr,
+            "or.b d3,"+adr)
+            .expectD3(0xffffffff)
+            .dumpMemory(adr,12)
+            .expectMemoryByte(adr, 0xff)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
+            "move.l #$ffffffff,d3",
+            "or.b d2,d3")
+            .expectD2(0x0)
+            .expectD3(0xffffffff)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        // d3 = ($1200) & d3
+        // d3 = $12 & 0xff
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.b #$12,"+adr,
+            "or.b "+adr+",d3")
+            .expectD3(0xffffffff)
+            .expectMemoryByte(adr, 0x12)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d2",
+            "move.l #$12,d3",
+            "or.b d3,d2")
+            .expectD2(0xffffffff)
+            .expectD3(0x12)
+            .notZero().negative().noCarry().noOverflow().extended();
+    }
+
+    public void testOR_Word()
+    {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
+            "move.l #$ffffff00,d3",
+            "or.w d2,d3")
+            .expectD2(0x00)
+            .expectD3(0xffffff00)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffff00,d2",
+            "move.l #$12,d3",
+            "or.w d2,d3")
+            .expectD2(0xffffff00)
+            .expectD3(0xff12)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        // ($1200) = d3 & ($1200)
+        final int adr = PROGRAM_START_ADDRESS + 128;
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.b #$12,"+adr,
+            "or.w d3,"+adr)
+            .expectD3(0xffffffff)
+            .dumpMemory(adr,12)
+            .expectMemoryByte(adr, 0xff)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
+            "move.l #$ffffffff,d3",
+            "or.w d2,d3")
+            .expectD2(0x0)
+            .expectD3(0xffffffff)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        // d3 = ($1200) & d3
+        // d3 = $12 & 0xff
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.b #$12,"+adr,
+            "or.w "+adr+",d3")
+            .expectD3(0xffffffff)
+            .expectMemoryByte(adr, 0x12)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d2",
+            "move.l #$12,d3",
+            "or.w d3,d2")
+            .expectD2(0xffffffff)
+            .expectD3(0x12)
+            .notZero().negative().noCarry().noOverflow().extended();
+    }
+
+    public void testOR_Long()
+    {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
+            "move.l #$ffffff00,d3",
+            "or.l d2,d3")
+            .expectD2(0x00)
+            .expectD3(0xffffff00)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffff00,d2",
+            "move.l #$12,d3",
+            "or.l d2,d3")
+            .expectD2(0xffffff00)
+            .expectD3(0xffffff12)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        // ($1200) = d3 & ($1200)
+        final int adr = PROGRAM_START_ADDRESS + 128;
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.b #$12,"+adr,
+            "or.l d3,"+adr)
+            .expectD3(0xffffffff)
+            .dumpMemory(adr,12)
+            .expectMemoryByte(adr, 0xff)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
+            "move.l #$ffffffff,d3",
+            "or.l d2,d3")
+            .expectD2(0x0)
+            .expectD3(0xffffffff)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        // d3 = ($1200) & d3
+        // d3 = $12 & 0xff
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+            "move.b #$12,"+adr,
+            "or.l "+adr+",d3")
+            .expectD3(0xffffffff)
+            .expectMemoryByte(adr, 0x12)
+            .notZero().negative().noCarry().noOverflow().extended();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d2",
+            "move.l #$12,d3",
+            "or.l d3,d2")
+            .expectD2(0xffffffff)
+            .expectD3(0x12)
+            .notZero().negative().noCarry().noOverflow().extended();
+    }
+
     public void testAND_Byte()
     {
         execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$0,d2",
@@ -2091,6 +2243,13 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             return this;
         }
 
+        public ExpectionBuilder dumpMemory(int startAddress,int byteCount)
+        {
+            System.out.println("=== Dump at "+Misc.hex(startAddress)+" ===");
+            System.out.println( cpu.memory.hexdump(startAddress, byteCount) );
+            return this;
+        }
+
         public ExpectionBuilder expectD0(int value) { return assertHexEquals( "D0 mismatch" , value, cpu.dataRegisters[0]); }
         public ExpectionBuilder expectD1(int value) { return assertHexEquals( "D1 mismatch" , value, cpu.dataRegisters[1]); }
         public ExpectionBuilder expectD2(int value) { return assertHexEquals( "D2 mismatch" , value, cpu.dataRegisters[2]); }
@@ -2140,8 +2299,9 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         public ExpectionBuilder expectMemoryByte(int address,int value)
         {
             final int actual = memory.readByte(address);
-            if ( value != actual ) {
-                fail("Expected "+Misc.hex(value)+" @ "+Misc.hex(address)+" but got "+Misc.hex(actual));
+            if ( (value & 0xff) != (actual & 0xff) )
+            {
+                fail("Expected "+Misc.hex(value)+" @ "+Misc.hex(address)+" but got "+Misc.hex(actual & 0xff));
             }
             return this;
         }

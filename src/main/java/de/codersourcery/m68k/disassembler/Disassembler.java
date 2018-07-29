@@ -585,6 +585,12 @@ public class Disassembler
                 appendln("ori");
                 decodeImmediateBinaryLogicalOp(insnWord);
                 return;
+            case OR:
+                if ( decodeRegularBinaryLogicalOp("or", insnWord,Instruction.OR_SRC_EA_ENCODING,Instruction.OR_DST_EA_ENCODING) )
+                {
+                    return;
+                }
+                break;
             case AND:
                 if ( matches(insnWord, Instruction.ANDI_TO_SR_ENCODING) ) {
                     final int word = readWord() & 0xffff;

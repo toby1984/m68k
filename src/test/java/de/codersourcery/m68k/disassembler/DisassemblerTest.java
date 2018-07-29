@@ -126,6 +126,19 @@ public class DisassemblerTest extends TestCase
         compile("eor.l d2,d3");
     }
 
+    public void testOR()
+    {
+        compile("or.b d3,$1200");
+        compile("or.b $1200,d3");
+        compile("or.b d2,d3");
+        compile("or.w d3,$1200");
+        compile("or.w $1200,d3");
+        compile("or.w d2,d3");
+        compile("or.l d3,$1200");
+        compile("or.l $1200,d3");
+        compile("or.l d2,d3");
+    }
+
     public void testAND()
     {
         compile("and.b d3,$1200");

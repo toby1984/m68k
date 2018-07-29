@@ -489,20 +489,34 @@ public enum Instruction
             Instruction.checkSourceAddressingMode(insn,AddressingMode.DATA_REGISTER_DIRECT);
         }
     },
-    AND("AND",2)
-            {
-                @Override
-                public boolean supportsExplicitOperandSize()
-                {
-                    return true;
-                }
+    OR("OR",2)
+    {
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
 
-                @Override
-                public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
-                {
-                    checkBinaryLogicalOperation(insn,estimateSizeOnly,ctx);
-                }
-            },
+        @Override
+        public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            checkBinaryLogicalOperation(insn,estimateSizeOnly,ctx);
+        }
+    },
+    AND("AND",2)
+    {
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+
+        @Override
+        public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            checkBinaryLogicalOperation(insn,estimateSizeOnly,ctx);
+        }
+    },
     TRAP("TRAP",1, 0b0100)
             {
                 @Override
@@ -1037,9 +1051,15 @@ public enum Instruction
                 }
                 return EXTL_ENCODING;
             case EOR:
+                insn.setImplicitOperandSize(OperandSize.WORD);
                 String[] patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
                 return EOR_DST_EA_ENCODING.append(patterns);
             case ORI:
+
+                /*
+If the destination is a data register, it must be specified using the
+destination Dn mode, not the destination < ea > mode.
+                 */
 
                 if ( insn.destination().getValue().isRegister(Register.CCR) )
                 {
@@ -1161,6 +1181,16 @@ public enum Instruction
                     default:
                         throw new RuntimeException("Unsupported addressing mode for JMP: "+insn.source().addressingMode);
                 }
+            case OR:
+                // OR Dn,<ea>
+                // OR <ea>,Dn
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                if ( ! insn.destination().hasAddressingMode(AddressingMode.DATA_REGISTER_DIRECT) ) {
+                    patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
+                    return OR_DST_EA_ENCODING.append(patterns);
+                }
+                patterns = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn, context);
+                return OR_SRC_EA_ENCODING.append(patterns);
             case AND:
                 if ( insn.source().hasAddressingMode( IMMEDIATE_VALUE ) )
                 {
@@ -1194,6 +1224,7 @@ public enum Instruction
                 }
                 // AND Dn,<ea>
                 // AND <ea>,Dn
+                insn.setImplicitOperandSize(OperandSize.WORD);
                 if ( ! insn.destination().hasAddressingMode(AddressingMode.DATA_REGISTER_DIRECT) ) {
                     patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
                     return AND_DST_EA_ENCODING.append(patterns);
@@ -1432,6 +1463,8 @@ public enum Instruction
         if ( op.addressingMode.maxExtensionWords == 0 ) {
             return null;
         }
+
+        // TODO: Handle estimateSizeOnly properly and return the worst-case here...
 
         switch (op.addressingMode)
         {
@@ -1972,12 +2005,18 @@ D/A   |     |   |           |
     public static final InstructionEncoding AND_SRC_EA_ENCODING  = InstructionEncoding.of("1100DDD0SSmmmsss");
     // dst eaMode/eaRegister contained in lower 6 bits
     public static final InstructionEncoding AND_DST_EA_ENCODING  = InstructionEncoding.of("1100sss1SSMMMDDD");
+
     public static final InstructionEncoding ANDI_TO_CCR_ENCODING = InstructionEncoding.of("0000001000111100","00000000vvvvvvvv");
 
     public static final InstructionEncoding ANDI_BYTE_ENCODING   = InstructionEncoding.of("0000001000MMMDDD","00000000_vvvvvvvv");
     public static final InstructionEncoding ANDI_WORD_ENCODING   = InstructionEncoding.of("0000001001MMMDDD","vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding ANDI_LONG_ENCODING   = InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding ANDI_TO_SR_ENCODING  = InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
+
+    // src eaMode/eaRegister contained in lower 6 bits
+    public static final InstructionEncoding OR_SRC_EA_ENCODING  = InstructionEncoding.of("1000DDD0SSmmmsss");
+    // dst eaMode/eaRegister contained in lower 6 bits
+    public static final InstructionEncoding OR_DST_EA_ENCODING  = InstructionEncoding.of("1000sss1SSMMMDDD");
 
     public static final InstructionEncoding ORI_TO_CCR_ENCODING  = InstructionEncoding.of("0000000000111100",
         "00000000_vvvvvvvv");
@@ -2298,6 +2337,8 @@ D/A   |     |   |           |
 
         put(ORI_16_BIT_ENCODING,ORI);
         put(ORI_32_BIT_ENCODING,ORI);
+        put(OR_SRC_EA_ENCODING,OR);
+        put(OR_DST_EA_ENCODING,OR);
 
         put(EORI_16_BIT_ENCODING,EORI);
         put(EORI_32_BIT_ENCODING,EORI);

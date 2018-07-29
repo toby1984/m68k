@@ -4,7 +4,6 @@ import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
-import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
@@ -733,10 +732,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b0000001000111100: // ANDI to CCR
-                binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.CCR);
+                binaryLogicalOp(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.CCR);
                 return;
             case 0b0000001001111100: // ANDI to SR
-                binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.SR);
+                binaryLogicalOp(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.SR);
                 return;
             /* ================================
              * Miscellaneous instructions
@@ -817,20 +816,20 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
                 if ( instruction == 0b0000000000111100 ) {
                     // ORI to CCR
-                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.CCR);
+                    binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.CCR);
                     return;
                 }
 
                 if ( instruction == 0b0000000001111100 ) {
                     // ORI to SR
-                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.SR);
+                    binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.SR);
                     return;
                 }
 
                 if ( instruction == 0b0000101000111100 )
                 {
                     // EORI #xx,CCR
-                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.CCR);
+                    binaryLogicalOp(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.CCR);
                     return;
                 }
 
@@ -839,27 +838,27 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     // EORI #xx,SR
                     if ( assertSupervisorMode() )
                     {
-                        binaryLogicalOpImmediate(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.SR);
+                        binaryLogicalOp(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.SR);
                     }
                     return;
                 }
 
                 if ( ( instruction & 0b1111111100000000 ) == 0b0000101000000000 ) {
                     // EORI #xx,<ea>
-                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.IMMEDIATE);
+                    binaryLogicalOp(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.IMMEDIATE);
                     return;
                 }
 
                 if ( ( instruction & 0b1111111100000000 ) == 0b0000000000000000 )
                 {
                     // ORI #xx,<ea>
-                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.IMMEDIATE);
+                    binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.IMMEDIATE);
                     return;
                 }
 
                 if ( ( instruction & 0b1111111100000000) == 0b0000001000000000 ) {
                     // ANDI #xx,<ea>
-                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.IMMEDIATE);
+                    binaryLogicalOp(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.IMMEDIATE);
                     return;
                 }
                 if ( (instruction & 0b1111000111000000) == 0b0000000101000000) {
@@ -1406,6 +1405,17 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b1000_0000_0000_0000:
+                if ( ( instruction & 0b1111000100000000 ) == 0b1000000100000000 ) {
+                    // OR Dn,<ea>
+                    binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.REGULAR);
+                    return;
+                }
+
+                if ( ( instruction& 0b1111000100000000 ) == 0b1000000000000000 ) {
+                    // OR <ea>,Dn
+                    binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.REGULAR);
+                    return;
+                }
                 break;
             /* ================================
              * SUB/SUBX
@@ -1479,7 +1489,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( masked == 0b1100000000000000 || masked == 0b1100000100000000) {
                     // AND <ea>,Dn
                     // AND Dn,<ea>
-                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.REGULAR);
+                    binaryLogicalOp(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.REGULAR);
                     return;
                 }
                 break;
@@ -1653,14 +1663,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
         switch( operandSizeInBytes )
         {
-            case 1: return (input & 0xffffff00) | (toMerge & 0x00ff);
+            case 1: return (input & 0xffffff00) | (toMerge & 0xff);
             case 2: return (input & 0xffff0000) | (toMerge & 0xffff);
             case 4: return toMerge;
         }
         throw new IllegalInstructionException(pcAtStartOfLastInstruction, memLoadWord(pcAtStartOfLastInstruction) );
     }
 
-    private void binaryLogicalOpImmediate(int instruction, BinaryLogicalOp operation,BinaryLogicalOpMode mode)
+    private void binaryLogicalOp(int instruction, BinaryLogicalOp operation, BinaryLogicalOpMode mode)
     {
         if ( mode == BinaryLogicalOpMode.IMMEDIATE )
         {
@@ -1723,9 +1733,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             // OR  Dn,<ea> / OR  Dn,<ea>
             // EOR Dn,<ea> / EOR Dn,<ea>
             final int sizeBits = (instruction & 0b11000000) >>> 6;
-            final int operandSize = 1<<sizeBits;
+            final int operandSizeInBytes = 1<<sizeBits;
             final boolean destinationIsDataRegister = (instruction & 0b100000000) == 0;
-            final boolean sourceIsDataRegister = ! destinationIsDataRegister;
 
             final int regNum = (instruction & 0b111000000000) >> 9;
             final int regValue = dataRegisters[regNum];
@@ -1734,17 +1743,17 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             if ( destinationIsDataRegister )
             {
                 // <ea> OP Dn -> DN
-                decodeSourceOperand(instruction,operandSize,false);
+                decodeSourceOperand(instruction,operandSizeInBytes,false);
 
                 value = operation.apply(value,regValue);
-                dataRegisters[regNum] = mergeValue(regValue,value,operandSize);
+                dataRegisters[regNum] = mergeValue(regValue,value,operandSizeInBytes);
             } else {
                 // Dn OP <ea> -> <ea>
-                decodeSourceOperand(instruction,operandSize,false,false);
+                decodeSourceOperand(instruction,operandSizeInBytes,false,false);
                 value = operation.apply(regValue,value);
-                storeValue((instruction&0b111000)>>>3,instruction&0b111,operandSize);
+                storeValue((instruction&0b111000)>>>3,instruction&0b111,operandSizeInBytes);
             }
-            updateFlagsAfterMove(operandSize);
+            updateFlagsAfterMove(operandSizeInBytes);
             return;
         }
 
