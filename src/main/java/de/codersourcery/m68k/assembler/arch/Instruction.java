@@ -10,7 +10,6 @@ import de.codersourcery.m68k.parser.ast.RegisterNode;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
-import javax.xml.crypto.Data;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -41,25 +40,7 @@ public enum Instruction
             @Override
             public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
             {
-                Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
-
-                if ( node.destination().getValue().isRegister(Register.CCR) )
-                {
-                    if (node.hasExplicitOperandSize() && node.getOperandSize() != OperandSize.BYTE)
-                    {
-                        throw new RuntimeException("Unsupported operand size " + node.getOperandSize() + " for EORI to CCR");
-                    }
-                    return;
-                }
-                if ( node.destination().getValue().isRegister(Register.SR) )
-                {
-                    if (node.hasExplicitOperandSize() && node.getOperandSize() != OperandSize.WORD)
-                    {
-                        throw new RuntimeException("Unsupported operand size " + node.getOperandSize() + " for EORI to SR");
-                    }
-                    return;
-                }
-                Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+                checkBinaryLogicalOperation(node,estimateSizeOnly,ctx);
             }
         },
     ORI("ORI",2)
@@ -73,8 +54,7 @@ public enum Instruction
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
-            Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
-            Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+            checkBinaryLogicalOperation(node,estimateSizeOnly,ctx);
         }
     },
     MOVEP("MOVEP",2)
@@ -1060,6 +1040,18 @@ public enum Instruction
                 String[] patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
                 return EOR_DST_EA_ENCODING.append(patterns);
             case ORI:
+
+                if ( insn.destination().getValue().isRegister(Register.CCR) )
+                {
+                    insn.setImplicitOperandSize(OperandSize.BYTE);
+                    return ORI_TO_CCR_ENCODING;
+                }
+                if ( insn.destination().getValue().isRegister(Register.SR) )
+                {
+                    insn.setImplicitOperandSize(OperandSize.WORD);
+                    return ORI_TO_SR_ENCODING;
+                }
+
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(),Operand.DESTINATION,insn,context);
 
@@ -1986,6 +1978,12 @@ D/A   |     |   |           |
     public static final InstructionEncoding ANDI_WORD_ENCODING   = InstructionEncoding.of("0000001001MMMDDD","vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding ANDI_LONG_ENCODING   = InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding ANDI_TO_SR_ENCODING  = InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding ORI_TO_CCR_ENCODING  = InstructionEncoding.of("0000000000111100",
+        "00000000_vvvvvvvv");
+
+    public static final InstructionEncoding ORI_TO_SR_ENCODING  = InstructionEncoding.of("0000000001111100",
+        "vvvvvvvv_vvvvvvvv");
 
     public static final InstructionEncoding ORI_16_BIT_ENCODING  = InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding ORI_32_BIT_ENCODING  = InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");

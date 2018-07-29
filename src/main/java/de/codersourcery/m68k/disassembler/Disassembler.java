@@ -572,18 +572,28 @@ public class Disassembler
                 decodeImmediateBinaryLogicalOp(insnWord);
                 return;
             case ORI:
+                if ( matches(insnWord, Instruction.ORI_TO_SR_ENCODING) ) {
+                    final int word = readWord() & 0xffff;
+                    appendln("ori.w #").append( Misc.hex(word) ).append(",sr");
+                    return;
+                }
+                if ( matches(insnWord, Instruction.ORI_TO_CCR_ENCODING) ) {
+                    final int word = readWord() & 0xff;
+                    appendln("ori.b #").append( Misc.hex(word) ).append(",ccr");
+                    return;
+                }
                 appendln("ori");
                 decodeImmediateBinaryLogicalOp(insnWord);
                 return;
             case AND:
                 if ( matches(insnWord, Instruction.ANDI_TO_SR_ENCODING) ) {
-                    final int word = readWord();
-                    appendln("andi #").append( Misc.hex(word) ).append(",sr");
+                    final int word = readWord() & 0xffff;
+                    appendln("andi.w #").append( Misc.hex(word) ).append(",sr");
                     return;
                 }
                 if ( matches(insnWord, Instruction.ANDI_TO_CCR_ENCODING) ) {
-                    final int word = readWord();
-                    appendln("andi #").append( Misc.hex(word) ).append(",ccr");
+                    final int word = readWord() & 0xff;
+                    appendln("andi.b #").append( Misc.hex(word) ).append(",ccr");
                     return;
                 }
                 if ( matches(insnWord, Instruction.ANDI_BYTE_ENCODING) ) {

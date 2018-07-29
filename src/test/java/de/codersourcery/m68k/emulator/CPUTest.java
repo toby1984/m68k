@@ -1009,9 +1009,9 @@ public class CPUTest extends TestCase
 
     public void testEORIToCCR()
     {
-        execute( cpu -> cpu.clearFlags(CPU.ALL_USERMODE_FLAGS),
-            "eori #$ff,ccr")
-            .zero().extended().negative().carry().overflow()
+        execute( cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "eori.b #$ff,ccr")
+            .notZero().noExtended().notNegative().noCarry().noOverflow()
             .noIrqActive();
     }
 

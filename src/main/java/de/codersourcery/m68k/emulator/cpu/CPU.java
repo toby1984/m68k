@@ -4,6 +4,7 @@ import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
+import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
@@ -814,10 +815,22 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         return;
                 }
 
+                if ( instruction == 0b0000000000111100 ) {
+                    // ORI to CCR
+                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.CCR);
+                    return;
+                }
+
+                if ( instruction == 0b0000000001111100 ) {
+                    // ORI to SR
+                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.SR);
+                    return;
+                }
+
                 if ( instruction == 0b0000101000111100 )
                 {
                     // EORI #xx,CCR
-                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.IMMEDIATE);
+                    binaryLogicalOpImmediate(instruction,BinaryLogicalOp.EOR,BinaryLogicalOpMode.CCR);
                     return;
                 }
 

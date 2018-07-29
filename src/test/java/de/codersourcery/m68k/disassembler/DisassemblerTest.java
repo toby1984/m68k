@@ -100,6 +100,14 @@ public class DisassemblerTest extends TestCase
         compile("ori.l #$12345678,-(a3)");
     }
 
+    public void testORIToCCR() {
+        compile("ori.b #$ff,ccr");
+    }
+
+    public void testORIToSR() {
+        compile("ori.w #$ffff,sr");
+    }
+
     public void testEORIToCCR() {
         compile("eori.b #$ff,ccr");
     }
@@ -139,11 +147,11 @@ public class DisassemblerTest extends TestCase
     }
 
     public void testANDISR() {
-        compile("AND #$1234,sr","00000000: andi #$1234,sr");
+        compile("AND #$1234,sr","00000000: andi.w #$1234,sr");
     }
 
     public void testANDICCR() {
-        compile("AND #$34,ccr","00000000: andi #$34,ccr");
+        compile("AND #$34,ccr","00000000: andi.b #$34,ccr");
     }
 
     public void testDBRA()
