@@ -80,6 +80,142 @@ public class CPUTest extends TestCase
             .notSupervisor().noIrqActive();
     }
 
+    public void testDivu()
+    {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #0,d2",
+            "move.l #3,d3",
+            "divu.w d2,d3") // d3 / d2
+            .expectD2(0x00)
+            .expectD3(0x03)
+            .zero()
+            .overflow()
+            .negative()
+            .extended() // not affected
+            .carry() // always cleared
+            .supervisor().irqActive(CPU.IRQ.INTEGER_DIVIDE_BY_ZERO);
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #3,d2",
+            "move.l #6,d3",
+            "divu.w d2,d3") // d3 / d2
+            .expectD2(0x03)
+            .expectD3(0x02)
+            .notZero()
+            .noOverflow()
+            .notNegative()
+            .extended() // not affected
+            .noCarry() // always cleared
+            .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #3,d2",
+            "move.l #7,d3",
+            "divu.w d2,d3") // d3 / d2
+            .expectD2(0x03)
+            .expectD3((0x01<<16) | 0x02)
+            .notZero()
+            .noOverflow()
+            .notNegative()
+            .extended() // not affected
+            .noCarry() // always cleared
+            .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #2,d2",
+            "move.l #1,d3",
+            "divu.w d2,d3") // d3 / d2
+            .expectD2(0x02)
+            .expectD3((0x01<<16) | 0x00)
+            .zero()
+            .noOverflow()
+            .notNegative()
+            .extended() // not affected
+            .noCarry() // always cleared
+            .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #1,d2",
+            "move.l #$ffffffff,d3",
+            "divu.w d2,d3") // d3 / d2
+            .expectD2(0x01)
+            .expectD3(0xffff)
+            .notZero()
+            .overflow()
+            .negative()
+            .extended() // not affected
+            .noCarry() // always cleared
+            .notSupervisor().noIrqActive();
+    }
+
+    public void testDivs()
+    {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #0,d2",
+            "move.l #3,d3",
+            "divs.w d2,d3") // d3 / d2
+            .expectD2(0x00)
+            .expectD3(0x03)
+            .zero()
+            .overflow()
+            .negative()
+            .extended() // not affected
+            .carry() // always cleared
+            .supervisor().irqActive(CPU.IRQ.INTEGER_DIVIDE_BY_ZERO);
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #3,d2",
+            "move.l #6,d3",
+            "divs.w d2,d3") // d3 / d2
+            .expectD2(0x03)
+            .expectD3(0x02)
+            .notZero()
+            .noOverflow()
+            .notNegative()
+            .extended() // not affected
+            .noCarry() // always cleared
+            .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #3,d2",
+            "move.l #7,d3",
+            "divs.w d2,d3") // d3 / d2
+            .expectD2(0x03)
+            .expectD3((0x01<<16) | 0x02)
+            .notZero()
+            .noOverflow()
+            .notNegative()
+            .extended() // not affected
+            .noCarry() // always cleared
+            .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #2,d2",
+            "move.l #1,d3",
+            "divs.w d2,d3") // d3 / d2
+            .expectD2(0x02)
+            .expectD3((0x01<<16) | 0x00)
+            .zero()
+            .noOverflow()
+            .notNegative()
+            .extended() // not affected
+            .noCarry() // always cleared
+            .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #1,d2",
+            "move.l #$ffffffff,d3",
+            "divs.w d2,d3") // d3 / d2
+            .expectD2(0x01)
+            .expectD3(0xffff)
+            .notZero()
+            .noOverflow()
+            .negative()
+            .extended() // not affected
+            .noCarry() // always cleared
+            .notSupervisor().noIrqActive();
+    }
+
     public void testMulu()
     {
         execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),

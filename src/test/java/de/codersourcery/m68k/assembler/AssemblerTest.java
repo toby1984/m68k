@@ -397,6 +397,18 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("muls.w d4,d3"),0xc7,0xc4);
     }
 
+    public void testDivu()
+    {
+        assertArrayEquals(compile("divu.w $1200,d3"),0x86,0xf8,0x12,0x00);
+        assertArrayEquals(compile("divu.w d4,d3"),   0x86,0xc4);
+    }
+
+    public void testDivs()
+    {
+        assertArrayEquals(compile("divs.w $1200,d3"),0x87,0xf8,0x12,0x00);
+        assertArrayEquals(compile("divs.w d4,d3"),   0x87,0xc4);
+    }
+
     public void testAsl()
     {
         assertArrayEquals(compile("asl $1234"  ),0xe1,0xf8,0x12,0x34);

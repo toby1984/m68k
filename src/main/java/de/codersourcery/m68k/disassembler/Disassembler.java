@@ -566,6 +566,18 @@ public class Disassembler
                 dstReg = (insnWord&0b111000000000) >> 9;
                 append(",").appendDataRegister(dstReg);
                 return;
+            case DIVS:
+                appendln("divs.w ");
+                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
+                dstReg = (insnWord&0b111000000000) >> 9;
+                append(",").appendDataRegister(dstReg);
+                return;
+            case DIVU:
+                appendln("divu.w ");
+                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
+                dstReg = (insnWord&0b111000000000) >> 9;
+                append(",").appendDataRegister(dstReg);
+                return;
             case EORI:
                 if ( insnWord == 0b0000101000111100)
                 {

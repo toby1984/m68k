@@ -24,8 +24,8 @@
 [ ] CMPI
 [ ] CMPM
 [X] DBcc
-[ ] DIVS
-[ ] DIVU
+[X] DIVS
+[X] DIVU
 [X] EOR
 [X] EORI
 [X] EORI to CCR

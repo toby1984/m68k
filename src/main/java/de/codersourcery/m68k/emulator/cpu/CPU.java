@@ -1405,6 +1405,73 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b1000_0000_0000_0000:
+
+                if ( ( instruction & 0b1111000111000000 ) == 0b1000000011000000 )
+                {
+                    // DIVU_ENCODING
+                    final int dataReg = (instruction&0b111000000000)>>9;
+                    decodeSourceOperand(instruction,4,false);
+                    long a = dataRegisters[dataReg];
+                    a &= 0xffffffff;
+                    long b = value;
+                    b &= 0xffff;
+                    if ( b == 0 )
+                    {
+                        triggerIRQ(IRQ.INTEGER_DIVIDE_BY_ZERO,0);
+                        return;
+                    }
+                    long result = a/b;
+                    long remainder = a - (result*b);
+                    dataRegisters[dataReg] = (int) ( ((remainder & 0xffff)<<16) | (result & 0xffff) );
+                    final int clearMask = ~(CPU.FLAG_NEGATIVE|CPU.FLAG_ZERO|CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW);
+                    int setMask = 0;
+                    if ( result == 0 ) {
+                        setMask |= CPU.FLAG_ZERO;
+                    }
+                    if ( result < 0 || result > 0xffffffffL ) {
+                        setMask |= CPU.FLAG_OVERFLOW;
+                    }
+                    if ( (result & 1<<15)!=0) {
+                        setMask |= CPU.FLAG_NEGATIVE;
+                    }
+                    cycles += 140;
+                    statusRegister = (statusRegister & clearMask) | setMask;
+                    return;
+                }
+
+                if ( ( instruction & 0b1111000111000000 ) == 0b1000000111000000 ) {
+                    // DIVS_ENCODING
+                    final int dataReg = (instruction&0b111000000000)>>9;
+                    decodeSourceOperand(instruction,4,false);
+                    long a = dataRegisters[dataReg];
+                    long b = value;
+                    if ( b == 0 )
+                    {
+                        triggerIRQ(IRQ.INTEGER_DIVIDE_BY_ZERO,0);
+                        return;
+                    }
+                    long result = a/b;
+                    long remainder = a - (result*b);
+                    dataRegisters[dataReg] = (int) ( ((remainder & 0xffff)<<16) | (result & 0xffff) );
+                    final int clearMask = ~(CPU.FLAG_NEGATIVE|CPU.FLAG_ZERO|CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW);
+                    int setMask = 0;
+                    if ( result == 0 ) {
+                        setMask |= CPU.FLAG_ZERO;
+                    }
+                    if ( (result & 1<<15)!=0) {
+                        setMask |= CPU.FLAG_NEGATIVE;
+                    }
+                    final long masked = result & 0xffffffff_00000000L;
+                    if ( masked != 0 && masked != 0xffffffff_00000000L) {
+                        setMask |= CPU.FLAG_OVERFLOW;
+                    }
+                    cycles += 170;
+                    statusRegister = (statusRegister & clearMask) | setMask;
+                    return;
+                }
+
+
+
                 if ( ( instruction & 0b1111000100000000 ) == 0b1000000100000000 ) {
                     // OR Dn,<ea>
                     binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.REGULAR);

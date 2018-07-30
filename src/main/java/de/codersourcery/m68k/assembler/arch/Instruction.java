@@ -29,42 +29,44 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
-    MULS("MULS",2)
-            {
-                @Override
-                public boolean supportsExplicitOperandSize()
-                {
-                    return true;
-                }
-
-                @Override
-                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-                {
-                    if ( node.hasExplicitOperandSize() && ! node.hasOperandSize(OperandSize.WORD ) ) {
-                        throw new RuntimeException("MULU on 68000 only supports word operands");
-                    }
-                    if ( ! node.destination().getValue().isDataRegister() ) {
-                        throw new RuntimeException("MULU needs a data register as destination");
-                    }
-                }
-            },
-    MULU("MULU",2)
+    DIVS("DIVS",2)
     {
-        @Override
-        public boolean supportsExplicitOperandSize()
-        {
-            return true;
-        }
+        @Override public boolean supportsExplicitOperandSize() { return true; }
 
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
-            if ( node.hasExplicitOperandSize() && ! node.hasOperandSize(OperandSize.WORD ) ) {
-                throw new RuntimeException("MULU on 68000 only supports word operands");
-            }
-            if ( ! node.destination().getValue().isDataRegister() ) {
-                throw new RuntimeException("MULU needs a data register as destination");
-            }
+            checkMultiplyDivide(node);
+        }
+    },
+    DIVU("DIVU",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            checkMultiplyDivide(node);
+        }
+    },
+    MULS("MULS",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            checkMultiplyDivide(node);
+        }
+    },
+    MULU("MULU",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            checkMultiplyDivide(node);
         }
     },
     EORI("EORI",2)
@@ -1048,6 +1050,14 @@ public enum Instruction
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 return CHK_ENCODING.append(extraInsnWords);
+            case DIVS:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return DIVS_ENCODING.append(extraInsnWords);
+            case DIVU:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return DIVU_ENCODING.append(extraInsnWords);
             case MULS:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
@@ -1697,6 +1707,15 @@ D/A   |     |   |           |
         throw new RuntimeException("Operands have unsupported addressing modes for " + node.instruction);
     }
 
+    private static void checkMultiplyDivide(InstructionNode node) {
+        if ( node.hasExplicitOperandSize() && ! node.hasOperandSize(OperandSize.WORD ) ) {
+            throw new RuntimeException(node.instruction.getMnemonic()+"on 68000 only supports word operands");
+        }
+        if ( ! node.destination().getValue().isDataRegister() ) {
+            throw new RuntimeException(node.instruction.getMnemonic()+" needs a data register as destination");
+        }
+    }
+
     private static void checkBinaryLogicalOperation(InstructionNode insn,boolean estimateSizeOnly, ICompilationContext ctx)
     {
         checkDestinationIsNotAddressRegisterDirect(insn,ctx);
@@ -2262,6 +2281,12 @@ D/A   |     |   |           |
     public static final InstructionEncoding NOT_ENCODING = // NOT
             InstructionEncoding.of( "01000110SSmmmsss");
 
+    public static final InstructionEncoding DIVU_ENCODING = // MULS <ea>,Dn
+        InstructionEncoding.of( "1000DDD011mmmsss");
+
+    public static final InstructionEncoding DIVS_ENCODING = // MULS <ea>,Dn
+        InstructionEncoding.of( "1000DDD111mmmsss");
+
     public static final InstructionEncoding MULS_ENCODING = // MULS <ea>,Dn
             InstructionEncoding.of( "1100DDD111mmmsss");
 
@@ -2401,5 +2426,8 @@ D/A   |     |   |           |
 
         put(MULU_ENCODING,MULU);
         put(MULS_ENCODING,MULS);
+
+        put(DIVU_ENCODING,DIVU);
+        put(DIVS_ENCODING,DIVS);
     }};
 }
