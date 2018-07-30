@@ -80,6 +80,79 @@ public class CPUTest extends TestCase
             .notSupervisor().noIrqActive();
     }
 
+    public void testMulu()
+    {
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #3,d2",
+                "move.l #4,d3",
+                "mulu.w d2,d3")
+                .expectD2(0x03)
+                .expectD3(12)
+                .notZero()
+                .noOverflow() // cannot happen on 68000 with 16x16 operands
+                .notNegative()
+                .extended() // not affected
+                .noCarry() // always cleared
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #2,d2",
+                "move.l #$ffff,d3",
+                "mulu.w d2,d3")
+                .expectD2(2)
+                .expectD3(0x1fffe)
+                .notZero()
+                .noOverflow() // cannot happen on 68000 with 16x16 operands
+                .notNegative()
+                .extended() // not affected
+                .noCarry() // always cleared
+                .notSupervisor().noIrqActive();
+    }
+
+    public void testMuls()
+    {
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #2,d2",
+                "move.l #$ffff,d3",
+                "muls.w d2,d3")
+                .expectD2(2)
+                .expectD3(0xfffffffe)
+                .notZero()
+                .noOverflow()
+                .negative()
+                .extended() // not affected
+                .noCarry() // always cleared
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #3,d2",
+                "move.l #4,d3",
+                "muls.w d2,d3")
+                .expectD2(0x03)
+                .expectD3(12)
+                .notZero()
+                .noOverflow()
+                .notNegative()
+                .extended() // not affected
+                .noCarry() // always cleared
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$8fff,d2",
+                "move.l #$ffff,d3",
+                "muls.w d2,d3")
+                .expectD2(0x8fff)
+                .expectD3(0xffff7001)
+                .notZero()
+                .noOverflow()
+                .negative()
+                .extended() // not affected
+                .noCarry() // always cleared
+                .notSupervisor().noIrqActive();
+
+
+    }
+
     public void testEOR() {
 
         execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),

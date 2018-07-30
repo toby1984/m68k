@@ -108,6 +108,18 @@ public class DisassemblerTest extends TestCase
         compile("ori.w #$ffff,sr");
     }
 
+    public void testMulu()
+    {
+        compile("mulu.w $1200,d3");
+        compile("mulu.w d4,d3");
+    }
+
+    public void testMuls()
+    {
+        compile("muls.w $1200,d3");
+        compile("muls.w d4,d3");
+    }
+
     public void testEORIToCCR() {
         compile("eori.b #$ff,ccr");
     }

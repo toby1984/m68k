@@ -554,6 +554,18 @@ public class Disassembler
                 append(",");
                 decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
+            case MULS:
+                appendln("muls.w ");
+                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
+                int dstReg = (insnWord&0b111000000000) >> 9;
+                append(",").appendDataRegister(dstReg);
+                return;
+            case MULU:
+                appendln("mulu.w ");
+                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
+                dstReg = (insnWord&0b111000000000) >> 9;
+                append(",").appendDataRegister(dstReg);
+                return;
             case EORI:
                 if ( insnWord == 0b0000101000111100)
                 {

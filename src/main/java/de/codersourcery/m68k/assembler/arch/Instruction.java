@@ -29,20 +29,58 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
-    EORI("EORI",2)
-        {
-            @Override
-            public boolean supportsExplicitOperandSize()
+    MULS("MULS",2)
             {
-                return true;
-            }
+                @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return true;
+                }
 
-            @Override
-            public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-            {
-                checkBinaryLogicalOperation(node,estimateSizeOnly,ctx);
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    if ( node.hasExplicitOperandSize() && ! node.hasOperandSize(OperandSize.WORD ) ) {
+                        throw new RuntimeException("MULU on 68000 only supports word operands");
+                    }
+                    if ( ! node.destination().getValue().isDataRegister() ) {
+                        throw new RuntimeException("MULU needs a data register as destination");
+                    }
+                }
+            },
+    MULU("MULU",2)
+    {
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            if ( node.hasExplicitOperandSize() && ! node.hasOperandSize(OperandSize.WORD ) ) {
+                throw new RuntimeException("MULU on 68000 only supports word operands");
             }
-        },
+            if ( ! node.destination().getValue().isDataRegister() ) {
+                throw new RuntimeException("MULU needs a data register as destination");
+            }
+        }
+    },
+    EORI("EORI",2)
+    {
+        @Override
+        public boolean supportsExplicitOperandSize()
+        {
+            return true;
+        }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            checkBinaryLogicalOperation(node,estimateSizeOnly,ctx);
+        }
+    },
     ORI("ORI",2)
     {
         @Override
@@ -1010,6 +1048,14 @@ public enum Instruction
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 return CHK_ENCODING.append(extraInsnWords);
+            case MULS:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return MULS_ENCODING.append(extraInsnWords);
+            case MULU:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return MULU_ENCODING.append(extraInsnWords);
             case TAS:
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 return TAS_ENCODING.append(extraInsnWords);
@@ -2216,6 +2262,12 @@ D/A   |     |   |           |
     public static final InstructionEncoding NOT_ENCODING = // NOT
             InstructionEncoding.of( "01000110SSmmmsss");
 
+    public static final InstructionEncoding MULS_ENCODING = // MULS <ea>,Dn
+            InstructionEncoding.of( "1100DDD111mmmsss");
+
+    public static final InstructionEncoding MULU_ENCODING = // MULU <ea>,Dn
+            InstructionEncoding.of( "1100DDD011mmmsss");
+
     public static final InstructionEncoding CHK_ENCODING = // CHK <ea>,Dn
             InstructionEncoding.of( "0100DDDSS0mmmsss").decorateWith(fieldDecorator(Field.SIZE, originalValue ->
             {
@@ -2346,5 +2398,8 @@ D/A   |     |   |           |
         put(EOR_DST_EA_ENCODING,EOR);
         put(EORI_TO_CCR_ENCODING,EORI);
         put(EORI_TO_SR_ENCODING,EORI);
+
+        put(MULU_ENCODING,MULU);
+        put(MULS_ENCODING,MULS);
     }};
 }

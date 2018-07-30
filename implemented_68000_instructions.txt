@@ -48,8 +48,8 @@
 [X] MOVEM
 [X] MOVEP
 [X] MOVEQ
-[ ] MULS
-[ ] MULU
+[X] MULS
+[X] MULU
 [ ] NBCD
 [X] NEG
 [ ] NEGX

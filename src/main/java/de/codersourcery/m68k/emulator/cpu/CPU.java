@@ -1452,6 +1452,71 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b1100_0000_0000_0000:
 
+                if ( ( instruction & 0b1111000111000000 ) == 0b1100000111000000 ) {
+                    // MULS_ENCODING
+                    final int dataReg = (instruction & 0b111_000000000) >> 9;
+                    decodeSourceOperand(instruction,2,false);
+
+                    int pattern = value & 0xffff;
+                    pattern <<= 1;
+
+                    int grpCount = 0;
+                    grpCount += (((pattern & 0b110000000000000000) == 0b100000000000000000) ||
+                                 ((pattern & 0b110000000000000000) == 0b010000000000000000)) ? 1 : 0;
+                    grpCount += (((pattern & 0b001100000000000000) == 0b001000000000000000) ||
+                                 ((pattern & 0b001100000000000000) == 0b000100000000000000)) ? 1 : 0;
+                    grpCount += (((pattern & 0b000011000000000000) == 0b000010000000000000) ||
+                                 ((pattern & 0b000011000000000000) == 0b000001000000000000)) ? 1 : 0;
+                    grpCount += (((pattern & 0b000000110000000000) == 0b000000100000000000) ||
+                                 ((pattern & 0b000000110000000000) == 0b000000010000000000)) ? 1 : 0;
+                    grpCount += (((pattern & 0b000000001100000000) == 0b000000001000000000) ||
+                                 ((pattern & 0b000000001100000000) == 0b000000000100000000)) ? 1 : 0;
+                    grpCount += (((pattern & 0b000000000011000000) == 0b000000000010000000) ||
+                                 ((pattern & 0b000000000011000000) == 0b000000000001000000)) ? 1 : 0;
+                    grpCount += (((pattern & 0b000000000000110000) == 0b000000000000100000) ||
+                                 ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
+                    grpCount += (((pattern & 0b000000000000110000) == 0b000000000000100000) ||
+                                 ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
+                    grpCount += (((pattern & 0b000000000000001100) == 0b000000000000001000) ||
+                                 ((pattern & 0b000000000000001100) == 0b000000000000000100)) ? 1 : 0;
+                    grpCount += (((pattern & 0b000000000000000011) == 0b000000000000000010) ||
+                                 ((pattern & 0b000000000000000011) == 0b000000000000000001)) ? 1 : 0;
+
+                    value *= ((dataRegisters[dataReg] << 16 ) >> 16); // sign-extend data register
+                    dataRegisters[dataReg] = value;
+                    int setMask = 0;
+                    if ( value == 0 ) {
+                        setMask |= FLAG_ZERO;
+                    } else if ( (value & 1<<31) != 0 ) {
+                        setMask |= FLAG_NEGATIVE;
+                    }
+                    final int clearMask = ~(FLAG_OVERFLOW | FLAG_NEGATIVE | FLAG_ZERO | FLAG_CARRY);
+                    statusRegister = (statusRegister & clearMask) | setMask;
+                    cycles+=(38+2*grpCount);
+                    return;
+                }
+
+                if ( ( instruction & 0b1111000111000000 ) == 0b1100000011000000 )
+                {
+                    // MULU_ENCODING
+                    final int dataReg = (instruction & 0b111_000000000) >> 9;
+                    decodeSourceOperand(instruction,2,false);
+                    value &= 0xffff; // decodeSourceOperand() always does sign extension but we're doing unsigned multiplication here...
+                    final int oneBitCnt = Integer.bitCount(value);
+                    value *= (dataRegisters[dataReg] & 0xffff);
+                    dataRegisters[dataReg] = value;
+                    int setMask = 0;
+                    if ( value == 0 ) {
+                        setMask |= FLAG_ZERO;
+                    } else if ( (value & 1<<31) != 0 ) {
+                        setMask |= FLAG_NEGATIVE;
+                    }
+                    final int clearMask = ~(FLAG_OVERFLOW | FLAG_NEGATIVE | FLAG_ZERO | FLAG_CARRY);
+                    statusRegister = (statusRegister & clearMask) | setMask;
+                    cycles+=(38+2*oneBitCnt);
+                    return;
+                }
+
                 // EXG and AND look almost the same so just applying the instruction encoding's AND
                 // mask is not enough
                 int masked = instruction & 0b1111000111111000;
