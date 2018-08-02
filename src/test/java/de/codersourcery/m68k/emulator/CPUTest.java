@@ -45,6 +45,151 @@ public class CPUTest extends TestCase
         cpu = new CPU(CPUType.BEST,memory);
     }
 
+    public void testADDI()
+    {
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$3,d0",
+            "addi.b #$4,d0")
+            .expectD0( 0x7 )
+            .notZero()
+            .noCarry()
+            .noExtended()
+            .noOverflow()
+            .notNegative()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$7f,d0",
+            "addi.b #$1,d0")
+            .expectD0( 0x80 )
+            .notZero()
+            .noCarry()
+            .noExtended()
+            .overflow()
+            .negative()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$ffff,d0",
+            "addi.w #$1,d0")
+            .expectD0( 0x0 )
+            .zero()
+            .carry()
+            .extended()
+            .noOverflow()
+            .notNegative()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #0,d0",
+            "addi.l #$12345678,d0")
+            .expectD0( 0x12345678 )
+            .notZero()
+            .noCarry()
+            .noExtended()
+            .noOverflow()
+            .notNegative()
+            .notSupervisor().noIrqActive();
+
+    }
+
+    public void testADDA()
+    {
+        final int addr = PROGRAM_START_ADDRESS+256;
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.w #$0001,"+addr,
+                "move.l #"+addr+",A0",
+                "lea 0,A1",
+                "adda.w (a0),a1")
+                .expectA1( 0x1 )
+                .zero()
+                .carry()
+                .extended()
+                .overflow()
+                .negative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.w #$ffff,"+addr,
+                "move.l #"+addr+",A0",
+                "lea 1,A1",
+                "adda.w (a0),a1")
+                .expectA1( 0x0 )
+                .zero()
+                .carry()
+                .extended()
+                .overflow()
+                .negative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$00000001,"+addr,
+                "move.l #"+addr+",A0",
+                "lea 1,A1",
+                "adda.l (a0),a1")
+                .expectA1( 0x02 )
+                .zero()
+                .carry()
+                .extended()
+                .overflow()
+                .negative()
+                .notSupervisor().noIrqActive();
+    }
+
+    public void testADDQ()
+    {
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$7fff,d3",
+                "addq.w #1,d3")
+                .expectD3( 0x8000 )
+                .notZero()
+                .noCarry()
+                .noExtended()
+                .overflow()
+                .negative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffffff,d3",
+                "addq.w #1,d3")
+                .expectD3( 0xffff0000 )
+                .zero()
+                .carry()
+                .extended()
+                .noOverflow()
+                .notNegative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffff00,d3",
+                "addq.b #1,d3")
+                .expectD3( 0xffffff01 )
+                .notZero()
+                .noCarry()
+                .noExtended()
+                .noOverflow()
+                .notNegative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffff0000,d3",
+                "addq.w #1,d3")
+                .expectD3( 0xffff0001 )
+                .notZero()
+                .noCarry()
+                .noExtended()
+                .noOverflow()
+                .notNegative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #0,a0",
+                "addq.l #1,a0")
+                .expectA0(0x1)
+                .zero()
+                .carry()
+                .extended()
+                .overflow()
+                .negative()
+                .notSupervisor().noIrqActive();
+    }
+
     public void testORI() {
 
         execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),"move.l #$ffffff00,d3",
@@ -285,8 +430,6 @@ public class CPUTest extends TestCase
                 .extended() // not affected
                 .noCarry() // always cleared
                 .notSupervisor().noIrqActive();
-
-
     }
 
     public void testEOR() {

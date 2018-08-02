@@ -29,6 +29,57 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    ADDI("ADDI",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+            Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE );
+            if ( node.destination().hasAddressingMode(ADDRESS_REGISTER_DIRECT) &&
+                node.destination().getValue().isAddressRegister() )
+            {
+                throw new RuntimeException("Cannot use ADDI for address registers");
+            }
+        }
+    },
+    ADDA("ADDA",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_DIRECT);
+            if( node.hasOperandSize(OperandSize.BYTE ) ) {
+                throw new RuntimeException("ADDA only supports .w or .l");
+            }
+        }
+    },
+    ADDQ("ADDQ",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+            if ( ! estimateSizeOnly ) {
+                int value = node.source().getValue().getBits(ctx);
+                if ( value < 1 || value > 8) {
+                    throw new RuntimeException("ADDQ only supports values in the range 1...8");
+                }
+            }
+            Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+            if ( node.destination().hasAddressingMode(AddressingMode.ADDRESS_REGISTER_DIRECT) ) {
+                if ( node.hasOperandSize(OperandSize.BYTE) ) {
+                    throw new RuntimeException("ADDQ #xx,An does not support byte-sized operands");
+                }
+            }
+        }
+    },
     DIVS("DIVS",2)
     {
         @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -1058,6 +1109,26 @@ public enum Instruction
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 return DIVU_ENCODING.append(extraInsnWords);
+            case ADDI:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                if ( ! insn.hasOperandSize(OperandSize.LONG) )
+                {
+                    return ADDI_WORD_ENCODING.append(extraInsnWords);
+                }
+                return ADDI_LONG_ENCODING.append(extraInsnWords);
+            case ADDA:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( insn.hasOperandSize(OperandSize.WORD) )
+                {
+                    return ADDA_WORD_ENCODING.append(extraInsnWords);
+                }
+                return ADDA_LONG_ENCODING.append(extraInsnWords);
+            case ADDQ:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                return ADDQ_ENCODING.append(extraInsnWords);
             case MULS:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
@@ -1111,7 +1182,6 @@ public enum Instruction
                 String[] patterns = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn, context);
                 return EOR_DST_EA_ENCODING.append(patterns);
             case ORI:
-
                 /*
 If the destination is a data register, it must be specified using the
 destination Dn mode, not the destination < ea > mode.
@@ -2281,6 +2351,21 @@ D/A   |     |   |           |
     public static final InstructionEncoding NOT_ENCODING = // NOT
             InstructionEncoding.of( "01000110SSmmmsss");
 
+    public static final InstructionEncoding ADDQ_ENCODING = // ADDQ #xx,<ea>
+            InstructionEncoding.of( "0101vvv0SSMMMDDD");
+
+    public static final InstructionEncoding ADDI_WORD_ENCODING = // ADDI.w #xx,<ea>
+        InstructionEncoding.of( "00000110SSMMMDDD","vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding ADDI_LONG_ENCODING = // ADDI.l #xx,<ea>
+        InstructionEncoding.of( "00000110SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding ADDA_WORD_ENCODING = // ADDA.w <ea>,An
+            InstructionEncoding.of( "1101DDD011mmmsss");
+
+    public static final InstructionEncoding ADDA_LONG_ENCODING = // ADDA.l <ea>,An
+            InstructionEncoding.of( "1101DDD111mmmsss");
+
     public static final InstructionEncoding DIVU_ENCODING = // MULS <ea>,Dn
         InstructionEncoding.of( "1000DDD011mmmsss");
 
@@ -2429,5 +2514,13 @@ D/A   |     |   |           |
 
         put(DIVU_ENCODING,DIVU);
         put(DIVS_ENCODING,DIVS);
+
+        put(ADDQ_ENCODING,ADDQ);
+
+        put(ADDA_LONG_ENCODING,ADDA);
+        put(ADDA_WORD_ENCODING,ADDA);
+
+        put(ADDI_LONG_ENCODING,ADDI);
+        put(ADDI_WORD_ENCODING,ADDI);
     }};
 }

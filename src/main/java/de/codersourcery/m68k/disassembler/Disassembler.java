@@ -554,6 +554,46 @@ public class Disassembler
                 append(",");
                 decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
+            case ADDI:
+                appendln("addi");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                appendOperandSize(sizeBits);
+                int value;
+                switch(sizeBits)
+                {
+                    case 0b00:
+                        value = readWord()&0xff;
+                        break;
+                    case 0b01:
+                        value = readWord()&0xffff;
+                        break;
+                    case 0b10:
+                        value = readLong();
+                        break;
+                    default:
+                        throw new RuntimeException("Invalid size");
+                }
+                append("#").appendHex(value).append(",");
+                decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
+                return;
+            case ADDA:
+                appendln("adda");
+                if ((insnWord&1<<8) == 0 ) {
+                    append(".w ");
+                } else {
+                    append(".l ");
+                }
+                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
+                regNum = (insnWord&0b111000000000) >> 9;
+                append(",").appendAddressRegister(regNum);
+                return;
+            case ADDQ:
+                appendln("addq");
+                appendOperandSize((insnWord&0b11000000) >> 6);
+                value = (insnWord & 0b111000000000) >> 9;
+                append("#").append(value == 0 ? 8 : value ).append(",");
+                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
+                return;
             case MULS:
                 appendln("muls.w ");
                 decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
@@ -760,7 +800,7 @@ public class Disassembler
                 }
                 break;
             case MOVEQ:
-                int value = insnWord & 0xff;
+                value = insnWord & 0xff;
                 value = (value <<24) >> 24;
                 regNum = (insnWord & 0b0000111000000000) >>> 9;
                 appendln("moveq #").append( value ).append(",").appendDataRegister(regNum);

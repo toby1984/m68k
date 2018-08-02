@@ -391,6 +391,30 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("mulu.w d4,d3"),0xc6,0xc4);
     }
 
+    public void testAdda() {
+        assertArrayEquals(compile("adda.w $1200,a4"),0xd8,0xf8,0x12,0x00);
+        assertArrayEquals(compile("adda.l $1200,a4"),0xd9,0xf8,0x12,0x00);
+        assertArrayEquals(compile("adda.l (a3)+,a3 "),0xd7,0xdb);
+    }
+
+    public void testAddi() {
+        assertArrayEquals(compile("addi.b #10,$1200"),0x06,0x38,0x00,0x0a,0x12,0x00);
+        assertArrayEquals(compile("addi.w #10,$1200"),0x06,0x78,0x00,0x0a,0x12,0x00);
+        assertArrayEquals(compile("addi.l #10,$1200"),0x06,0xb8,0x00,0x00,0x00,0x0a,0x12,0x00);
+    }
+
+    public void testAddq()
+    {
+        assertArrayEquals(compile("addq.b #1,d3"),0x52,0x03);
+        assertArrayEquals(compile("addq.b #1,$1200"),0x52,0x38,0x12,0x00);
+        assertArrayEquals(compile("addq.w #8,d3"),0x50,0x43);
+        assertArrayEquals(compile("addq.w #8,a3"),0x50,0x4b);
+        assertArrayEquals(compile("addq.w #8,$1200"),0x50,0x78,0x12,0x00);
+        assertArrayEquals(compile("addq.l #8,d3"),0x50,0x83);
+        assertArrayEquals(compile("addq.l #8,a3"),0x50,0x8b);
+        assertArrayEquals(compile("addq.l #8,$1200"),0x50,0xb8,0x12,0x00);
+    }
+
     public void testMuls()
     {
         assertArrayEquals(compile("muls.w $1200,d3"),0xc7,0xf8,0x12,0x00);

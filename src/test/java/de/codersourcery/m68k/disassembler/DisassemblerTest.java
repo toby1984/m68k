@@ -120,6 +120,29 @@ public class DisassemblerTest extends TestCase
         compile("divs.w d4,d3");
     }
 
+    public void testAddi() {
+        compile("addi.b #$a,$1200");
+        compile("addi.w #$a,$1200");
+        compile("addi.l #$a,$1200");
+    }
+
+    public void testAdda() {
+        compile("adda.w $1200,a4");
+        compile("adda.l $1200,a4");
+        compile("adda.l (a3)+,a3");
+    }
+
+    public void testADDQ() {
+       compile("addq.b #1,d3");
+       compile("addq.b #1,$1200");
+       compile("addq.w #8,d3");
+       compile("addq.w #8,a3");
+       compile("addq.w #8,$1200");
+       compile("addq.l #8,d3");
+       compile("addq.l #8,a3");
+       compile("addq.l #8,$1200");
+    }
+
     public void testMulu()
     {
         compile("mulu.w $1200,d3");

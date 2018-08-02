@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.cpu;
 
 import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
@@ -75,6 +76,19 @@ public class CPU
         LOGICAL_SHIFT,
         ROTATE,
         ROTATE_WITH_EXTEND;
+    }
+
+    public enum ArithmeticOp {
+        ADD,SUB
+    }
+
+    private enum ArithmeticOpMode
+    {
+        REGULAR,
+        ADDRESS_REGISTER,
+        IMMEDIATE,
+        QUICK,
+        EXTENDED
     }
 
     /*
@@ -856,6 +870,64 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     return;
                 }
 
+                if ( (instruction & 0b1111111100000000) == 0b0000011000000000 )
+                {
+                    // ADDI
+                    final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
+                    int srcValue;
+                    switch(operandSizeInBytes) {
+                        case 1:
+                            srcValue = (memLoadWord(pc)<<24)>>24; // sign-extend
+                            pc += 2;
+                            break;
+                        case 2:
+                            srcValue = memLoadWord(pc);
+                            pc += 2;
+                            break;
+                        case 4:
+                            srcValue = memLoadLong(pc);
+                            pc += 4;
+                            break;
+                        default:
+                            throw new RuntimeException("Unreachable code reached");
+                    }
+                    final int eaMode = (instruction & 0b111000) >> 3;
+                    final int eaRegister = instruction & 0b111;
+
+                    if ( decodeSourceOperand(instruction,operandSizeInBytes,false,false) ) {
+                        // register operand
+                        switch(operandSizeInBytes) {
+                            case 1:
+                            case 2:
+                                cycles+=8;
+                                break;
+                            case 4:
+                                cycles += 12;
+                                break;
+                        }
+                    } else {
+                        // memory operand
+                        switch(operandSizeInBytes) {
+                            case 1:
+                            case 2:
+                                cycles+=16;
+                                break;
+                            case 4:
+                                cycles += 20;
+                                break;
+                        }
+                    }
+
+                    final int dstValue = value;
+
+                    value += srcValue;
+
+                    storeValue(eaMode, eaRegister, operandSizeInBytes);
+
+                    updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.ADDITION, CPU.ALL_USERMODE_FLAGS);
+                    return;
+                }
+
                 if ( ( instruction & 0b1111111100000000) == 0b0000001000000000 ) {
                     // ANDI #xx,<ea>
                     binaryLogicalOp(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.IMMEDIATE);
@@ -1278,7 +1350,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
                 if ( (instruction & 0b1111000011111000 ) == 0b0101000011001000 )
                 {
-                     // DBcc
+                    // DBcc
                     final int cc = (instruction & 0b0000111100000000) >> 8;
                     if ( ! Condition.isTrue(this,cc ) )
                     {
@@ -1314,6 +1386,43 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     final int eaRegister = (instruction & 0b111);
                     value = Condition.isTrue(this,cc ) ? 0xff : 0x00;
                     storeValue(eaMode,eaRegister,1);
+                    return;
+                }
+                if ( ( instruction & 0b1111000100000000 ) == 0b0101000000000000 )
+                {
+                    // ADDQ_ENCODING
+                    final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
+                    switch(operandSizeInBytes) {
+                        case 1:
+                        case 2:
+                            cycles += 4;
+                            break;
+                        case 4:
+                            cycles += 6;
+                            break;
+                        default:
+                            throw new RuntimeException("Unreachable code reached");
+                    }
+                    final int eaMode = (instruction & 0b111000) >> 3;
+                    final int eaRegister = instruction & 0b111;
+                    final boolean dstIsAddressRegister = eaMode == AddressingMode.ADDRESS_REGISTER_DIRECT.eaModeField;
+
+                    int srcValue = (instruction& 0b111000000000) >> 9;
+                    if ( srcValue == 0 ) {
+                        srcValue = 8;
+                    }
+
+                    decodeSourceOperand(instruction,operandSizeInBytes,false,false);
+                    final int dstValue = value;
+
+                    value += srcValue;
+
+                    storeValue(eaMode, eaRegister, operandSizeInBytes);
+
+                    if ( ! dstIsAddressRegister )
+                    {
+                        updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.ADDITION, CPU.ALL_USERMODE_FLAGS);
+                    }
                     return;
                 }
                 break;
@@ -1529,25 +1638,25 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
                     int grpCount = 0;
                     grpCount += (((pattern & 0b110000000000000000) == 0b100000000000000000) ||
-                                 ((pattern & 0b110000000000000000) == 0b010000000000000000)) ? 1 : 0;
+                            ((pattern & 0b110000000000000000) == 0b010000000000000000)) ? 1 : 0;
                     grpCount += (((pattern & 0b001100000000000000) == 0b001000000000000000) ||
-                                 ((pattern & 0b001100000000000000) == 0b000100000000000000)) ? 1 : 0;
+                            ((pattern & 0b001100000000000000) == 0b000100000000000000)) ? 1 : 0;
                     grpCount += (((pattern & 0b000011000000000000) == 0b000010000000000000) ||
-                                 ((pattern & 0b000011000000000000) == 0b000001000000000000)) ? 1 : 0;
+                            ((pattern & 0b000011000000000000) == 0b000001000000000000)) ? 1 : 0;
                     grpCount += (((pattern & 0b000000110000000000) == 0b000000100000000000) ||
-                                 ((pattern & 0b000000110000000000) == 0b000000010000000000)) ? 1 : 0;
+                            ((pattern & 0b000000110000000000) == 0b000000010000000000)) ? 1 : 0;
                     grpCount += (((pattern & 0b000000001100000000) == 0b000000001000000000) ||
-                                 ((pattern & 0b000000001100000000) == 0b000000000100000000)) ? 1 : 0;
+                            ((pattern & 0b000000001100000000) == 0b000000000100000000)) ? 1 : 0;
                     grpCount += (((pattern & 0b000000000011000000) == 0b000000000010000000) ||
-                                 ((pattern & 0b000000000011000000) == 0b000000000001000000)) ? 1 : 0;
+                            ((pattern & 0b000000000011000000) == 0b000000000001000000)) ? 1 : 0;
                     grpCount += (((pattern & 0b000000000000110000) == 0b000000000000100000) ||
-                                 ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
+                            ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
                     grpCount += (((pattern & 0b000000000000110000) == 0b000000000000100000) ||
-                                 ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
+                            ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
                     grpCount += (((pattern & 0b000000000000001100) == 0b000000000000001000) ||
-                                 ((pattern & 0b000000000000001100) == 0b000000000000000100)) ? 1 : 0;
+                            ((pattern & 0b000000000000001100) == 0b000000000000000100)) ? 1 : 0;
                     grpCount += (((pattern & 0b000000000000000011) == 0b000000000000000010) ||
-                                 ((pattern & 0b000000000000000011) == 0b000000000000000001)) ? 1 : 0;
+                            ((pattern & 0b000000000000000011) == 0b000000000000000001)) ? 1 : 0;
 
                     value *= ((dataRegisters[dataReg] << 16 ) >> 16); // sign-extend data register
                     dataRegisters[dataReg] = value;
@@ -1630,6 +1739,26 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b1101_0000_0000_0000:
+
+                if ( ( instruction & 0b1111000111000000 ) == 0b1101000111000000 ) {
+                    // ADDA_LONG_ENCODING
+                    decodeSourceOperand(instruction,4,false);
+                    final int dstReg = (instruction & 0b111000000000) >> 9;
+                    addressRegisters[dstReg] += value;
+                    cycles += 8;
+                    return;
+                }
+
+                if ( ( instruction & 0b1111000111000000 ) == 0b1101000011000000 )
+                {
+                    // ADDA_WORD_ENCODING
+                    decodeSourceOperand(instruction,2,false);
+                    final int dstReg = (instruction & 0b111000000000) >> 9;
+                    addressRegisters[dstReg] += value;
+                    cycles += 8;
+                    return;
+                }
+
                 break;
             /* ================================
              * Shift/Rotate/Bit Field
@@ -1725,7 +1854,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
                 if ( ( instruction & 0b1111000000111000 ) == 0b1110000000110000 )
                 {
-                     // ROXL/ROXR REGISTER
+                    // ROXL/ROXR REGISTER
                     final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
                     rotateRegister(instruction,RotateMode.ROTATE_WITH_EXTEND,rotateLeft);
                     return;
@@ -1777,7 +1906,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
         int cnt = dataRegisters[ srcRegNum ];
         int value = rotate( dataRegisters[ dstRegNum ],
-                1<<sizeBits,mode,rotateLeft,cnt);
+                            1<<sizeBits,mode,rotateLeft,cnt);
         dataRegisters[ dstRegNum ] = mergeValue(dataRegisters[ dstRegNum ],value,1<<sizeBits);
     }
 
@@ -2102,7 +2231,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
             case 1:
                 value &= value & 0xff;
                 cycles += 6+2*rotateCount2;
-             break;
+                break;
             case 2:
                 value &= value & 0xffff;
                 cycles += 6+2*rotateCount2;
@@ -2160,6 +2289,40 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
     public void clearFlags(int bitMask)
     {
         this.statusRegister &= ~bitMask;
+    }
+
+    /**
+     * Calculate OVERFLOW and CARRY flag values after ADD/ADDQ/ADDI.
+     * @param srcValue (sign-extended to 32 bits)
+     * @param dstValue (sign-extended to 32 bits)
+     * @param result (sign-extended to 32 bits)
+     * @return setMask to be OR'ed with the status register
+     */
+    public int updateFlagsAfterADD_ADDQ_ADDI(int srcValue,int dstValue,int result)
+    {
+        /*
+V = Sm & Dm & ~Rm | ~Sm & ~Dm & Rm
+C = Sm & Dm | ~Rm &  Dm | Sm  & ~Rm
+         */
+
+        final boolean Sm = srcValue < 0;
+        final boolean Dm = dstValue < 0;
+        final boolean Rm = result < 0;
+
+        int setMask = 0;
+        if ( Sm & Dm & !Rm | !Sm & !Dm & Rm ) {
+            setMask |= FLAG_OVERFLOW;
+        }
+        if ( Sm & Dm | !Rm & Dm | Sm & !Rm ) {
+            setMask |= FLAG_CARRY;
+            setMask |= FLAG_EXTENDED;
+        }
+        if ( Rm ) {
+            setMask |= FLAG_NEGATIVE;
+        } else if ( result == 0 ) {
+            setMask |= FLAG_ZERO;
+        }
+        return setMask;
     }
 
     /**
@@ -2817,12 +2980,12 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
             switch( eaMode )
             {
                 case 0b110: cycles += 14;break;case 0b111:
-                    switch(eaRegister)
-                    {
-                        case 0b000: cycles += 12;break;
-                        case 0b001: cycles += 16;break;
-                        default: throw new RuntimeException("Unreachable code reached");
-                    }
+                switch(eaRegister)
+                {
+                    case 0b000: cycles += 12;break;
+                    case 0b001: cycles += 16;break;
+                    default: throw new RuntimeException("Unreachable code reached");
+                }
                 case 0b010:
                 case 0b100: cycles += 8;break;
                 case 0b101: cycles += 12;break;
@@ -2855,22 +3018,22 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         final int insn = memory.readWordNoCheck(pc);
         final String binaryInsn =
                 StringUtils.leftPad(Integer.toBinaryString((insn & 0xff00) >>8 ),8,"0")+"_"+
-                StringUtils.leftPad(Integer.toBinaryString((insn & 0xff) ),8,"0");
+                        StringUtils.leftPad(Integer.toBinaryString((insn & 0xff) ),8,"0");
 
         final String flagHelp = "|T1|T0|S|M|I2|I1|I0|X|N|Z|O|C|";
         String flags = "|"+
                 ( ( statusRegister & FLAG_T1 ) != 0 ? "XX" : "--" )+"|"+
-                        ( ( statusRegister & FLAG_T0 ) != 0 ? "XX" : "--" )+"|"+
-                        ( ( statusRegister & FLAG_SUPERVISOR_MODE ) != 0 ? "X" : "-" )+"|"+
-                        ( ( statusRegister & FLAG_MASTER_INTERRUPT ) != 0 ? "X" : "-" )+"|"+
-                        ( ( statusRegister & FLAG_I2 ) != 0 ? "XX" : "--" )+"|"+
-                        ( ( statusRegister & FLAG_I1 ) != 0 ? "XX" : "--" )+"|"+
-                        ( ( statusRegister & FLAG_I0 ) != 0 ? "XX" : "--" )+"|"+
-                        ( ( statusRegister & FLAG_EXTENDED ) != 0 ? "X" : "-" )+"|"+
-                        ( ( statusRegister & FLAG_NEGATIVE ) != 0 ? "X" : "-" )+"|"+
-                        ( ( statusRegister & FLAG_ZERO     ) != 0 ? "X" : "-" )+"|"+
-                        ( ( statusRegister & FLAG_OVERFLOW ) != 0 ? "X" : "-" )+"|"+
-                        ( ( statusRegister & FLAG_CARRY    ) != 0 ? "X" : "-" )+"|";
+                ( ( statusRegister & FLAG_T0 ) != 0 ? "XX" : "--" )+"|"+
+                ( ( statusRegister & FLAG_SUPERVISOR_MODE ) != 0 ? "X" : "-" )+"|"+
+                ( ( statusRegister & FLAG_MASTER_INTERRUPT ) != 0 ? "X" : "-" )+"|"+
+                ( ( statusRegister & FLAG_I2 ) != 0 ? "XX" : "--" )+"|"+
+                ( ( statusRegister & FLAG_I1 ) != 0 ? "XX" : "--" )+"|"+
+                ( ( statusRegister & FLAG_I0 ) != 0 ? "XX" : "--" )+"|"+
+                ( ( statusRegister & FLAG_EXTENDED ) != 0 ? "X" : "-" )+"|"+
+                ( ( statusRegister & FLAG_NEGATIVE ) != 0 ? "X" : "-" )+"|"+
+                ( ( statusRegister & FLAG_ZERO     ) != 0 ? "X" : "-" )+"|"+
+                ( ( statusRegister & FLAG_OVERFLOW ) != 0 ? "X" : "-" )+"|"+
+                ( ( statusRegister & FLAG_CARRY    ) != 0 ? "X" : "-" )+"|";
         return "CPU[ pc = "+ Misc.hex(pc)+" , insn="+binaryInsn+", sp="+Misc.hex(addressRegisters[7])+",IRQ="+activeIrq+"]\n"+flagHelp+"\n"+flags;
     }
 
@@ -2885,10 +3048,10 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
             dataRegisters[dstDataRegNum] = (dataRegisters[dstDataRegNum] & 0xffff0000) | value;
         } else {
             final int value =
-                ((memory.readByte(address)           & 0xff) << 24) |
-                ((memory.readByte(address+2) & 0xff) << 16) |
-                ((memory.readByte(address+4) & 0xff) <<  8) |
-                ( memory.readByte(address+6) & 0xff);
+                    ((memory.readByte(address)           & 0xff) << 24) |
+                            ((memory.readByte(address+2) & 0xff) << 16) |
+                            ((memory.readByte(address+4) & 0xff) <<  8) |
+                            ( memory.readByte(address+6) & 0xff);
             dataRegisters[dstDataRegNum] = value;
         }
     }
@@ -3067,5 +3230,173 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     public int getIRQLevel()
     {
         return (statusRegister >>>8 ) & 0b111;
+    }
+
+    private enum CCOperation {
+        ADDITION, SUBTRACTION,OTHER
+    }
+
+    private void updateFlags(int src, int dst, int result, int sizeInBytes, CCOperation operation, int flagsToUpdate)
+    {
+        // this method taken from https://github.com/BSVC/bsvc and converted from C++ to Java by me.
+        // The original implementation is (C) Dan Cross (https://github.com/dancrossnyc)
+        boolean S, D, R;
+
+        switch (sizeInBytes) {
+            case 1:
+                S = (src & 1<<7) != 0;
+                D = (dst & 1<<7) != 0;
+                R = (result & 1<<7) != 0;
+                result = result & 0xff;
+                break;
+            case 2:
+                S = (src & 1<<15) != 0;
+                D = (dst & 1<<15) != 0;
+                R = (result & 1<<15) != 0;
+                result = result & 0xffff;
+                break;
+            case 4:
+                S = (src & 1<<31) != 0;
+                D = (dst & 1<<31) != 0;
+                R = (result & 1<<31) != 0;
+                result = result & 0xffffffff;
+                break;
+            default:
+                S = D = R = false;
+        }
+
+        boolean needsCarry = (operation == CCOperation.ADDITION || operation == CCOperation.SUBTRACTION) && (flagsToUpdate & FLAG_CARRY) != 0 ||
+                (flagsToUpdate & FLAG_EXTENDED) != 0;
+
+        boolean setCarry = false;
+        if ( needsCarry )
+        {
+            if (operation == CCOperation.ADDITION)
+            {
+                setCarry = ((S && D) || (!R && D) || (S && !R));
+            }
+            else if (operation == CCOperation.SUBTRACTION)
+            {
+                setCarry = ((S && !D) || (R && !D) || (S && R));
+            }
+        }
+
+        int clearMask = 0xffffffff;
+        int setMask = 0;
+
+        if ( (flagsToUpdate & FLAG_CARRY) != 0)
+        {
+            switch (operation)
+            {
+                case ADDITION:
+                    if (setCarry)
+                    {
+                        setMask |= FLAG_CARRY;
+                    }
+                    else
+                    {
+                        clearMask &= ~FLAG_CARRY;
+                    }
+                    break;
+                case SUBTRACTION:
+                    if (setCarry)
+                    {
+                        setMask |= FLAG_CARRY;
+                    }
+                    else
+                    {
+                        clearMask &= ~FLAG_CARRY;
+                    }
+                    break;
+                default:
+                    clearMask &= ~FLAG_CARRY;
+                    break;
+            }
+            statusRegister = (statusRegister & clearMask) | setMask;
+        }
+
+        if ( (flagsToUpdate & FLAG_OVERFLOW) != 0)
+        {
+            switch (operation)
+            {
+                case ADDITION:
+                    if ((S && D && !R) || (!S && !D && R))
+                    {
+                        setMask |= FLAG_OVERFLOW;
+                    }
+                    else
+                    {
+                        clearMask &= ~FLAG_OVERFLOW;
+                    }
+                    break;
+                case SUBTRACTION:
+                    if ((!S && D && !R) || (S && !D && R))
+                    {
+                        setMask |= FLAG_OVERFLOW;
+                    }
+                    else
+                    {
+                        clearMask &= ~FLAG_OVERFLOW;
+                    }
+                    break;
+                default:
+                    clearMask &= ~FLAG_OVERFLOW;
+                    break;
+            }
+        }
+
+        if ( (flagsToUpdate & FLAG_ZERO) != 0) {
+            if (result == 0)
+            {
+                setMask |= FLAG_ZERO;
+            }
+            else
+            {
+                clearMask &= ~FLAG_ZERO;
+            }
+        }
+
+        if ( (flagsToUpdate & FLAG_NEGATIVE) != 0) {
+            if (R)
+            {
+                setMask |= FLAG_NEGATIVE;
+            }
+            else
+            {
+                clearMask &= ~FLAG_NEGATIVE;
+            }
+        }
+
+        if ( (flagsToUpdate & FLAG_EXTENDED) != 0)
+        {
+            switch (operation)
+            {
+                case ADDITION:
+                    if (setCarry)
+                    {
+                        setMask |= FLAG_EXTENDED;
+                    }
+                    else
+                    {
+                        clearMask &= ~FLAG_EXTENDED;
+                    }
+                    break;
+                case SUBTRACTION:
+                    if (setCarry)
+                    {
+                        setMask |= FLAG_EXTENDED;
+                    }
+                    else
+                    {
+                        clearMask &= ~FLAG_EXTENDED;
+                    }
+                    break;
+                default:
+                    clearMask &= ~FLAG_EXTENDED;
+                    break;
+            }
+        }
+
+        statusRegister = (statusRegister & clearMask) | setMask;
     }
 }
