@@ -1859,6 +1859,75 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     return;
                 }
 
+                if ( ( ( instruction & 0b1111000100000000 ) == 0b1101000000000000 ) ||
+                    ( instruction & 0b1111000100000000 ) == 0b1101000100000000 )
+                {
+                    // ADD <ea>,Dx
+                    // ADD Dx,<ea>
+                    int sizeBits = (instruction & 0b11000000) >> 6;
+                    int regNum = (instruction&0b111000000000)>>9;
+
+                    final int srcValue;
+                    final int dstValue;
+                    final boolean dstIsEa = (instruction & 1<<8) != 0;
+                    if (dstIsEa)
+                    {
+                        // Dn + <ea> -> <ea>
+                        switch(sizeBits)
+                        {
+                            case 0b00:
+                                srcValue = (dataRegisters[regNum]<<24)>>24;
+                                cycles += 8;
+                                break;
+                            case 0b01:
+                                srcValue = (dataRegisters[regNum]<<16)>>16;
+                                cycles += 8;
+                                break;
+                            case 0b10:
+                                srcValue = dataRegisters[regNum];
+                                cycles += 12;
+                                break;
+                            default:
+                                throw new RuntimeException("Unreachable code reached");
+                        }
+                        decodeSourceOperand(instruction,1<<sizeBits,false,false);
+                        dstValue = value;
+                    }
+                    else
+                    {
+                        // <ea> + Dn -> Dn
+                        decodeSourceOperand(instruction,1<<sizeBits,false);
+                        srcValue = value;
+                        switch(sizeBits)
+                        {
+                            case 0b00:
+                                dstValue = (dataRegisters[regNum]<<24)>>24;
+                                cycles += 4;
+                                break;
+                            case 0b01:
+                                dstValue = (dataRegisters[regNum]<<16)>>16;
+                                cycles += 4;
+                                break;
+                            case 0b10:
+                                dstValue = dataRegisters[regNum];
+                                cycles += 6;
+                                break;
+                            default:
+                                throw new RuntimeException("Unreachable code reached");
+                        }
+                    }
+                    final int result = srcValue + dstValue;
+                    value = result;
+                    statusRegister = (statusRegister & ~CPU.ALL_USERMODE_FLAGS) |
+                        updateFlagsAfterADD_ADDQ_ADDI(srcValue,dstValue,result);
+                    if ( dstIsEa ) {
+                        storeValue((instruction&0b111000)>>3,instruction&0b111,1<<sizeBits);
+                    } else {
+                        dataRegisters[regNum] = mergeValue(dataRegisters[regNum], result,1<<sizeBits);
+                    }
+                    return;
+                }
+
                 break;
             /* ================================
              * Shift/Rotate/Bit Field
@@ -2468,13 +2537,13 @@ C = Sm & Dm | ~Rm &  Dm | Sm  & ~Rm
      * Decodes an 16-bit instruction word's source operand.
      *
      * @param instruction
-     * @param operandSize
+     * @param operandSizeInBytes
      * @param calculateAddressOnly whether to only calculate the effective address but not actually load
      *                             the value from there
      * @return true if the operand is a register, otherwise false
      */
-    private boolean decodeSourceOperand(int instruction, int operandSize,boolean calculateAddressOnly) {
-        return decodeSourceOperand(instruction,operandSize,calculateAddressOnly,true);
+    private boolean decodeSourceOperand(int instruction, int operandSizeInBytes,boolean calculateAddressOnly) {
+        return decodeSourceOperand(instruction,operandSizeInBytes,calculateAddressOnly,true);
     }
 
     /**
@@ -2497,7 +2566,21 @@ C = Sm & Dm | ~Rm &  Dm | Sm  & ~Rm
         {
             case 0b000:
                 // DATA_REGISTER_DIRECT;
-                ea = value = dataRegisters[eaRegister];
+                int tmp;
+                switch(operandSizeInBytes) {
+                    case 1:
+                        tmp = (dataRegisters[eaRegister]<<24)>>24;
+                        break;
+                    case 2:
+                        tmp = (dataRegisters[eaRegister]<<16)>>16;
+                        break;
+                    case 4:
+                        tmp = dataRegisters[eaRegister];
+                        break;
+                    default:
+                        throw new RuntimeException("Unreachable code reached");
+                }
+                ea = value = tmp;
                 cycles += 4;
                 return true;
             case 0b001:
@@ -2506,8 +2589,17 @@ C = Sm & Dm | ~Rm &  Dm | Sm  & ~Rm
                 {
                     throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
                 }
-                ea = value = addressRegisters[eaRegister];
-
+                ea = addressRegisters[eaRegister];
+                switch(operandSizeInBytes) {
+                    case 2:
+                        value = (addressRegisters[eaRegister]<<16)>>16;
+                        break;
+                    case 4:
+                        value = addressRegisters[eaRegister];
+                        break;
+                    default:
+                        throw new RuntimeException("Internal error,invalid operand size for address register: "+operandSizeInBytes);
+                }
                 cycles += 4;
                 return true;
             case 0b111:
@@ -3223,7 +3315,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         final int modeFlags = AddressingModeKind.bitsToFlags( eaMode,eaRegister );
         final boolean isMemory = (modeFlags & AddressingModeKind.MEMORY.bits) != 0;
         final int operandSize= isMemory ? 1 : 4;
-        decodeSourceOperand( instruction,1, false );
+        decodeSourceOperand( instruction,operandSize, false );
         if ( ( value & 1<<bitNum) == 0 ) {
             statusRegister |= FLAG_ZERO;
         } else {

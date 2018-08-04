@@ -1,5 +1,5 @@
 [ ] ABCD
-[ ] ADD
+[X] ADD
 [X] ADDA
 [X] ADDI
 [X] ADDQ

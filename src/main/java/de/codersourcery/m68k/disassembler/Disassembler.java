@@ -554,6 +554,23 @@ public class Disassembler
                 append(",");
                 decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
+            case ADD:
+                appendln("add");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                appendOperandSize(sizeBits);
+                if ( (insnWord & 1<<8) == 0 )
+                {
+                    // <ea> + Dn -> Dn
+                    decodeOperand(1<<sizeBits,(insnWord&0b111000)>>3 , insnWord&0b111);
+                    append(",").appendDataRegister((insnWord&0b111000000000)>>9);
+                }
+                else {
+                    // Dn + <ea> -> <ea>
+                    appendDataRegister((insnWord&0b111000000000)>>9);
+                    append(",");
+                    decodeOperand(1<<sizeBits,(insnWord&0b111000)>>3 , insnWord&0b111);
+                }
+                return;
             case ADDX:
                 appendln("addx");
                 appendOperandSize( (insnWord & 0b11000000) >> 6 );

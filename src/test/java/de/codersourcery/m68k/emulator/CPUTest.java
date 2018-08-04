@@ -45,6 +45,22 @@ public class CPUTest extends TestCase
         cpu = new CPU(CPUType.BEST,memory);
     }
 
+    public void testAdd() {
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$ffffff01,d0",
+            "move.l #$ffffff01,d1",
+            "add.b d0,d1")
+            .expectD1( 0xffffff02 )
+            .notZero()
+            .noCarry()
+            .noExtended()
+            .noOverflow()
+            .notNegative()
+            .notSupervisor().noIrqActive();
+
+    }
+
     public void testADDI()
     {
         execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
@@ -539,10 +555,10 @@ public class CPUTest extends TestCase
                 "move.l #$ffff,d3",
                 "muls.w d2,d3")
                 .expectD2(0x8fff)
-                .expectD3(0xffff7001)
+                .expectD3(0x00007001)
                 .notZero()
                 .noOverflow()
-                .negative()
+                .notNegative()
                 .extended() // not affected
                 .noCarry() // always cleared
                 .notSupervisor().noIrqActive();

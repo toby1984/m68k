@@ -29,6 +29,21 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    ADD("ADD",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+            if (! ( node.source().hasAddressingMode(DATA_REGISTER_DIRECT) ||
+                    node.destination().hasAddressingMode(DATA_REGISTER_DIRECT)))
+            {
+                throw new RuntimeException("ADD needs a data register as either source or destination");
+            }
+        }
+    },
     ADDX("ADDX",2)
     {
         @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -1130,6 +1145,14 @@ public enum Instruction
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 return DIVU_ENCODING.append(extraInsnWords);
+            case ADD:
+                if ( insn.destination().hasAddressingMode(DATA_REGISTER_DIRECT) )
+                {
+                    extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                    return ADD_DST_DATA_ENCODING.append(extraInsnWords);
+                }
+                extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                return ADD_DST_EA_ENCODING.append(extraInsnWords);
             case ADDX:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 if ( insn.source().hasAddressingMode( AddressingMode.DATA_REGISTER_DIRECT ) ) {
@@ -2378,6 +2401,12 @@ D/A   |     |   |           |
     public static final InstructionEncoding NOT_ENCODING = // NOT
             InstructionEncoding.of( "01000110SSmmmsss");
 
+    public static final InstructionEncoding ADD_DST_DATA_ENCODING = // ADD <ea>,Dn
+        InstructionEncoding.of( "1101DDD0SSmmmsss");
+
+    public static final InstructionEncoding ADD_DST_EA_ENCODING = // // ADD Dn,<ea>
+        InstructionEncoding.of( "1101sss1SSMMMDDD");
+
     public static final InstructionEncoding ADDX_DATAREG_ENCODING = // ADDX Dx,Dy
             InstructionEncoding.of( "1101DDD1SS000sss");
 
@@ -2553,5 +2582,8 @@ D/A   |     |   |           |
 
         put(ADDX_DATAREG_ENCODING,ADDX);
         put(ADDX_ADDRREG_ENCODING,ADDX);
+
+        put(ADD_DST_DATA_ENCODING,ADD);
+        put(ADD_DST_EA_ENCODING,ADD);
     }};
 }

@@ -400,6 +400,18 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("mulu.w d4,d3"),0xc6,0xc4);
     }
 
+    public void testAdd() {
+        assertArrayEquals(compile("add.b d3,$1200"),0xd7,0x38,0x12,0x00);
+        assertArrayEquals(compile("add.b $1200,d3"),0xd6,0x38,0x12,0x00);
+        assertArrayEquals(compile("add.b d2,d3   "),0xd6,0x02);
+        assertArrayEquals(compile("add.w d3,$1200"),0xd7,0x78,0x12,0x00);
+        assertArrayEquals(compile("add.w $1200,d3"),0xd6,0x78,0x12,0x00);
+        assertArrayEquals(compile("add.w d2,d3   "),0xd6,0x42);
+        assertArrayEquals(compile("add.l d3,$1200"),0xd7,0xb8,0x12,0x00);
+        assertArrayEquals(compile("add.l $1200,d3"),0xd6,0xb8,0x12,0x00);
+        assertArrayEquals(compile("add.l d2,d3   "),0xd6,0x82);
+    }
+
     public void testAdda() {
         assertArrayEquals(compile("adda.w $1200,a4"),0xd8,0xf8,0x12,0x00);
         assertArrayEquals(compile("adda.l $1200,a4"),0xd9,0xf8,0x12,0x00);
