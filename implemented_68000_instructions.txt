@@ -3,7 +3,7 @@
 [X] ADDA
 [X] ADDI
 [X] ADDQ
-[ ] ADDX
+[X] ADDX
 [X] AND
 [X] ANDI
 [X] ANDI to CCR

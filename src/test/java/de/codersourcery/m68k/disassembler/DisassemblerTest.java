@@ -370,6 +370,15 @@ public class DisassemblerTest extends TestCase
         compile("pea (a3)");
     }
 
+    public void testAddx() {
+        compile("addx.b d3,d4");
+        compile("addx.w d3,d4");
+        compile("addx.l d3,d4");
+        compile("addx.b -(a1),-(a2)");
+        compile("addx.w -(a1),-(a2)");
+        compile("addx.l -(a1),-(a2)");
+    }
+
     public void testNeg()
     {
         compile("neg.b d3");

@@ -1740,6 +1740,106 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b1101_0000_0000_0000:
 
+                if ( ( instruction & 0b1111000100111000 ) == 0b1101000100001000 ) {
+                    // ADDX -(Ax),-(Ay)
+                    final int sizeBits = (instruction & 0b11000000) >> 6;
+                    int srcReg = instruction&0b111;
+                    int dstReg = (instruction&0b111000000000)>>9;
+                    final int srcValue;
+                    final int dstValue;
+                    switch( sizeBits )
+                    {
+                        case 0b00:
+                            addressRegisters[srcReg] -= 1;
+                            srcValue = memory.readByte( addressRegisters[srcReg] );
+                            addressRegisters[dstReg] -= 1;
+                            dstValue = memory.readByte( addressRegisters[dstReg] );
+                            cycles += 18;
+                            break;
+                        case 0b01:
+                            addressRegisters[srcReg] -= 2;
+                            srcValue = memory.readWord( addressRegisters[srcReg] );
+                            addressRegisters[dstReg] -= 2;
+                            dstValue = memory.readWord( addressRegisters[dstReg] );
+                            cycles += 18;
+                            break;
+                        case 0b10:
+                            addressRegisters[srcReg] -= 4;
+                            srcValue = memory.readLong( addressRegisters[srcReg] );
+                            addressRegisters[dstReg] -= 4;
+                            dstValue = memory.readLong( addressRegisters[dstReg] );
+                            cycles += 30;
+                            break;
+                        default:
+                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
+                    }
+                    int result = srcValue + dstValue + (isExtended() ? 1 : 0);
+
+                    statusRegister = (statusRegister & ~CPU.ALL_USERMODE_FLAGS) |
+                            updateFlagsAfterADD_ADDQ_ADDI( srcValue, dstValue, result );
+
+                    switch( sizeBits )
+                    {
+                        case 0b00:
+                            memory.writeByte( addressRegisters[dstReg], result );
+                            break;
+                        case 0b01:
+                            memory.writeWord( addressRegisters[dstReg], result );
+                            break;
+                        case 0b10:
+                            memory.writeLong( addressRegisters[dstReg], result );
+                            break;
+                        default:
+                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
+                    }
+                    return;
+                }
+
+                if ( ( instruction & 0b1111000100111000 ) == 0b1101000100000000 ) {
+                    // ADDX Dx,Dy
+                    final int sizeBits = (instruction & 0b11000000) >> 6;
+                    int srcReg = instruction&0b111;
+                    int dstReg = (instruction&0b111000000000)>>9;
+                    final int srcValue;
+                    final int dstValue;
+                    switch( sizeBits )
+                    {
+                        case 0b00:
+                            srcValue = (dataRegisters[srcReg]<<24)>>24;
+                            dstValue = (dataRegisters[dstReg]<<24)>>24;
+                            cycles += 4;
+                            break;
+                        case 0b01:
+                            srcValue = (dataRegisters[srcReg]<<16)>>16;
+                            dstValue = (dataRegisters[dstReg]<<16)>>16;
+                            cycles += 4;
+                            break;
+                        case 0b10:
+                            srcValue = dataRegisters[srcReg];
+                            dstValue = dataRegisters[dstReg];
+                            cycles += 8;
+                            break;
+                        default:
+                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
+                    }
+                    int result = srcValue + dstValue + (isExtended() ? 1 : 0);
+                    statusRegister = (statusRegister & ~CPU.ALL_USERMODE_FLAGS) |
+                            updateFlagsAfterADD_ADDQ_ADDI( srcValue, dstValue, result );
+                    switch( sizeBits )
+                    {
+                        case 0b00:
+                            dataRegisters[dstReg] = (dataRegisters[dstReg] & ~0xff) | (result & 0xff);
+                            break;
+                        case 0b01:
+                            dataRegisters[dstReg] = (dataRegisters[dstReg] & ~0xffff) | (result & 0xffff);
+                            break;
+                        case 0b10:
+                            dataRegisters[dstReg] = result;
+                            break;
+                    }
+                    return;
+                }
+
                 if ( ( instruction & 0b1111000111000000 ) == 0b1101000111000000 ) {
                     // ADDA_LONG_ENCODING
                     decodeSourceOperand(instruction,4,false);

@@ -385,6 +385,15 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("stop #12"),0x4e,0x72,0x00,0x0c);
     }
 
+    public void testAddx() {
+        assertArrayEquals(compile("addx.b d3,d4    "),0xd9,0x03);
+        assertArrayEquals(compile("addx.w d3,d4    "),0xd9,0x43);
+        assertArrayEquals(compile("addx.l d3,d4    "),0xd9,0x83);
+        assertArrayEquals(compile("addx.b -(a1),-(a2)"),0xd5,0x09);
+        assertArrayEquals(compile("addx.w -(a1),-(a2)"),0xd5,0x49);
+        assertArrayEquals(compile("addx.l -(a1),-(a2)"),0xd5,0x89);
+    }
+
     public void testMulu()
     {
         assertArrayEquals(compile("mulu.w $1200,d3"),0xc6,0xf8,0x12,0x00);

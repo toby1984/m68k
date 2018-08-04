@@ -29,6 +29,24 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    ADDX("ADDX",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            if ( node.source().hasAddressingMode( DATA_REGISTER_DIRECT ) &&
+                 node.destination().hasAddressingMode( DATA_REGISTER_DIRECT ) ) {
+                // ok
+            } else if ( node.source().hasAddressingMode( ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT ) &&
+                        node.destination().hasAddressingMode( ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT ) ) {
+                // ok
+            } else {
+                throw new RuntimeException("ADDX supports only two data registers or two address registers in indirect pre-decrement mode");
+            }
+        }
+    },
     ADDI("ADDI",2)
     {
         @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -1109,6 +1127,12 @@ public enum Instruction
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 return DIVU_ENCODING.append(extraInsnWords);
+            case ADDX:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                if ( insn.source().hasAddressingMode( AddressingMode.DATA_REGISTER_DIRECT ) ) {
+                    return ADDX_DATAREG_ENCODING;
+                }
+                return ADDX_ADDRREG_ENCODING;
             case ADDI:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
@@ -2351,6 +2375,12 @@ D/A   |     |   |           |
     public static final InstructionEncoding NOT_ENCODING = // NOT
             InstructionEncoding.of( "01000110SSmmmsss");
 
+    public static final InstructionEncoding ADDX_DATAREG_ENCODING = // ADDX Dx,Dy
+            InstructionEncoding.of( "1101DDD1SS000sss");
+
+    public static final InstructionEncoding ADDX_ADDRREG_ENCODING = // ADDX -(Ax),-(Ay)
+            InstructionEncoding.of( "1101DDD1SS001sss");
+
     public static final InstructionEncoding ADDQ_ENCODING = // ADDQ #xx,<ea>
             InstructionEncoding.of( "0101vvv0SSMMMDDD");
 
@@ -2522,5 +2552,8 @@ D/A   |     |   |           |
 
         put(ADDI_LONG_ENCODING,ADDI);
         put(ADDI_WORD_ENCODING,ADDI);
+
+        put(ADDX_DATAREG_ENCODING,ADDX);
+        put(ADDX_ADDRREG_ENCODING,ADDX);
     }};
 }

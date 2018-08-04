@@ -554,6 +554,20 @@ public class Disassembler
                 append(",");
                 decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
+            case ADDX:
+                appendln("addx");
+                appendOperandSize( (insnWord & 0b11000000) >> 6 );
+                final boolean isDataReg = (insnWord & 1<<3) == 0;
+                int srcReg = (insnWord&0b111);
+                int dstReg = (insnWord&0b111000000000) >> 9;
+                if ( isDataReg ) {
+                    appendDataRegister( srcReg ).append(",").appendDataRegister( dstReg );
+                } else {
+                    append("-(").appendAddressRegister( srcReg ).append(")");
+                    append(",");
+                    append("-(").appendAddressRegister( dstReg ).append(")");
+                }
+                return;
             case ADDI:
                 appendln("addi");
                 sizeBits = (insnWord & 0b11000000) >> 6;
@@ -597,7 +611,7 @@ public class Disassembler
             case MULS:
                 appendln("muls.w ");
                 decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
-                int dstReg = (insnWord&0b111000000000) >> 9;
+                dstReg = (insnWord&0b111000000000) >> 9;
                 append(",").appendDataRegister(dstReg);
                 return;
             case MULU:

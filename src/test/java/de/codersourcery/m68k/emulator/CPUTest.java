@@ -90,7 +90,123 @@ public class CPUTest extends TestCase
             .noOverflow()
             .notNegative()
             .notSupervisor().noIrqActive();
+    }
 
+    public void testAddx_Byte()
+    {
+        execute(cpu-> {},
+                "move.l #$ffffff00,d0",
+                "move.l #$ffffff00,d1",
+                "move.w #"+CPU.FLAG_EXTENDED+",ccr",
+                "addx.b d0,d1")
+                .expectD1( 0xffffff01 )
+                .notNegative()
+                .notZero()
+                .noOverflow()
+                .noCarry()
+                .noExtended();
+
+        execute(cpu-> {},
+                "move.l #$ffffff00,d0",
+                "move.l #$ffffff00,d1",
+                "move.w #0,ccr",
+                "addx.b d0,d1")
+                .expectD1( 0xffffff00 )
+                .notNegative()
+                .zero()
+                .noOverflow()
+                .noCarry()
+                .noExtended();
+
+        execute(cpu-> {},
+                "move.l #$ffffffff,d0",
+                "move.l #$ffffff01,d1",
+                "move.w #0,ccr",
+                "addx.b d0,d1")
+                .expectD1( 0xffffff00 )
+                .notNegative()
+                .zero()
+                .noOverflow()
+                .carry()
+                .extended();
+    }
+
+    public void testAddx_Word()
+    {
+        execute(cpu-> {},
+                "move.l #$ffff0000,d0",
+                "move.l #$ffff0000,d1",
+                "move.w #"+CPU.FLAG_EXTENDED+",ccr",
+                "addx.w d0,d1")
+                .expectD1( 0xffff0001 )
+                .notNegative()
+                .notZero()
+                .noOverflow()
+                .noCarry()
+                .noExtended();
+
+        execute(cpu-> {},
+                "move.l #$ffff0000,d0",
+                "move.l #$ffff0000,d1",
+                "move.w #0,ccr",
+                "addx.w d0,d1")
+                .expectD1( 0xffff0000 )
+                .notNegative()
+                .zero()
+                .noOverflow()
+                .noCarry()
+                .noExtended();
+
+        execute(cpu-> {},
+                "move.l #$ffffffff,d0",
+                "move.l #$ffff0001,d1",
+                "move.w #0,ccr",
+                "addx.w d0,d1")
+                .expectD1( 0xffff0000 )
+                .notNegative()
+                .zero()
+                .noOverflow()
+                .carry()
+                .extended();
+    }
+
+    public void testAddx_Long()
+    {
+        execute(cpu-> {},
+                "move.l #$00000000,d0",
+                "move.l #$00000000,d1",
+                "move.w #"+CPU.FLAG_EXTENDED+",ccr",
+                "addx.l d0,d1")
+                .expectD1( 0x00000001 )
+                .notNegative()
+                .notZero()
+                .noOverflow()
+                .noCarry()
+                .noExtended();
+
+        execute(cpu-> {},
+                "move.l #$00000000,d0",
+                "move.l #$00000000,d1",
+                "move.w #0,ccr",
+                "addx.l d0,d1")
+                .expectD1( 0x00000000 )
+                .notNegative()
+                .zero()
+                .noOverflow()
+                .noCarry()
+                .noExtended();
+
+        execute(cpu-> {},
+                "move.l #$ffffffff,d0",
+                "move.l #$00000001,d1",
+                "move.w #0,ccr",
+                "addx.w d0,d1")
+                .expectD1( 0x00000000 )
+                .notNegative()
+                .zero()
+                .noOverflow()
+                .carry()
+                .extended();
     }
 
     public void testADDA()
