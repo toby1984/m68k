@@ -511,8 +511,8 @@ public class AssemblerTest extends TestCase
 
     public void testChk()
     {
+        assertArrayEquals(compile("chk $1200,d3"),  0x47,0xb8,0x12,0x00);
         assertArrayEquals(compile("chk.w $1200,d3"),0x47,0xb8,0x12,0x00);
-        assertArrayEquals(compile("chk $1200,d3"),0x47,0xb8,0x12,0x00);
         assertArrayEquals(compile("chk.l (a4),d7"),0x4f,0x14);
     }
 

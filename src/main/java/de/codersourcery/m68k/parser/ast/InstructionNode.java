@@ -67,7 +67,7 @@ public class InstructionNode extends ASTNode implements ICodeGeneratingNode
     }
 
     public boolean hasOperandSize(OperandSize size) {
-        return ! useImpliedOperandSize && getOperandSize() == size;
+        return getOperandSize() == size;
     }
 
     public boolean hasDestination() {

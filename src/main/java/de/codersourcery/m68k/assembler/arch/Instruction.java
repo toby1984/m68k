@@ -1118,7 +1118,10 @@ public enum Instruction
             case CHK:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
-                return CHK_ENCODING.append(extraInsnWords);
+                if ( insn.hasOperandSize( OperandSize.WORD ) ) {
+                    return CHK_WORD_ENCODING.append(extraInsnWords);
+                }
+                return CHK_LONG_ENCODING.append(extraInsnWords);
             case DIVS:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
@@ -2408,17 +2411,11 @@ D/A   |     |   |           |
     public static final InstructionEncoding MULU_ENCODING = // MULU <ea>,Dn
             InstructionEncoding.of( "1100DDD011mmmsss");
 
-    public static final InstructionEncoding CHK_ENCODING = // CHK <ea>,Dn
-            InstructionEncoding.of( "0100DDDSS0mmmsss").decorateWith(fieldDecorator(Field.SIZE, originalValue ->
-            {
-                if ( originalValue == OperandSize.WORD.bits) {
-                    return 0b11;
-                }
-                if ( originalValue == OperandSize.LONG.bits ) {
-                    return 0b10;
-                }
-                throw new RuntimeException("Unhandled size bit-pattern: %"+Integer.toBinaryString(originalValue ) );
-            }));
+    public static final InstructionEncoding CHK_WORD_ENCODING = // CHK <ea>,Dn
+            InstructionEncoding.of( "0100DDD110mmmsss");
+
+    public static final InstructionEncoding CHK_LONG_ENCODING = // CHK <ea>,Dn
+            InstructionEncoding.of( "0100DDD100mmmsss");
 
     public static final InstructionEncoding TAS_ENCODING = // TAS
             InstructionEncoding.of( "0100101011mmmsss");
@@ -2514,7 +2511,8 @@ D/A   |     |   |           |
         put(TST_ENCODING,TST);
         put(TRAPV_ENCODING,TRAPV);
         put(NOT_ENCODING,NOT);
-        put(CHK_ENCODING,CHK);
+        put(CHK_WORD_ENCODING,CHK);
+        put(CHK_LONG_ENCODING,CHK);
         put(SCC_ENCODING,SCC);
         put(STOP_ENCODING,STOP);
         put(TAS_ENCODING,TAS);
