@@ -1679,7 +1679,7 @@ D/A   |     |   |           |
             case IMMEDIATE_VALUE:
                 field = operandKind == Operand.SOURCE ? Field.SRC_VALUE : Field.DST_VALUE;
 
-                // TODO: 8-bit immediate values could actually be stored in-line (MOVEQ) instead of wasting a byte here
+                // TODO: 8-bit immediate values could actually be stored inline (MOVEQ) instead of wasting a byte here
                 // TODO: Maybe add optimization pass that turns regular MOVE into MOVEQ when possible?
                 final int words = insn.getOperandSize() == OperandSize.LONG ? 2 : 1;
                 return new String[] { StringUtils.repeat(field.c,words*16) };
