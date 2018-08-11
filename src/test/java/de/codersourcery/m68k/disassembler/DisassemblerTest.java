@@ -120,6 +120,18 @@ public class DisassemblerTest extends TestCase
         compile("divs.w d4,d3");
     }
 
+    public void testSub() {
+        compile("sub.b d3,$1200");
+        compile("sub.b $1200,d3");
+        compile("sub.b d2,d3");
+        compile("sub.w d3,$1200");
+        compile("sub.w $1200,d3");
+        compile("sub.w d2,d3");
+        compile("sub.l d3,$1200");
+        compile("sub.l $1200,d3");
+        compile("sub.l d2,d3");
+    }
+
     public void testAdd() {
         compile("add.b d3,$1200");
         compile("add.b $1200,d3");
@@ -132,16 +144,45 @@ public class DisassemblerTest extends TestCase
         compile("add.l d2,d3");
     }
 
+    public void testSwap()
+    {
+        compile("swap d3","00000000: swap.w d3");
+        compile("swap.w d3");
+    }
+
+    public void testSubi() {
+        compile("subi.b #$a,$1200");
+        compile("subi.w #$a,$1200");
+        compile("subi.l #$a,$1200");
+    }
+
     public void testAddi() {
         compile("addi.b #$a,$1200");
         compile("addi.w #$a,$1200");
         compile("addi.l #$a,$1200");
     }
 
+    public void testSuba() {
+       compile("suba.w $1200,a4");
+       compile("suba.l $1200,a4");
+       compile("suba.l (a3)+,a3");
+    }
+
     public void testAdda() {
         compile("adda.w $1200,a4");
         compile("adda.l $1200,a4");
         compile("adda.l (a3)+,a3");
+    }
+
+    public void testSubq() {
+        compile("subq.b #1,d3");
+        compile("subq.b #1,$1200");
+        compile("subq.w #8,d3");
+        compile("subq.w #8,a3");
+        compile("subq.w #8,$1200");
+        compile("subq.l #8,d3");
+        compile("subq.l #8,a3");
+        compile("subq.l #8,$1200");
     }
 
     public void testADDQ() {

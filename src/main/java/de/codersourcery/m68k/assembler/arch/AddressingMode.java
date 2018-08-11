@@ -3,7 +3,10 @@ package de.codersourcery.m68k.assembler.arch;
 import de.codersourcery.m68k.utils.Misc;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * M68000 family addressing modes.
@@ -258,7 +261,22 @@ public enum AddressingMode
     public boolean isMemory() { return hasKind(AddressingModeKind.MEMORY); }
     public boolean isAlterable() { return hasKind(AddressingModeKind.ALTERABLE); }
 
+    public boolean hasFixedEaRegisterValue()
+    {
+        return eaRegisterField.isFixedValue();
+    }
+
     public boolean hasKind(AddressingModeKind kind) {
         return (this.kinds & kind.bits) != 0;
+    }
+
+    public static Set<AddressingMode> getByKind(AddressingModeKind kind1,AddressingModeKind... additional)
+    {
+        final Set<AddressingModeKind> kinds = new HashSet<>();
+        kinds.add(kind1);
+        if ( additional != null ) {
+            kinds.addAll(Arrays.asList(additional));
+        }
+        return Stream.of(AddressingMode.values()).filter( mode -> kinds.stream().anyMatch(mode::hasKind) ).collect(Collectors.toSet());
     }
 }

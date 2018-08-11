@@ -44,12 +44,12 @@ public class Parser
     {
         final StatementNode result = new StatementNode();
 
-        ASTNode node = parseInstruction();
+        ASTNode node = parseLabel();
         if ( node != null ) {
             result.add(node);
         }
 
-        node = parseLabel();
+        node = parseInstruction();
         if ( node != null ) {
             result.add(node);
         }

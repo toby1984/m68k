@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -345,7 +346,7 @@ public class InstructionEncoding
         }
         this.valueDecorator = (field, value) -> value;
         this.sizeInBytes = sizeInBytes;
-        populateInstructionMask(pattern1 );
+        populateInstructionMask(pattern1);
     }
 
     private static String stripUnderscores(String s) {
@@ -388,7 +389,13 @@ public class InstructionEncoding
         return bitMappings;
     }
 
-    private Map<Field,List<IBitMapping>> getMappings(String pattern)
+    /**
+     * Returns all bit-field mappings for a given pattern.
+     *
+     * @param pattern
+     * @return
+     */
+    public static Map<Field,List<IBitMapping>> getMappings(String pattern)
     {
         Validate.notBlank( pattern, "pattern must not be null or blank");
         if ( (pattern.length() % PATTERN_MULTIPLE_OF) != 0) {

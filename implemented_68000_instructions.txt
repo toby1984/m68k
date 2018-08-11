@@ -71,10 +71,10 @@
 [ ] SBCD
 [X] Scc
 [X] STOP
-[ ] SUB
-[ ] SUBA
-[ ] SUBI
-[ ] SUBQ
+[X] SUB
+[X] SUBA
+[X] SUBI
+[X] SUBQ
 [ ] SUBX
 [X] SWAP
 [X] TAS

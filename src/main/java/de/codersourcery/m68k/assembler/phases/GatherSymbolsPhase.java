@@ -4,6 +4,7 @@ import de.codersourcery.m68k.assembler.ICompilationContext;
 import de.codersourcery.m68k.assembler.ICompilationPhase;
 import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.SymbolTable;
+import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.parser.ast.AST;
 import de.codersourcery.m68k.parser.ast.ASTNode;
 import de.codersourcery.m68k.parser.ast.IASTNode;

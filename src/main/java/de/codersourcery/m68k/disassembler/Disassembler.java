@@ -238,6 +238,10 @@ public class Disassembler
                 eaRegister = (insnWord & 0b000111);
                 decodeOperand(1<<sizeBits,eaMode,eaRegister);
                 return;
+            case SWAP:
+                appendln("swap.w ");
+                appendDataRegister((insnWord&0b111) );
+                return;
             case MOVEM:
                 appendln("movem");
                 if ( ( insnWord & 1<<6) == 0) {
@@ -554,6 +558,23 @@ public class Disassembler
                 append(",");
                 decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
+            case SUB:
+                appendln("sub");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                appendOperandSize(sizeBits);
+                if ( (insnWord & 1<<8) == 0 )
+                {
+                    // <ea> + Dn -> Dn
+                    decodeOperand(1<<sizeBits,(insnWord&0b111000)>>3 , insnWord&0b111);
+                    append(",").appendDataRegister((insnWord&0b111000000000)>>9);
+                }
+                else {
+                    // Dn + <ea> -> <ea>
+                    appendDataRegister((insnWord&0b111000000000)>>9);
+                    append(",");
+                    decodeOperand(1<<sizeBits,(insnWord&0b111000)>>3 , insnWord&0b111);
+                }
+                return;
             case ADD:
                 appendln("add");
                 sizeBits = (insnWord & 0b11000000) >> 6;
@@ -585,8 +606,8 @@ public class Disassembler
                     append("-(").appendAddressRegister( dstReg ).append(")");
                 }
                 return;
-            case ADDI:
-                appendln("addi");
+            case SUBI:
+                appendln("subi");
                 sizeBits = (insnWord & 0b11000000) >> 6;
                 appendOperandSize(sizeBits);
                 int value;
@@ -607,6 +628,38 @@ public class Disassembler
                 append("#").appendHex(value).append(",");
                 decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
+            case ADDI:
+                appendln("addi");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                appendOperandSize(sizeBits);
+                switch(sizeBits)
+                {
+                    case 0b00:
+                        value = readWord()&0xff;
+                        break;
+                    case 0b01:
+                        value = readWord()&0xffff;
+                        break;
+                    case 0b10:
+                        value = readLong();
+                        break;
+                    default:
+                        throw new RuntimeException("Invalid size");
+                }
+                append("#").appendHex(value).append(",");
+                decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
+                return;
+            case SUBA:
+                appendln("suba");
+                if ((insnWord&1<<8) == 0 ) {
+                    append(".w ");
+                } else {
+                    append(".l ");
+                }
+                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
+                regNum = (insnWord&0b111000000000) >> 9;
+                append(",").appendAddressRegister(regNum);
+                return;
             case ADDA:
                 appendln("adda");
                 if ((insnWord&1<<8) == 0 ) {
@@ -617,6 +670,13 @@ public class Disassembler
                 decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
                 regNum = (insnWord&0b111000000000) >> 9;
                 append(",").appendAddressRegister(regNum);
+                return;
+            case SUBQ:
+                appendln("subq");
+                appendOperandSize((insnWord&0b11000000) >> 6);
+                value = (insnWord & 0b111000000000) >> 9;
+                append("#").append(value == 0 ? 8 : value ).append(",");
+                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
             case ADDQ:
                 appendln("addq");

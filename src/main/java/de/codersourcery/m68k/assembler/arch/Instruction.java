@@ -12,8 +12,10 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 
 import static de.codersourcery.m68k.assembler.arch.AddressingMode.ABSOLUTE_SHORT_ADDRESSING;
@@ -29,253 +31,319 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    SUB("SUB",2)
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+                    if (! ( node.source().hasAddressingMode(DATA_REGISTER_DIRECT) ||
+                            node.destination().hasAddressingMode(DATA_REGISTER_DIRECT)))
+                    {
+                        throw new RuntimeException("SUB needs a data register as either source or destination");
+                    }
+                }
+            },
     ADD("ADD",2)
-    {
-        @Override public boolean supportsExplicitOperandSize() { return true; }
-
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
-            if (! ( node.source().hasAddressingMode(DATA_REGISTER_DIRECT) ||
-                    node.destination().hasAddressingMode(DATA_REGISTER_DIRECT)))
             {
-                throw new RuntimeException("ADD needs a data register as either source or destination");
-            }
-        }
-    },
+                @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+                    if (! ( node.source().hasAddressingMode(DATA_REGISTER_DIRECT) ||
+                            node.destination().hasAddressingMode(DATA_REGISTER_DIRECT)))
+                    {
+                        throw new RuntimeException("ADD needs a data register as either source or destination");
+                    }
+                }
+            },
     ADDX("ADDX",2)
-    {
-        @Override public boolean supportsExplicitOperandSize() { return true; }
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
 
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            if ( node.source().hasAddressingMode( DATA_REGISTER_DIRECT ) &&
-                 node.destination().hasAddressingMode( DATA_REGISTER_DIRECT ) ) {
-                // ok
-            } else if ( node.source().hasAddressingMode( ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT ) &&
-                        node.destination().hasAddressingMode( ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT ) ) {
-                // ok
-            } else {
-                throw new RuntimeException("ADDX supports only two data registers or two address registers in indirect pre-decrement mode");
-            }
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    if ( node.source().hasAddressingMode( DATA_REGISTER_DIRECT ) &&
+                            node.destination().hasAddressingMode( DATA_REGISTER_DIRECT ) ) {
+                        // ok
+                    } else if ( node.source().hasAddressingMode( ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT ) &&
+                            node.destination().hasAddressingMode( ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT ) ) {
+                        // ok
+                    } else {
+                        throw new RuntimeException("ADDX supports only two data registers or two address registers in indirect pre-decrement mode");
+                    }
+                }
+            },
+    SUBI("SUBI",2)
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+                    Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE );
+                    if ( node.destination().hasAddressingMode(ADDRESS_REGISTER_DIRECT) &&
+                            node.destination().getValue().isAddressRegister() )
+                    {
+                        throw new RuntimeException("Cannot use SUBI for address registers");
+                    }
+                }
+            },
     ADDI("ADDI",2)
-    {
-        @Override public boolean supportsExplicitOperandSize() { return true; }
-
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
-            Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE );
-            if ( node.destination().hasAddressingMode(ADDRESS_REGISTER_DIRECT) &&
-                node.destination().getValue().isAddressRegister() )
             {
-                throw new RuntimeException("Cannot use ADDI for address registers");
-            }
-        }
-    },
+                @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+                    Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE );
+                    if ( node.destination().hasAddressingMode(ADDRESS_REGISTER_DIRECT) &&
+                            node.destination().getValue().isAddressRegister() )
+                    {
+                        throw new RuntimeException("Cannot use ADDI for address registers");
+                    }
+                }
+            },
+    SUBA("SUBA",2)
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_DIRECT);
+                    if( node.hasOperandSize(OperandSize.BYTE ) ) {
+                        throw new RuntimeException("SUBA only supports .w or .l");
+                    }
+                }
+            },
     ADDA("ADDA",2)
-    {
-        @Override public boolean supportsExplicitOperandSize() { return true; }
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
 
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_DIRECT);
-            if( node.hasOperandSize(OperandSize.BYTE ) ) {
-                throw new RuntimeException("ADDA only supports .w or .l");
-            }
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_DIRECT);
+                    if( node.hasOperandSize(OperandSize.BYTE ) ) {
+                        throw new RuntimeException("ADDA only supports .w or .l");
+                    }
+                }
+            },
+    SUBQ("SUBQ",2)
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+                    if ( ! estimateSizeOnly ) {
+                        int value = node.source().getValue().getBits(ctx);
+                        if ( value < 1 || value > 8) {
+                            throw new RuntimeException("SUBQ only supports values in the range 1...8");
+                        }
+                    }
+                    Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+                    if ( node.destination().hasAddressingMode(AddressingMode.ADDRESS_REGISTER_DIRECT) ) {
+                        if ( node.hasOperandSize(OperandSize.BYTE) ) {
+                            throw new RuntimeException("SUBQ #xx,An does not support byte-sized operands");
+                        }
+                    }
+                }
+            },
     ADDQ("ADDQ",2)
-    {
-        @Override public boolean supportsExplicitOperandSize() { return true; }
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
 
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
-            if ( ! estimateSizeOnly ) {
-                int value = node.source().getValue().getBits(ctx);
-                if ( value < 1 || value > 8) {
-                    throw new RuntimeException("ADDQ only supports values in the range 1...8");
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+                    if ( ! estimateSizeOnly ) {
+                        int value = node.source().getValue().getBits(ctx);
+                        if ( value < 1 || value > 8) {
+                            throw new RuntimeException("ADDQ only supports values in the range 1...8");
+                        }
+                    }
+                    Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+                    if ( node.destination().hasAddressingMode(AddressingMode.ADDRESS_REGISTER_DIRECT) ) {
+                        if ( node.hasOperandSize(OperandSize.BYTE) ) {
+                            throw new RuntimeException("ADDQ #xx,An does not support byte-sized operands");
+                        }
+                    }
                 }
-            }
-            Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE);
-            if ( node.destination().hasAddressingMode(AddressingMode.ADDRESS_REGISTER_DIRECT) ) {
-                if ( node.hasOperandSize(OperandSize.BYTE) ) {
-                    throw new RuntimeException("ADDQ #xx,An does not support byte-sized operands");
-                }
-            }
-        }
-    },
+            },
     DIVS("DIVS",2)
-    {
-        @Override public boolean supportsExplicitOperandSize() { return true; }
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
 
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            checkMultiplyDivide(node);
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    checkMultiplyDivide(node);
+                }
+            },
     DIVU("DIVU",2)
-    {
-        @Override public boolean supportsExplicitOperandSize() { return true; }
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
 
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            checkMultiplyDivide(node);
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    checkMultiplyDivide(node);
+                }
+            },
     MULS("MULS",2)
-    {
-        @Override public boolean supportsExplicitOperandSize() { return true; }
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
 
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            checkMultiplyDivide(node);
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    checkMultiplyDivide(node);
+                }
+            },
     MULU("MULU",2)
-    {
-        @Override public boolean supportsExplicitOperandSize() { return true; }
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
 
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            checkMultiplyDivide(node);
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    checkMultiplyDivide(node);
+                }
+            },
     EORI("EORI",2)
-    {
-        @Override
-        public boolean supportsExplicitOperandSize()
-        {
-            return true;
-        }
+            {
+                @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return true;
+                }
 
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            checkBinaryLogicalOperation(node,estimateSizeOnly,ctx);
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    checkBinaryLogicalOperation(node,estimateSizeOnly,ctx);
+                }
+            },
     ORI("ORI",2)
-    {
-        @Override
-        public boolean supportsExplicitOperandSize()
-        {
-            return true;
-        }
+            {
+                @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return true;
+                }
 
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            checkBinaryLogicalOperation(node,estimateSizeOnly,ctx);
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    checkBinaryLogicalOperation(node,estimateSizeOnly,ctx);
+                }
+            },
     MOVEP("MOVEP",2)
-    {
-        @Override
-        public boolean supportsExplicitOperandSize()
-        {
-            return true;
-        }
-
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            if ( node.hasExplicitOperandSize() ) {
-                if ( node.hasOperandSize(OperandSize.BYTE) ) {
-                    throw new RuntimeException("MOVEP only supports .w or .l operand sizes");
-                }
-            }
-            if ( node.source().getValue().isDataRegister() )
             {
-                Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_INDIRECT,AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT);
-                Instruction.checkOperandSizeSigned(node.destination().getValue(),16,ctx);
-            }
-            else if ( node.destination().getValue().isDataRegister() ) {
-                Instruction.checkSourceAddressingMode(node,AddressingMode.ADDRESS_REGISTER_INDIRECT,AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT);
-                Instruction.checkOperandSizeSigned(node.source().getValue(),16,ctx);
-            }
-            else {
-                throw new UnsupportedOperationException("Method checkSupports not implemented");
-            }
-        }
-    },
+                @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return true;
+                }
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    if ( node.hasExplicitOperandSize() ) {
+                        if ( node.hasOperandSize(OperandSize.BYTE) ) {
+                            throw new RuntimeException("MOVEP only supports .w or .l operand sizes");
+                        }
+                    }
+                    if ( node.source().getValue().isDataRegister() )
+                    {
+                        Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_INDIRECT,AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT);
+                        Instruction.checkOperandSizeSigned(node.destination().getValue(),16,ctx);
+                    }
+                    else if ( node.destination().getValue().isDataRegister() ) {
+                        Instruction.checkSourceAddressingMode(node,AddressingMode.ADDRESS_REGISTER_INDIRECT,AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT);
+                        Instruction.checkOperandSizeSigned(node.source().getValue(),16,ctx);
+                    }
+                    else {
+                        throw new UnsupportedOperationException("Method checkSupports not implemented");
+                    }
+                }
+            },
     MOVEM("MOVEM",2)
-    {
-        @Override
-        public boolean supportsExplicitOperandSize()
-        {
-            return true;
-        }
-
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            if ( node.hasExplicitOperandSize() && !(node.hasOperandSize(OperandSize.WORD) || node.hasOperandSize(OperandSize.LONG) ) )
             {
-                throw new RuntimeException("MOVEM supports only .w or .l");
-            }
-            // one operand needs to be a register,register list or register range
-            final boolean srcIsRegList = isRegisterList(node.source());
-            final boolean dstIsRegList = isRegisterList(node.destination());
-
-            if ( ( srcIsRegList ^ dstIsRegList) == false )
-            {
-                throw new RuntimeException("MOVEM requires exactly one register,register range or register list");
-            }
-            final boolean registersToMemory = srcIsRegList;
-            if ( registersToMemory )
-            {
-                // registers -> memory
-                switch( node.destination().addressingMode )
+                @Override
+                public boolean supportsExplicitOperandSize()
                 {
-                    case ADDRESS_REGISTER_INDIRECT:
-                    case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT:
-                    case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
-                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
-                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
-                    case ABSOLUTE_SHORT_ADDRESSING:
-                    case ABSOLUTE_LONG_ADDRESSING:
-                        break;
-                    default:
-                        throw new RuntimeException("Invalid addressing mode "+node.destination().addressingMode+" for MOVEM destination operand");
+                    return true;
                 }
-                // TODO: 68020+ supports more addressing modes here...
-            }
-            else
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
-                // memory -> registers
-                switch( node.source().addressingMode )
-                {
-                    case ADDRESS_REGISTER_INDIRECT:
-                    case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT:
-                    case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
-                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
-                    case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
-                    case PC_INDIRECT_WITH_DISPLACEMENT:
-                    case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
-                    case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
-                    case ABSOLUTE_SHORT_ADDRESSING:
-                    case ABSOLUTE_LONG_ADDRESSING:
-                        break;
-                    default:
-                        throw new RuntimeException("Invalid addressing mode for MOVEM source operand");
+                    if ( node.hasExplicitOperandSize() && !(node.hasOperandSize(OperandSize.WORD) || node.hasOperandSize(OperandSize.LONG) ) )
+                    {
+                        throw new RuntimeException("MOVEM supports only .w or .l");
+                    }
+                    // one operand needs to be a register,register list or register range
+                    final boolean srcIsRegList = isRegisterList(node.source());
+                    final boolean dstIsRegList = isRegisterList(node.destination());
+
+                    if ( ( srcIsRegList ^ dstIsRegList) == false )
+                    {
+                        throw new RuntimeException("MOVEM requires exactly one register,register range or register list");
+                    }
+                    final boolean registersToMemory = srcIsRegList;
+                    if ( registersToMemory )
+                    {
+                        // registers -> memory
+                        switch( node.destination().addressingMode )
+                        {
+                            case ADDRESS_REGISTER_INDIRECT:
+                            case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT:
+                            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
+                            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                            case ABSOLUTE_SHORT_ADDRESSING:
+                            case ABSOLUTE_LONG_ADDRESSING:
+                                break;
+                            default:
+                                throw new RuntimeException("Invalid addressing mode "+node.destination().addressingMode+" for MOVEM destination operand");
+                        }
+                        // TODO: 68020+ supports more addressing modes here...
+                    }
+                    else
+                    {
+                        // memory -> registers
+                        switch( node.source().addressingMode )
+                        {
+                            case ADDRESS_REGISTER_INDIRECT:
+                            case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT:
+                            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
+                            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                            case PC_INDIRECT_WITH_DISPLACEMENT:
+                            case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
+                            case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
+                            case ABSOLUTE_SHORT_ADDRESSING:
+                            case ABSOLUTE_LONG_ADDRESSING:
+                                break;
+                            default:
+                                throw new RuntimeException("Invalid addressing mode for MOVEM source operand");
+                        }
+                        // TODO: 68020+ supports more addressing modes here...
+                    }
                 }
-                // TODO: 68020+ supports more addressing modes here...
-            }
-        }
-    },
+            },
     CHK("CHK",2) {
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -529,68 +597,68 @@ public enum Instruction
         }
     },
     RESET("RESET",0)
-    {
-        @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) {}
-    },
+            {
+                @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) {}
+            },
     UNLK("UNLK",1)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            if ( ! node.source().getValue().isAddressRegister() ) {
-                throw new RuntimeException("Expected an address register as source operand");
-            }
-        }
-    },
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    if ( ! node.source().getValue().isAddressRegister() ) {
+                        throw new RuntimeException("Expected an address register as source operand");
+                    }
+                }
+            },
     LINK("LINK",2)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            if ( ! node.source().getValue().isAddressRegister() ) {
-                throw new RuntimeException("Expected an address register as source operand");
-            }
-            if ( ! node.destination().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE ) ) {
-                throw new RuntimeException("Expected an immediate mode value as destination operand");
-            }
-            Instruction.checkOperandSizeUnsigned( node.destination().getValue() ,16,ctx );
-        }
-    },
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    if ( ! node.source().getValue().isAddressRegister() ) {
+                        throw new RuntimeException("Expected an address register as source operand");
+                    }
+                    if ( ! node.destination().hasAddressingMode(AddressingMode.IMMEDIATE_VALUE ) ) {
+                        throw new RuntimeException("Expected an immediate mode value as destination operand");
+                    }
+                    Instruction.checkOperandSizeUnsigned( node.destination().getValue() ,16,ctx );
+                }
+            },
     RTS("RTS",0)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
 
-        }
-    },
+                }
+            },
     JSR("JSR",1)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
-        }
-    },
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
+                }
+            },
     SWAP("SWAP",1)
-    {
-        @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            if ( ! node.source().getValue().isDataRegister() ) {
-                throw new RuntimeException("SWAP requires a data requires");
-            }
-            if ( ! node.useImpliedOperandSize && node.getOperandSize() != OperandSize.WORD ) {
-                throw new RuntimeException("SWAP only supports .w");
-            }
-        }
+            {
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    if ( ! node.source().getValue().isDataRegister() ) {
+                        throw new RuntimeException("SWAP requires a data requires");
+                    }
+                    if ( ! node.useImpliedOperandSize && node.getOperandSize() != OperandSize.WORD ) {
+                        throw new RuntimeException("SWAP only supports .w");
+                    }
+                }
 
-        @Override
-        public boolean supportsExplicitOperandSize()
-        {
-            return true;
-        }
-    },
+                @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return true;
+                }
+            },
     JMP("JMP",1)
             {
                 @Override
@@ -600,47 +668,47 @@ public enum Instruction
                 }
             },
     EOR("EOR",2)
-    {
-        @Override
-        public boolean supportsExplicitOperandSize()
-        {
-            return true;
-        }
+            {
+                @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return true;
+                }
 
-        @Override
-        public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            Instruction.checkSourceAddressingMode(insn,AddressingMode.DATA_REGISTER_DIRECT);
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkSourceAddressingMode(insn,AddressingMode.DATA_REGISTER_DIRECT);
+                }
+            },
     OR("OR",2)
-    {
-        @Override
-        public boolean supportsExplicitOperandSize()
-        {
-            return true;
-        }
+            {
+                @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return true;
+                }
 
-        @Override
-        public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            checkBinaryLogicalOperation(insn,estimateSizeOnly,ctx);
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    checkBinaryLogicalOperation(insn,estimateSizeOnly,ctx);
+                }
+            },
     AND("AND",2)
-    {
-        @Override
-        public boolean supportsExplicitOperandSize()
-        {
-            return true;
-        }
+            {
+                @Override
+                public boolean supportsExplicitOperandSize()
+                {
+                    return true;
+                }
 
-        @Override
-        public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            checkBinaryLogicalOperation(insn,estimateSizeOnly,ctx);
-        }
-    },
+                @Override
+                public void checkSupports(InstructionNode insn, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    checkBinaryLogicalOperation(insn,estimateSizeOnly,ctx);
+                }
+            },
     TRAP("TRAP",1, 0b0100)
             {
                 @Override
@@ -660,6 +728,16 @@ public enum Instruction
                             throw new RuntimeException("TRAP # out-of-range (0-15), was "+value);
                         }
                     }
+                }
+
+                @Override
+                public List<EncodingTableGenerator.IValueIterator> getValueIterators(Set<Field> fields)
+                {
+                    if ( fields.size() == 1 && fields.contains(Field.SRC_VALUE) )
+                    {
+                        return Collections.singletonList(new EncodingTableGenerator.IntValueIterator(Field.SRC_VALUE, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15));
+                    }
+                    throw new IllegalArgumentException("Unhandled field/fields: "+fields);
                 }
             },
     RTE("RTE",0)
@@ -1145,6 +1223,14 @@ public enum Instruction
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 return DIVU_ENCODING.append(extraInsnWords);
+            case SUB:
+                if ( insn.destination().hasAddressingMode(DATA_REGISTER_DIRECT) )
+                {
+                    extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                    return SUB_DST_DATA_ENCODING.append(extraInsnWords);
+                }
+                extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                return SUB_DST_EA_ENCODING.append(extraInsnWords);
             case ADD:
                 if ( insn.destination().hasAddressingMode(DATA_REGISTER_DIRECT) )
                 {
@@ -1159,6 +1245,14 @@ public enum Instruction
                     return ADDX_DATAREG_ENCODING;
                 }
                 return ADDX_ADDRREG_ENCODING;
+            case SUBI:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                if ( ! insn.hasOperandSize(OperandSize.LONG) )
+                {
+                    return SUBI_WORD_ENCODING.append(extraInsnWords);
+                }
+                return SUBI_LONG_ENCODING.append(extraInsnWords);
             case ADDI:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
@@ -1167,6 +1261,14 @@ public enum Instruction
                     return ADDI_WORD_ENCODING.append(extraInsnWords);
                 }
                 return ADDI_LONG_ENCODING.append(extraInsnWords);
+            case SUBA:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( insn.hasOperandSize(OperandSize.WORD) )
+                {
+                    return SUBA_WORD_ENCODING.append(extraInsnWords);
+                }
+                return SUBA_LONG_ENCODING.append(extraInsnWords);
             case ADDA:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
@@ -1175,6 +1277,10 @@ public enum Instruction
                     return ADDA_WORD_ENCODING.append(extraInsnWords);
                 }
                 return ADDA_LONG_ENCODING.append(extraInsnWords);
+            case SUBQ:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                return SUBQ_ENCODING.append(extraInsnWords);
             case ADDQ:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
@@ -1253,9 +1359,9 @@ destination Dn mode, not the destination < ea > mode.
 
                 if ( ! estimateSizeOnly && insn.getOperandSize() != OperandSize.LONG)
                 {
-                    return ORI_16_BIT_ENCODING.append(extraInsnWords);
+                    return ORI_WORD_ENCODING.append(extraInsnWords);
                 }
-                return ORI_32_BIT_ENCODING.append(extraInsnWords);
+                return ORI_LONG_ENCODING.append(extraInsnWords);
             case EORI:
 
                 if ( insn.destination().getValue().isRegister(Register.CCR) )
@@ -1273,29 +1379,29 @@ destination Dn mode, not the destination < ea > mode.
                 extraInsnWords = getExtraWordPatterns(insn.destination(),Operand.DESTINATION,insn,context);
                 if ( ! estimateSizeOnly && insn.getOperandSize() != OperandSize.LONG)
                 {
-                    return EORI_16_BIT_ENCODING.append(extraInsnWords);
+                    return EORI_WORD_ENCODING.append(extraInsnWords);
                 }
-                return EORI_32_BIT_ENCODING.append(extraInsnWords);
+                return EORI_LONG_ENCODING.append(extraInsnWords);
             case ROXL:
                 return selectRotateEncoding( insn,
-                                             ROXL_MEMORY_ENCODING,
-                                             ROXL_IMMEDIATE_ENCODING,
-                                             ROXL_REGISTER_ENCODING,context);
+                        ROXL_MEMORY_ENCODING,
+                        ROXL_IMMEDIATE_ENCODING,
+                        ROXL_REGISTER_ENCODING,context);
             case ROXR:
                 return selectRotateEncoding( insn,
-                                             ROXR_MEMORY_ENCODING,
-                                             ROXR_IMMEDIATE_ENCODING,
-                                             ROXR_REGISTER_ENCODING,context);
+                        ROXR_MEMORY_ENCODING,
+                        ROXR_IMMEDIATE_ENCODING,
+                        ROXR_REGISTER_ENCODING,context);
             case ASL:
                 return selectRotateEncoding( insn,
-                         ASL_MEMORY_ENCODING,
-                         ASL_IMMEDIATE_ENCODING,
-                         ASL_REGISTER_ENCODING,context);
+                        ASL_MEMORY_ENCODING,
+                        ASL_IMMEDIATE_ENCODING,
+                        ASL_REGISTER_ENCODING,context);
             case ASR:
                 return selectRotateEncoding( insn,
-                         ASR_MEMORY_ENCODING,
-                         ASR_IMMEDIATE_ENCODING,
-                         ASR_REGISTER_ENCODING,context);
+                        ASR_MEMORY_ENCODING,
+                        ASR_IMMEDIATE_ENCODING,
+                        ASR_REGISTER_ENCODING,context);
             case LSL:
                 return selectRotateEncoding( insn,
                         LSL_MEMORY_ENCODING,
@@ -1712,10 +1818,10 @@ D/A   |     |   |           |
     }
 
     private static InstructionEncoding selectRotateEncoding(InstructionNode insn,
-                                               InstructionEncoding memory,
-                                               InstructionEncoding immediate,
-                                               InstructionEncoding register,
-                                               ICompilationContext context)
+                                                            InstructionEncoding memory,
+                                                            InstructionEncoding immediate,
+                                                            InstructionEncoding register,
+                                                            ICompilationContext context)
     {
         if ( insn.useImpliedOperandSize ) {
             insn.setImplicitOperandSize(OperandSize.WORD);
@@ -1888,18 +1994,18 @@ D/A   |     |   |           |
                 final int bits = insn.source().getValue().getBits(ctx);
                 if ( NumberNode.getSizeInBitsUnsigned(bits) > allowedOperandSizeInBits ) {
                     throw new RuntimeException( insn.instruction+" needs a "+allowedOperandSizeInBits+"-" +
-                        "bit operand, was: "+Misc.hex(bits));
+                            "bit operand, was: "+Misc.hex(bits));
                 }
             }
             return;
         }
         // no immediate mode src operand
         final boolean srcIsDataReg =
-            insn.source().getValue().isDataRegister() &&
-                insn.source().hasAddressingMode(DATA_REGISTER_DIRECT);
+                insn.source().getValue().isDataRegister() &&
+                        insn.source().hasAddressingMode(DATA_REGISTER_DIRECT);
         final boolean dstIsDataReg =
-            insn.destination().getValue().isDataRegister() &&
-                insn.destination().hasAddressingMode(DATA_REGISTER_DIRECT);
+                insn.destination().getValue().isDataRegister() &&
+                        insn.destination().hasAddressingMode(DATA_REGISTER_DIRECT);
 
         if ( ! (srcIsDataReg | dstIsDataReg ) ) {
             throw new RuntimeException(insn.instruction+" needs a data register as either source or destination operand");
@@ -2168,8 +2274,8 @@ D/A   |     |   |           |
     {
         final IValueNode value = operand.getValue();
         return (value.is(NodeType.REGISTER) && operand.addressingMode.isRegisterDirect() ) ||
-            value.is(NodeType.REGISTER_RANGE) ||
-            value.is(NodeType.REGISTER_LIST);
+                value.is(NodeType.REGISTER_RANGE) ||
+                value.is(NodeType.REGISTER_LIST);
     }
 
     private static InstructionEncoding.IValueDecorator fieldDecorator(Field f, Function<Integer, Integer> func)
@@ -2204,25 +2310,25 @@ D/A   |     |   |           |
     public static final InstructionEncoding OR_DST_EA_ENCODING  = InstructionEncoding.of("1000sss1SSMMMDDD");
 
     public static final InstructionEncoding ORI_TO_CCR_ENCODING  = InstructionEncoding.of("0000000000111100",
-        "00000000_vvvvvvvv");
+            "00000000_vvvvvvvv");
 
     public static final InstructionEncoding ORI_TO_SR_ENCODING  = InstructionEncoding.of("0000000001111100",
-        "vvvvvvvv_vvvvvvvv");
+            "vvvvvvvv_vvvvvvvv");
 
-    public static final InstructionEncoding ORI_16_BIT_ENCODING  = InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding ORI_32_BIT_ENCODING  = InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding ORI_WORD_ENCODING = InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding ORI_LONG_ENCODING = InstructionEncoding.of("00000000SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
     // dst eaMode/eaRegister contained in lower 6 bits
     public static final InstructionEncoding EOR_DST_EA_ENCODING  = InstructionEncoding.of("1011sss1SSMMMDDD");
 
     public static final InstructionEncoding EORI_TO_CCR_ENCODING = InstructionEncoding.of("0000101000111100",
-        "00000000_vvvvvvvv");
+            "00000000_vvvvvvvv");
 
     public static final InstructionEncoding EORI_TO_SR_ENCODING = InstructionEncoding.of("0000101001111100",
-        "vvvvvvvv_vvvvvvvv");
+            "vvvvvvvv_vvvvvvvv");
 
-    public static final InstructionEncoding EORI_16_BIT_ENCODING  = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding EORI_32_BIT_ENCODING  = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding EORI_WORD_ENCODING = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding EORI_LONG_ENCODING = InstructionEncoding.of("00001010SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
     private static final InstructionEncoding.IValueDecorator MOVEM_SIZE_DECORATOR = (field, origValue) ->
     {
@@ -2240,12 +2346,12 @@ D/A   |     |   |           |
     };
 
     public static final InstructionEncoding MOVEM_FROM_REGISTERS_ENCODING =
-        InstructionEncoding.of("010010001SMMMDDD","LLLLLLLL_LLLLLLLL")
-            .decorateWith(MOVEM_SIZE_DECORATOR);
+            InstructionEncoding.of("010010001SMMMDDD","LLLLLLLL_LLLLLLLL")
+                    .decorateWith(MOVEM_SIZE_DECORATOR);
 
     public static final InstructionEncoding MOVEM_TO_REGISTERS_ENCODING   =
-        InstructionEncoding.of("010011001Smmmsss","LLLLLLLL_LLLLLLLL")
-            .decorateWith(MOVEM_SIZE_DECORATOR);
+            InstructionEncoding.of("010011001Smmmsss","LLLLLLLL_LLLLLLLL")
+                    .decorateWith(MOVEM_SIZE_DECORATOR);
 
     public static final InstructionEncoding TRAP_ENCODING = InstructionEncoding.of("010011100100vvvv");
 
@@ -2256,13 +2362,13 @@ D/A   |     |   |           |
     public static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of(     "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
     public static final InstructionEncoding MOVEP_WORD_FROM_MEMORY_ENCODING = // MOVEP.W d16(An),Dx
-        InstructionEncoding.of("0000DDD100001sss", "bbbbbbbb_bbbbbbbb");
+            InstructionEncoding.of("0000DDD100001sss", "bbbbbbbb_bbbbbbbb");
     public static final InstructionEncoding MOVEP_LONG_FROM_MEMORY_ENCODING = // // MOVEP.L d16(An),Dx
-        InstructionEncoding.of("0000DDD101001sss","bbbbbbbb_bbbbbbbb");
+            InstructionEncoding.of("0000DDD101001sss","bbbbbbbb_bbbbbbbb");
     public static final InstructionEncoding MOVEP_WORD_TO_MEMORY_ENCODING   = // MOVEP.W Dx,d16(An)
-        InstructionEncoding.of("0000sss110001DDD","BBBBBBBB_BBBBBBBB");
+            InstructionEncoding.of("0000sss110001DDD","BBBBBBBB_BBBBBBBB");
     public static final InstructionEncoding MOVEP_LONG_TO_MEMORY_ENCODING   = // MOVEP.L Dx,d16(An)
-        InstructionEncoding.of("0000sss111001DDD","BBBBBBBB_BBBBBBBB");
+            InstructionEncoding.of("0000sss111001DDD","BBBBBBBB_BBBBBBBB");
 
     public static final InstructionEncoding MOVE_BYTE_ENCODING = InstructionEncoding.of("0001DDDMMMmmmsss");
     public static final InstructionEncoding MOVE_WORD_ENCODING = InstructionEncoding.of("0011DDDMMMmmmsss");
@@ -2274,7 +2380,7 @@ D/A   |     |   |           |
     public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv");
 
     public static final InstructionEncoding MOVE_TO_CCR_ENCODING =
-        InstructionEncoding.of("0100010011mmmsss");
+            InstructionEncoding.of("0100010011mmmsss");
 
     public static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
 
@@ -2291,7 +2397,7 @@ D/A   |     |   |           |
     public static final InstructionEncoding SCC_ENCODING = InstructionEncoding.of( "0101cccc11mmmsss");
 
     public static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss",
-        "CCCCCCCC_CCCCCCCC");
+            "CCCCCCCC_CCCCCCCC");
 
     public static final InstructionEncoding BCC_8BIT_ENCODING =
             InstructionEncoding.of(  "0110ccccCCCCCCCC");
@@ -2315,7 +2421,7 @@ D/A   |     |   |           |
 
     // TODO: 68020+ supports LONG displacement value as well
     public static final InstructionEncoding LINK_ENCODING = InstructionEncoding.of( "0100111001010sss",
-                                                                                    "VVVVVVVV_VVVVVVVV");
+            "VVVVVVVV_VVVVVVVV");
     public static final InstructionEncoding UNLINK_ENCODING = InstructionEncoding.of( "0100111001011sss");
 
     public static final InstructionEncoding RESET_ENCODING = InstructionEncoding.of( "0100111001110000");
@@ -2401,11 +2507,36 @@ D/A   |     |   |           |
     public static final InstructionEncoding NOT_ENCODING = // NOT
             InstructionEncoding.of( "01000110SSmmmsss");
 
+    // subtractions
+
+    public static final InstructionEncoding SUBA_WORD_ENCODING = // SUB.W <ea>,An
+            InstructionEncoding.of( "1001DDD011mmmsss");
+
+    public static final InstructionEncoding SUBA_LONG_ENCODING = // SUB.L <ea>,An
+            InstructionEncoding.of( "1001DDD111mmmsss");
+
+    public static final InstructionEncoding SUBQ_ENCODING = // SUBQ #xx,<ea>
+            InstructionEncoding.of( "0101vvv1SSMMMDDD");
+
+    public static final InstructionEncoding SUBI_WORD_ENCODING = // SUBI.w #xx,<ea>
+            InstructionEncoding.of( "00000100SSMMMDDD","vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding SUBI_LONG_ENCODING = // SUBI.l #xx,<ea>
+            InstructionEncoding.of( "00000100SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding SUB_DST_DATA_ENCODING = // SUB <ea>,Dn
+            InstructionEncoding.of( "1001DDD0SSmmmsss");
+
+    public static final InstructionEncoding SUB_DST_EA_ENCODING = // // SUB Dn,<ea>
+            InstructionEncoding.of( "1001sss1SSMMMDDD");
+
+    // additions
+
     public static final InstructionEncoding ADD_DST_DATA_ENCODING = // ADD <ea>,Dn
-        InstructionEncoding.of( "1101DDD0SSmmmsss");
+            InstructionEncoding.of( "1101DDD0SSmmmsss");
 
     public static final InstructionEncoding ADD_DST_EA_ENCODING = // // ADD Dn,<ea>
-        InstructionEncoding.of( "1101sss1SSMMMDDD");
+            InstructionEncoding.of( "1101sss1SSMMMDDD");
 
     public static final InstructionEncoding ADDX_DATAREG_ENCODING = // ADDX Dx,Dy
             InstructionEncoding.of( "1101DDD1SS000sss");
@@ -2417,10 +2548,10 @@ D/A   |     |   |           |
             InstructionEncoding.of( "0101vvv0SSMMMDDD");
 
     public static final InstructionEncoding ADDI_WORD_ENCODING = // ADDI.w #xx,<ea>
-        InstructionEncoding.of( "00000110SSMMMDDD","vvvvvvvv_vvvvvvvv");
+            InstructionEncoding.of( "00000110SSMMMDDD","vvvvvvvv_vvvvvvvv");
 
     public static final InstructionEncoding ADDI_LONG_ENCODING = // ADDI.l #xx,<ea>
-        InstructionEncoding.of( "00000110SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+            InstructionEncoding.of( "00000110SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
     public static final InstructionEncoding ADDA_WORD_ENCODING = // ADDA.w <ea>,An
             InstructionEncoding.of( "1101DDD011mmmsss");
@@ -2428,11 +2559,13 @@ D/A   |     |   |           |
     public static final InstructionEncoding ADDA_LONG_ENCODING = // ADDA.l <ea>,An
             InstructionEncoding.of( "1101DDD111mmmsss");
 
+    // divisions
+
     public static final InstructionEncoding DIVU_ENCODING = // MULS <ea>,Dn
-        InstructionEncoding.of( "1000DDD011mmmsss");
+            InstructionEncoding.of( "1000DDD011mmmsss");
 
     public static final InstructionEncoding DIVS_ENCODING = // MULS <ea>,Dn
-        InstructionEncoding.of( "1000DDD111mmmsss");
+            InstructionEncoding.of( "1000DDD111mmmsss");
 
     public static final InstructionEncoding MULS_ENCODING = // MULS <ea>,Dn
             InstructionEncoding.of( "1100DDD111mmmsss");
@@ -2539,6 +2672,7 @@ D/A   |     |   |           |
         put(CLR_ENCODING,CLR);
         put(TST_ENCODING,TST);
         put(TRAPV_ENCODING,TRAPV);
+        put(SWAP_ENCODING,SWAP);
         put(NOT_ENCODING,NOT);
         put(CHK_WORD_ENCODING,CHK);
         put(CHK_LONG_ENCODING,CHK);
@@ -2554,13 +2688,13 @@ D/A   |     |   |           |
         put(AND_SRC_EA_ENCODING,AND);
         put(AND_DST_EA_ENCODING,AND);
 
-        put(ORI_16_BIT_ENCODING,ORI);
-        put(ORI_32_BIT_ENCODING,ORI);
+        put(ORI_WORD_ENCODING,ORI);
+        put(ORI_LONG_ENCODING,ORI);
         put(OR_SRC_EA_ENCODING,OR);
         put(OR_DST_EA_ENCODING,OR);
 
-        put(EORI_16_BIT_ENCODING,EORI);
-        put(EORI_32_BIT_ENCODING,EORI);
+        put(EORI_WORD_ENCODING,EORI);
+        put(EORI_LONG_ENCODING,EORI);
 
         put(EOR_DST_EA_ENCODING,EOR);
         put(EORI_TO_CCR_ENCODING,EORI);
@@ -2572,6 +2706,7 @@ D/A   |     |   |           |
         put(DIVU_ENCODING,DIVU);
         put(DIVS_ENCODING,DIVS);
 
+        // additions
         put(ADDQ_ENCODING,ADDQ);
 
         put(ADDA_LONG_ENCODING,ADDA);
@@ -2585,5 +2720,47 @@ D/A   |     |   |           |
 
         put(ADD_DST_DATA_ENCODING,ADD);
         put(ADD_DST_EA_ENCODING,ADD);
+
+        // subtractions
+        put(SUBA_WORD_ENCODING,SUBA);
+        put(SUBA_LONG_ENCODING,SUBA);
+
+        put(SUBQ_ENCODING,SUBQ);
+        put(SUBI_WORD_ENCODING,SUBI);
+        put(SUBI_LONG_ENCODING,SUBI);
+
+        put(SUB_DST_DATA_ENCODING,SUB);
+        put(SUB_DST_EA_ENCODING,SUB);
+
+        // sanity check
+        for ( Instruction insn : Instruction.values() ) {
+            if ( ! values().contains(insn ) )
+            {
+                // conditional instructions are special as we operate on them in bulk
+                if ( insn.conditionalType == ConditionalInstructionType.NONE )
+                {
+                    System.err.println("****************************************************");
+                    System.err.println("Internal error, you forgot to add mappings for instruction " + insn + " to the disassembly map");
+                    System.err.println("****************************************************");
+                }
+            }
+        }
     }};
+
+    private static List<EncodingTableGenerator.IValueIterator> addressingModeRegisterGenerator(AddressingMode m1, AddressingMode...additional)
+    {
+        return Collections.singletonList( new EncodingTableGenerator.AddressingModeIterator(Field.SRC_MODE,Field.SRC_VALUE,m1,additional) );
+    }
+
+    /**
+     * Returns value iterators to be used when constructing all possible 16-bit opcodes for this instruction
+     * during emulator jump-table generation.
+     *
+     * @param fields Fields to return value iterators for
+     * @return
+     */
+    public List<EncodingTableGenerator.IValueIterator> getValueIterators(Set<Field> fields)
+    {
+        throw new RuntimeException("getValueIterator() not implemented for "+fields);
+    }
 }
