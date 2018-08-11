@@ -162,6 +162,14 @@ public class DisassemblerTest extends TestCase
         compile("addi.l #$a,$1200");
     }
 
+    public void testCmpa() {
+        compile("cmpa.w $1200,a4");
+        compile("cmpa.l $1200,a4");
+        compile("cmpa.l (a3)+,a3");
+        compile("cmpa.l (a3)+,a3");
+        compile("cmpa.w a4,a5");
+    }
+
     public void testSuba() {
        compile("suba.w $1200,a4");
        compile("suba.l $1200,a4");

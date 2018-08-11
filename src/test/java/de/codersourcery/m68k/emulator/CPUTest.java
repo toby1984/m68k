@@ -322,6 +322,64 @@ public class CPUTest extends TestCase
                 .extended();
     }
 
+    public void testCMPA()
+    {
+        final int addr = PROGRAM_START_ADDRESS + 256;
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.w #$ffff," + addr,
+            "move.l #" + addr + ",A0",
+            "lea 1,A1",
+            "cmpa.w (a0),a1")
+            .expectA1(0x00000001)
+            .notZero()
+            .carry()
+            .extended()
+            .noOverflow()
+            .notNegative()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$ffff0002,a0",
+            "move.l #$ffff0001,a1",
+            "cmpa.w a1,a0")
+            .expectA0(0xffff0002)
+            .expectA1(0xffff0001)
+            .notZero()
+            .noCarry()
+            .extended()
+            .noOverflow()
+            .negative()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.w #$0001," + addr,
+            "move.l #" + addr + ",A0",
+            "lea 2,A1",
+            "cmpa.w (a0),a1")
+            .expectA0(addr)
+            .expectA1(0x2)
+            .notZero()
+            .noCarry()
+            .extended()
+            .noOverflow()
+            .notNegative()
+            .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+            "move.l #$00000002," + addr,
+            "move.l #" + addr + ",A0",
+            "lea 1,A1",
+            "cmpa.l (a0),a1")
+            .expectA0(addr)
+            .expectA1(1)
+            .notZero()
+            .carry()
+            .extended()
+            .noOverflow()
+            .negative();
+    }
+
     public void testSUBA()
     {
         final int addr = PROGRAM_START_ADDRESS + 256;

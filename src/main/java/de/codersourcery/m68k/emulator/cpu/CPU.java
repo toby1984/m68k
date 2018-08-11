@@ -237,7 +237,8 @@ public class CPU
     public static final int FLAG_OVERFLOW = 1<<1;
     public static final int FLAG_CARRY    = 1<<0;
 
-    public static final int ALL_USERMODE_FLAGS = FLAG_EXTENDED|FLAG_NEGATIVE|FLAG_ZERO|FLAG_OVERFLOW|FLAG_CARRY;
+    public static final int ALL_USERMODE_FLAGS  = FLAG_NEGATIVE|FLAG_ZERO|FLAG_OVERFLOW|FLAG_CARRY|FLAG_EXTENDED;
+    public static final int USERMODE_FLAGS_NO_X = FLAG_NEGATIVE|FLAG_ZERO|FLAG_OVERFLOW|FLAG_CARRY;
 
     public final Memory memory;
 
@@ -873,58 +874,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( ( instruction & 0b1111111100000000) == 0b0000010000000000 )
                 {
                     // SUBI
-                    final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
-                    int srcValue;
-                    switch(operandSizeInBytes) {
-                        case 1:
-                            srcValue = (memLoadWord(pc)<<24)>>24; // sign-extend
-                            pc += 2;
-                            break;
-                        case 2:
-                            srcValue = memLoadWord(pc);
-                            pc += 2;
-                            break;
-                        case 4:
-                            srcValue = memLoadLong(pc);
-                            pc += 4;
-                            break;
-                        default:
-                            throw new RuntimeException("Unreachable code reached");
-                    }
-                    final int eaMode = (instruction & 0b111000) >> 3;
-                    final int eaRegister = instruction & 0b111;
-
-                    if ( decodeSourceOperand(instruction,operandSizeInBytes,false,false) ) {
-                        // register operand
-                        switch(operandSizeInBytes) {
-                            case 1:
-                            case 2:
-                                cycles+=8;
-                                break;
-                            case 4:
-                                cycles += 12;
-                                break;
-                        }
-                    } else {
-                        // memory operand
-                        switch(operandSizeInBytes) {
-                            case 1:
-                            case 2:
-                                cycles+=16;
-                                break;
-                            case 4:
-                                cycles += 20;
-                                break;
-                        }
-                    }
-
-                    final int dstValue = value;
-
-                    value -= srcValue;
-
-                    storeValue(eaMode, eaRegister, operandSizeInBytes);
-
-                    updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
+                    subi(instruction);
                     return;
                 }
 
@@ -1714,68 +1664,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( (instruction & 0b1111000100000000) == 0b1001000000000000 ||
                      (instruction & 0b1111000100000000) == 0b1001000100000000)
                 {
-                    // SUB <ea>,Dx
-                    // SUB Dx,<ea>
-                    int sizeBits = (instruction & 0b11000000) >> 6;
-                    int regNum = (instruction&0b111000000000)>>9;
-
-                    final int srcValue;
-                    final int dstValue;
-                    final boolean dstIsEa = (instruction & 1<<8) != 0;
-                    if (dstIsEa)
-                    {
-                        // Dn + <ea> -> <ea>
-                        switch(sizeBits)
-                        {
-                            case 0b00:
-                                srcValue = (dataRegisters[regNum]<<24)>>24;
-                                cycles += 8;
-                                break;
-                            case 0b01:
-                                srcValue = (dataRegisters[regNum]<<16)>>16;
-                                cycles += 8;
-                                break;
-                            case 0b10:
-                                srcValue = dataRegisters[regNum];
-                                cycles += 12;
-                                break;
-                            default:
-                                throw new RuntimeException("Unreachable code reached");
-                        }
-                        decodeSourceOperand(instruction,1<<sizeBits,false,false);
-                        dstValue = value;
-                    }
-                    else
-                    {
-                        // <ea> + Dn -> Dn
-                        decodeSourceOperand(instruction,1<<sizeBits,false);
-                        srcValue = value;
-                        switch(sizeBits)
-                        {
-                            case 0b00:
-                                dstValue = (dataRegisters[regNum]<<24)>>24;
-                                cycles += 4;
-                                break;
-                            case 0b01:
-                                dstValue = (dataRegisters[regNum]<<16)>>16;
-                                cycles += 4;
-                                break;
-                            case 0b10:
-                                dstValue = dataRegisters[regNum];
-                                cycles += 6;
-                                break;
-                            default:
-                                throw new RuntimeException("Unreachable code reached");
-                        }
-                    }
-                    final int result = dstValue - srcValue;
-                    value = result;
-                    updateFlags(srcValue, dstValue, value, 1<<sizeBits, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
-                    if ( dstIsEa ) {
-                        storeValue((instruction&0b111000)>>3,instruction&0b111,1<<sizeBits);
-                    } else {
-                        dataRegisters[regNum] = mergeValue(dataRegisters[regNum], result,1<<sizeBits);
-                    }
+                    sub(instruction);
                     return;
                 }
                 break;
@@ -1790,6 +1679,22 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              * ================================
              */
             case 0b1011_0000_0000_0000:
+
+                if ( (instruction & 0b1111000111000000) == 0b1011000111000000 ||
+                     (instruction & 0b1111000111000000) == 0b1011000011000000)
+                {
+                    // CMPA_WORD_ENCODING / CMPA_LONG_ENCODING
+                    final int dstReg = (instruction & 0b111000000000) >> 9;
+                    final boolean isWordOp = (instruction & 0b100000000) == 0;
+                    final int sizeInBytes = isWordOp ? 2 : 4;
+                    decodeSourceOperand(instruction,sizeInBytes,false);
+                    final int src = value;
+                    final int dst = addressRegisters[dstReg];
+                    final int result = dst - src;
+                    updateFlags(src,dst,result,4,CCOperation.SUBTRACTION,USERMODE_FLAGS_NO_X);
+                    cycles += 6;
+                    return;
+                }
 
                 if ( ( instruction & 0b1111000100000000 ) == 0b1011000100000000 ) {
                     // EOR_DST_EA_ENCODING
@@ -3737,5 +3642,153 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         }
 
         statusRegister = (statusRegister & clearMask) | setMask;
+    }
+
+    private void sub(int instruction) {
+        sub(instruction,true);
+    }
+
+    private void cmp(int instruction) {
+        sub(instruction,false);
+    }
+
+    private void sub(int instruction,boolean storeResult)
+    {
+        // SUB <ea>,Dx
+        // SUB Dx,<ea>
+        int sizeBits = (instruction & 0b11000000) >> 6;
+        int regNum = (instruction&0b111000000000)>>9;
+
+        final int srcValue;
+        final int dstValue;
+        final boolean dstIsEa = (instruction & 1<<8) != 0;
+        if (dstIsEa)
+        {
+            // Dn + <ea> -> <ea>
+            switch(sizeBits)
+            {
+                case 0b00:
+                    srcValue = (dataRegisters[regNum]<<24)>>24;
+                    cycles += 8;
+                    break;
+                case 0b01:
+                    srcValue = (dataRegisters[regNum]<<16)>>16;
+                    cycles += 8;
+                    break;
+                case 0b10:
+                    srcValue = dataRegisters[regNum];
+                    cycles += 12;
+                    break;
+                default:
+                    throw new RuntimeException("Unreachable code reached");
+            }
+            decodeSourceOperand(instruction,1<<sizeBits,false,false);
+            dstValue = value;
+        }
+        else
+        {
+            // <ea> + Dn -> Dn
+            decodeSourceOperand(instruction,1<<sizeBits,false);
+            srcValue = value;
+            switch(sizeBits)
+            {
+                case 0b00:
+                    dstValue = (dataRegisters[regNum]<<24)>>24;
+                    cycles += 4;
+                    break;
+                case 0b01:
+                    dstValue = (dataRegisters[regNum]<<16)>>16;
+                    cycles += 4;
+                    break;
+                case 0b10:
+                    dstValue = dataRegisters[regNum];
+                    cycles += 6;
+                    break;
+                default:
+                    throw new RuntimeException("Unreachable code reached");
+            }
+        }
+        final int result = dstValue - srcValue;
+        value = result;
+        updateFlags(srcValue, dstValue, value, 1<<sizeBits, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
+        if ( storeResult )
+        {
+            if (dstIsEa)
+            {
+                storeValue((instruction & 0b111000) >> 3, instruction & 0b111, 1 << sizeBits);
+            }
+            else
+            {
+                dataRegisters[regNum] = mergeValue(dataRegisters[regNum], result, 1 << sizeBits);
+            }
+        }
+    }
+
+    private void subi(int instruction) {
+        subi(instruction,true);
+    }
+
+    private void cmpi(int instruction) {
+        subi(instruction,false);
+    }
+
+    private void subi(int instruction,boolean storeResult)
+    {
+        // SUBI
+        final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
+        int srcValue;
+        switch(operandSizeInBytes) {
+            case 1:
+                srcValue = (memLoadWord(pc)<<24)>>24; // sign-extend
+                pc += 2;
+                break;
+            case 2:
+                srcValue = memLoadWord(pc);
+                pc += 2;
+                break;
+            case 4:
+                srcValue = memLoadLong(pc);
+                pc += 4;
+                break;
+            default:
+                throw new RuntimeException("Unreachable code reached");
+        }
+        final int eaMode = (instruction & 0b111000) >> 3;
+        final int eaRegister = instruction & 0b111;
+
+        if ( decodeSourceOperand(instruction,operandSizeInBytes,false,false) ) {
+            // register operand
+            switch(operandSizeInBytes) {
+                case 1:
+                case 2:
+                    cycles+=8;
+                    break;
+                case 4:
+                    cycles += 12;
+                    break;
+            }
+        } else {
+            // memory operand
+            switch(operandSizeInBytes) {
+                case 1:
+                case 2:
+                    cycles+=16;
+                    break;
+                case 4:
+                    cycles += 20;
+                    break;
+            }
+        }
+
+        final int dstValue = value;
+
+        value -= srcValue;
+
+        if ( storeResult )
+        {
+            storeValue(eaMode, eaRegister, operandSizeInBytes);
+        }
+
+        updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
     }
 }

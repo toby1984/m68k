@@ -424,6 +424,15 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("add.l d2,d3   "),0xd6,0x82);
     }
 
+    public void testCmpa() {
+
+        assertArrayEquals(compile("cmpa.w $1200,a4") ,0xb8,0xf8,0x12,0x00);
+        assertArrayEquals(compile("cmpa.l $1200,a4") ,0xb9,0xf8,0x12,0x00);
+        assertArrayEquals(compile("cmpa.l (a3)+,a3 "),0xb7,0xdb);
+        assertArrayEquals(compile("cmpa.l (a3)+,a3 "),0xb7,0xdb);
+        assertArrayEquals(compile("cmpa.w a4,a5 ")   ,0xba,0xcc);
+    }
+
     public void testSuba() {
 
         assertArrayEquals(compile("suba.w $1200,a4"),0x98,0xf8,0x12,0x00);

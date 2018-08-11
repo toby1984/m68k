@@ -111,6 +111,19 @@ public enum Instruction
                     }
                 }
             },
+    CMPA("CMPA",2)
+        {
+            @Override public boolean supportsExplicitOperandSize() { return true; }
+
+            @Override
+            public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+            {
+                Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_DIRECT);
+                if( node.hasOperandSize(OperandSize.BYTE ) ) {
+                    throw new RuntimeException("CMPA only supports .w or .l");
+                }
+            }
+        },
     SUBA("SUBA",2)
             {
                 @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -1261,6 +1274,14 @@ public enum Instruction
                     return ADDI_WORD_ENCODING.append(extraInsnWords);
                 }
                 return ADDI_LONG_ENCODING.append(extraInsnWords);
+            case CMPA:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                if ( insn.hasOperandSize(OperandSize.WORD) )
+                {
+                    return CMPA_WORD_ENCODING.append(extraInsnWords);
+                }
+                return CMPA_LONG_ENCODING.append(extraInsnWords);
             case SUBA:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
@@ -2507,6 +2528,14 @@ D/A   |     |   |           |
     public static final InstructionEncoding NOT_ENCODING = // NOT
             InstructionEncoding.of( "01000110SSmmmsss");
 
+    // comparisons
+
+    public static final InstructionEncoding CMPA_WORD_ENCODING = // CMPA.W <ea>,An
+        InstructionEncoding.of( "1011DDD011mmmsss");
+
+    public static final InstructionEncoding CMPA_LONG_ENCODING = // CMPA.W <ea>,An
+        InstructionEncoding.of( "1011DDD111mmmsss");
+
     // subtractions
 
     public static final InstructionEncoding SUBA_WORD_ENCODING = // SUB.W <ea>,An
@@ -2720,6 +2749,10 @@ D/A   |     |   |           |
 
         put(ADD_DST_DATA_ENCODING,ADD);
         put(ADD_DST_EA_ENCODING,ADD);
+
+        // comparisons
+        put(CMPA_WORD_ENCODING,CMPA);
+        put(CMPA_LONG_ENCODING,CMPA);
 
         // subtractions
         put(SUBA_WORD_ENCODING,SUBA);

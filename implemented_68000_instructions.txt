@@ -20,7 +20,7 @@
 [X] CHK
 [X] CLR
 [ ] CMP
-[ ] CMPA
+[X] CMPA
 [ ] CMPI
 [ ] CMPM
 [X] DBcc

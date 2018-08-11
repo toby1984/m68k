@@ -649,6 +649,17 @@ public class Disassembler
                 append("#").appendHex(value).append(",");
                 decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
+            case CMPA:
+                appendln("cmpa");
+                if ((insnWord&1<<8) == 0 ) {
+                    append(".w ");
+                } else {
+                    append(".l ");
+                }
+                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
+                regNum = (insnWord&0b111000000000) >> 9;
+                append(",").appendAddressRegister(regNum);
+                return;
             case SUBA:
                 appendln("suba");
                 if ((insnWord&1<<8) == 0 ) {
