@@ -95,6 +95,22 @@ public enum Instruction
                     }
                 }
             },
+    CMPI("CMPI",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
+            Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE );
+            if ( node.destination().hasAddressingMode(ADDRESS_REGISTER_DIRECT) &&
+                    node.destination().getValue().isAddressRegister() )
+            {
+                throw new RuntimeException("Cannot use CMPI for address registers");
+            }
+        }
+    },
     ADDI("ADDI",2)
             {
                 @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -1258,6 +1274,14 @@ public enum Instruction
                     return ADDX_DATAREG_ENCODING;
                 }
                 return ADDX_ADDRREG_ENCODING;
+            case CMPI:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                if ( ! insn.hasOperandSize(OperandSize.LONG) )
+                {
+                    return CMPI_WORD_ENCODING.append(extraInsnWords);
+                }
+                return CMPI_LONG_ENCODING.append(extraInsnWords);
             case SUBI:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
@@ -2536,6 +2560,12 @@ D/A   |     |   |           |
     public static final InstructionEncoding CMPA_LONG_ENCODING = // CMPA.W <ea>,An
         InstructionEncoding.of( "1011DDD111mmmsss");
 
+    public static final InstructionEncoding CMPI_WORD_ENCODING = // CMPI.w #xx,<ea>
+            InstructionEncoding.of( "00001100SSMMMDDD","vvvvvvvv_vvvvvvvv");
+
+    public static final InstructionEncoding CMPI_LONG_ENCODING = // CMPI.l #xx,<ea>
+            InstructionEncoding.of( "00001100SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+
     // subtractions
 
     public static final InstructionEncoding SUBA_WORD_ENCODING = // SUB.W <ea>,An
@@ -2753,6 +2783,8 @@ D/A   |     |   |           |
         // comparisons
         put(CMPA_WORD_ENCODING,CMPA);
         put(CMPA_LONG_ENCODING,CMPA);
+        put(CMPI_LONG_ENCODING,CMPI);
+        put(CMPI_WORD_ENCODING,CMPI);
 
         // subtractions
         put(SUBA_WORD_ENCODING,SUBA);

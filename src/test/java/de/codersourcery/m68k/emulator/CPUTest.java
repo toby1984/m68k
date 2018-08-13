@@ -111,6 +111,42 @@ public class CPUTest extends TestCase
                 .notSupervisor().noIrqActive();
     }
 
+    public void testCmpi()
+    {
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$0,d0",
+                "cmpi.b #$1,d0")
+                .expectD0( 0x0)
+                .notZero()
+                .carry()
+                .extended()
+                .noOverflow()
+                .negative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$0,d0",
+                "cmpi.b #$0,d0")
+                .expectD0( 0x0)
+                .zero()
+                .noCarry()
+                .extended()
+                .noOverflow()
+                .notNegative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$1,d0",
+                "cmpi.b #$0,d0")
+                .expectD0( 0x01)
+                .notZero()
+                .noCarry()
+                .extended()
+                .noOverflow()
+                .notNegative()
+                .notSupervisor().noIrqActive();
+    }
+
     public void testSUBI()
     {
         execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),

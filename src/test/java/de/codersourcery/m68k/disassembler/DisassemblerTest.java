@@ -150,6 +150,12 @@ public class DisassemblerTest extends TestCase
         compile("swap.w d3");
     }
 
+    public void testCmpi() {
+        compile("cmpi.b #$a,$1200");
+        compile("cmpi.w #$a,$1200");
+        compile("cmpi.l #$a,$1200");
+    }
+
     public void testSubi() {
         compile("subi.b #$a,$1200");
         compile("subi.w #$a,$1200");

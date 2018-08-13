@@ -606,11 +606,32 @@ public class Disassembler
                     append("-(").appendAddressRegister( dstReg ).append(")");
                 }
                 return;
+            case CMPI:
+                appendln("cmpi");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                appendOperandSize(sizeBits);
+                int value;
+                switch(sizeBits)
+                {
+                    case 0b00:
+                        value = readWord()&0xff;
+                        break;
+                    case 0b01:
+                        value = readWord()&0xffff;
+                        break;
+                    case 0b10:
+                        value = readLong();
+                        break;
+                    default:
+                        throw new RuntimeException("Invalid size");
+                }
+                append("#").appendHex(value).append(",");
+                decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
+                return;
             case SUBI:
                 appendln("subi");
                 sizeBits = (insnWord & 0b11000000) >> 6;
                 appendOperandSize(sizeBits);
-                int value;
                 switch(sizeBits)
                 {
                     case 0b00:

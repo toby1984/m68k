@@ -21,7 +21,7 @@
 [X] CLR
 [ ] CMP
 [X] CMPA
-[ ] CMPI
+[X] CMPI
 [ ] CMPM
 [X] DBcc
 [X] DIVS

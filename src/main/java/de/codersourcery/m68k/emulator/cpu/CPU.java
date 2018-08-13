@@ -871,6 +871,12 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     return;
                 }
 
+                if ( ( instruction & 0b1111111100000000 ) == 0b0000110000000000 ) {
+                    // CMPI
+                    subi(instruction,true);
+                    return;
+                }
+
                 if ( ( instruction & 0b1111111100000000) == 0b0000010000000000 )
                 {
                     // SUBI
@@ -3645,14 +3651,14 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void sub(int instruction) {
-        sub(instruction,true);
-    }
-
-    private void cmp(int instruction) {
         sub(instruction,false);
     }
 
-    private void sub(int instruction,boolean storeResult)
+    private void cmp(int instruction) {
+        sub(instruction,true);
+    }
+
+    private void sub(int instruction,boolean isCompareInsn)
     {
         // SUB <ea>,Dx
         // SUB Dx,<ea>
@@ -3710,9 +3716,14 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         }
         final int result = dstValue - srcValue;
         value = result;
-        updateFlags(srcValue, dstValue, value, 1<<sizeBits, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
-        if ( storeResult )
+
+        if ( isCompareInsn )
         {
+            updateFlags(srcValue, dstValue, value, 1<<sizeBits, CCOperation.SUBTRACTION, CPU.USERMODE_FLAGS_NO_X);
+        }
+        else
+        {
+            updateFlags(srcValue, dstValue, value, 1<<sizeBits, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
             if (dstIsEa)
             {
                 storeValue((instruction & 0b111000) >> 3, instruction & 0b111, 1 << sizeBits);
@@ -3725,14 +3736,14 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void subi(int instruction) {
-        subi(instruction,true);
-    }
-
-    private void cmpi(int instruction) {
         subi(instruction,false);
     }
 
-    private void subi(int instruction,boolean storeResult)
+    private void cmpi(int instruction) {
+        subi(instruction,true);
+    }
+
+    private void subi(int instruction,boolean isCompareInsn)
     {
         // SUBI
         final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
@@ -3784,11 +3795,15 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
 
         value -= srcValue;
 
-        if ( storeResult )
+        if ( isCompareInsn )
+        {
+            updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.SUBTRACTION, CPU.USERMODE_FLAGS_NO_X);
+        }
+        else
         {
             storeValue(eaMode, eaRegister, operandSizeInBytes);
+            updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
         }
 
-        updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
     }
 }
