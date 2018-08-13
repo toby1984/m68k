@@ -147,6 +147,10 @@ public class CPUTest extends TestCase
                 .notSupervisor().noIrqActive();
     }
 
+    public void testCMPM() {
+        fail("Implement me");
+    }
+
     public void testSUBI()
     {
         execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),

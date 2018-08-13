@@ -606,6 +606,16 @@ public class Disassembler
                     append("-(").appendAddressRegister( dstReg ).append(")");
                 }
                 return;
+            case CMPM:
+                appendln("cmpm");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                appendOperandSize(sizeBits);
+                append("(");
+                appendAddressRegister( (insnWord&0b111) );
+                append(")+,(");
+                appendAddressRegister( (insnWord&0b111000000000)>>9 );
+                append(")+");
+                return;
             case CMPI:
                 appendln("cmpi");
                 sizeBits = (insnWord & 0b11000000) >> 6;

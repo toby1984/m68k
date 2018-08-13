@@ -1686,6 +1686,37 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
              */
             case 0b1011_0000_0000_0000:
 
+                if ( ( instruction & 0b1111000100111000 ) == 0b1011000100001000 ) {
+                    // CMPM_ENCODING
+                    final int srcRegNum = (instruction & 0b000000000111);
+                    final int dstRegNum = (instruction & 0b111000000000)>>9;
+                    final int sizeBits = (instruction&0b11000000)>>6;
+                    final int sizeInBytes = 1<<sizeBits;
+                    final int srcValue;
+                    final int dstValue;
+                    switch( sizeInBytes ) {
+                        case 1:
+                            srcValue = memory.readByte(addressRegisters[srcRegNum]);
+                            dstValue = memory.readByte(addressRegisters[dstRegNum]);
+                            break;
+                        case 2:
+                            srcValue = memory.readWord(addressRegisters[srcRegNum]);
+                            dstValue = memory.readWord(addressRegisters[dstRegNum]);
+                            break;
+                        case 4:
+                            srcValue = memory.readWord(addressRegisters[srcRegNum]);
+                            dstValue = memory.readWord(addressRegisters[dstRegNum]);
+                            break;
+                        default:
+                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction );
+                    }
+                    addressRegisters[srcRegNum] += sizeInBytes;
+                    addressRegisters[dstRegNum] += sizeInBytes;
+                    int result = dstValue - srcValue;
+                    updateFlags( srcValue, dstValue,result,sizeInBytes,CCOperation.SUBTRACTION,CPU.USERMODE_FLAGS_NO_X );
+                    return;
+                }
+
                 if ( (instruction & 0b1111000111000000) == 0b1011000111000000 ||
                      (instruction & 0b1111000111000000) == 0b1011000011000000)
                 {

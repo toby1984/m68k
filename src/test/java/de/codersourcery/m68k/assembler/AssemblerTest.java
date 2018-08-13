@@ -448,6 +448,12 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("adda.l (a3)+,a3 "),0xd7,0xdb);
     }
 
+    public void testCmpm() {
+        assertArrayEquals(compile("cmpm.b (a3)+,(a4)+"),0xb9,0x0b);
+        assertArrayEquals(compile("cmpm.w (a3)+,(a4)+"),0xb9,0x4b);
+        assertArrayEquals(compile("cmpm.l (a3)+,(a4)+"),0xb9,0x8b);
+    }
+
     public void testCmpi()
     {
         assertArrayEquals(compile("cmpi.b #10,$1200"),0x0c,0x38,0x00,0x0a,0x12,0x00);

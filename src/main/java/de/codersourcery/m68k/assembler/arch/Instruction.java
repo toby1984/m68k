@@ -31,6 +31,17 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    CMPM("CMPM",2)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkSourceAddressingMode( node,AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT );
+            Instruction.checkDestinationAddressingMode( node,AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT );
+        }
+    },
     SUB("SUB",2)
             {
                 @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -1274,6 +1285,9 @@ public enum Instruction
                     return ADDX_DATAREG_ENCODING;
                 }
                 return ADDX_ADDRREG_ENCODING;
+            case CMPM:
+                insn.setImplicitOperandSize( OperandSize.WORD );
+                return CMPM_ENCODING;
             case CMPI:
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
@@ -2566,6 +2580,9 @@ D/A   |     |   |           |
     public static final InstructionEncoding CMPI_LONG_ENCODING = // CMPI.l #xx,<ea>
             InstructionEncoding.of( "00001100SSMMMDDD","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
+    public static final InstructionEncoding CMPM_ENCODING = // CMPM (Ay)+,(Ax)+
+            InstructionEncoding.of( "1011DDD1SS001sss");
+
     // subtractions
 
     public static final InstructionEncoding SUBA_WORD_ENCODING = // SUB.W <ea>,An
@@ -2785,6 +2802,7 @@ D/A   |     |   |           |
         put(CMPA_LONG_ENCODING,CMPA);
         put(CMPI_LONG_ENCODING,CMPI);
         put(CMPI_WORD_ENCODING,CMPI);
+        put(CMPM_ENCODING,CMPM);
 
         // subtractions
         put(SUBA_WORD_ENCODING,SUBA);

@@ -22,7 +22,7 @@
 [ ] CMP
 [X] CMPA
 [X] CMPI
-[ ] CMPM
+[X] CMPM
 [X] DBcc
 [X] DIVS
 [X] DIVU
