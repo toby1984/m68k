@@ -1,6 +1,5 @@
 package de.codersourcery.m68k.emulator;
 
-import de.codersourcery.m68k.Memory;
 import de.codersourcery.m68k.assembler.Assembler;
 import de.codersourcery.m68k.assembler.CompilationMessages;
 import de.codersourcery.m68k.assembler.CompilationUnit;
@@ -34,6 +33,7 @@ public class CPUTest extends TestCase
     // program start address in memory (in bytes)
     public static final int PROGRAM_START_ADDRESS = 4096;
 
+    private MMU mmu;
     private Memory memory;
     private CPU cpu;
     private CompilationUnit compilationUnit;
@@ -42,7 +42,8 @@ public class CPUTest extends TestCase
     protected void setUp() throws Exception
     {
         super.setUp();
-        memory = new Memory(MEM_SIZE);
+        mmu = new MMU( new MMU.PageFaultHandler() );
+        memory = new Memory(mmu);
         cpu = new CPU(CPUType.BEST,memory);
     }
 
@@ -3151,6 +3152,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         final String program = lines.stream().collect(Collectors.joining("\n"));
         final byte[] executable = compile("ORG "+PROGRAM_START_ADDRESS+"\n"+program);
         System.out.println( Memory.hexdump(PROGRAM_START_ADDRESS,executable,0,executable.length) );
+
         memory.writeBytes(PROGRAM_START_ADDRESS,executable );
 
         cpu.reset();
@@ -3165,6 +3167,16 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             cpu.executeOneInstruction();
         }
         return new ExpectionBuilder();
+    }
+
+    private void assertEquals(byte[] expected,int startAddress)
+    {
+        for ( int len = expected.length,idx =0 ; len > 0 ; len--,idx++) {
+            byte actual = memory.readByte(  startAddress+idx );
+            if ( actual != expected[idx] ) {
+                fail("Byte mismatch at "+Misc.hex(startAddress+idx));
+            }
+        }
     }
 
     private byte[] compile(String program)

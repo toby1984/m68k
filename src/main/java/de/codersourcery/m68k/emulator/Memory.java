@@ -1,27 +1,18 @@
-package de.codersourcery.m68k;
+package de.codersourcery.m68k.emulator;
 
 import de.codersourcery.m68k.emulator.cpu.BadAlignmentException;
+import de.codersourcery.m68k.emulator.cpu.MemoryPage;
 import de.codersourcery.m68k.emulator.cpu.MemoryAccessException;
 import de.codersourcery.m68k.emulator.cpu.MemoryWriteProtectedException;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.core.config.plugins.convert.HexConverter;
-
-import java.util.Arrays;
 
 public class Memory {
 
     private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
 
-    private static final int PAGE_SIZE_IN_BYTES = 4096;
-    private static final int PAGE_SIZE_LEFT_SHIFT = 12;
-
     private static final HexConverter HEX_CONVERTER = new HexConverter();
     private static final HexConverter BIN_CONVERTER = new BinConverter();
-
-    public static final byte FLAG_WRITE_PROTECTED = 1<<0;
-
-    private final byte[] pageFlags;
 
     private static class HexConverter
     {
@@ -64,157 +55,116 @@ public class Memory {
         }
     }
 
-    private final byte[] data;
+    private final MMU mmu;
 
-    public Memory(int sizeInBytes)
+    public Memory(MMU mmu)
     {
-        this.data = new byte[ sizeInBytes ];
-        this.pageFlags = new byte[1+sizeInBytes/PAGE_SIZE_IN_BYTES];
+        this.mmu = mmu;
     }
 
     public void bulkWrite(int startAddress,byte[] data,int offset,int count)
     {
-        System.arraycopy(data,offset,this.data,startAddress,count);
-    }
+        final int firstPage = mmu.getPageNo( startAddress );
+        final int startOffset = mmu.getOffsetInPage( startAddress );
 
-    public void setWriteProtection(int startaddress,int count,boolean onOff)
-    {
-        if ( onOff )
+        for ( int offsetInPage = startOffset, srcOffset = offset, currentPage = firstPage ; count > 0 ; )
         {
-            setPageFlags(startaddress, count, FLAG_WRITE_PROTECTED );
-        } else {
-            clearPageFlags(startaddress, count, FLAG_WRITE_PROTECTED );
+            final MemoryPage page = mmu.getPage( currentPage );
+            if ( ! page.isWriteable() ) {
+                final int pageStart = mmu.getPageStartAddress( currentPage );
+                throw new MemoryWriteProtectedException( "Memory at "+Misc.hex(pageStart)+" is not writeable", MemoryAccessException.Operation.WRITE_BYTE,pageStart);
+            }
+            currentPage++;
+            for ( ; count > 0 && offsetInPage <= 4095 ; count--) {
+                page.writeByte( offsetInPage++, data[srcOffset++]);
+            }
+            offsetInPage = 0;
         }
-    }
-
-    public void setPageFlags(int startaddress,int count,byte flags)
-    {
-        int firstPage = getPageNo(startaddress );
-        int lastPage = getPageNo(startaddress+count);
-        for ( int pageNo = firstPage ; pageNo <= lastPage ; pageNo++) {
-            pageFlags[pageNo] |= flags;
-        }
-    }
-
-    public void clearPageFlags(int startaddress,int count,byte flags)
-    {
-        final byte negated = (byte) ~flags;
-        int firstPage = getPageNo(startaddress );
-        int lastPage = getPageNo(startaddress+count);
-        for ( int pageNo = firstPage ; pageNo <= lastPage ; pageNo++) {
-            pageFlags[pageNo] &= negated;
-        }
-    }
-
-    public int getPageNo(int address)
-    {
-        return (address >> PAGE_SIZE_LEFT_SHIFT);
-    }
-
-    private boolean isPageWriteable(int pageNo)
-    {
-        return (pageFlags[ pageNo ] & FLAG_WRITE_PROTECTED) == 0;
-    }
-
-    public boolean isByteWriteable(int address) {
-
-        return isPageWriteable(getPageNo(address));
-    }
-
-    private void assertByteWritable(int address) {
-        if ( ! isByteWriteable(address ) ) {
-            throw new MemoryWriteProtectedException("Cannot write to write-protected memory at "+Misc.hex(address), MemoryAccessException.Operation.WRITE_BYTE,address);
-        }
-    }
-
-    private void assertWordWritable(int address) {
-        if ( ! isWordWriteable(address) ) {
-            throw new MemoryWriteProtectedException("Cannot write to write-protected memory at "+Misc.hex(address), MemoryAccessException.Operation.WRITE_WORD,address);
-        }
-    }
-
-    private void assertLongWritable(int address) {
-        if ( ! isLongWriteable(address) ) {
-            throw new MemoryWriteProtectedException("Cannot write to write-protected memory at "+Misc.hex(address), MemoryAccessException.Operation.WRITE_LONG,address);
-        }
-    }
-
-    public boolean isWordWriteable(int address)
-    {
-        int p0 = getPageNo(address);
-        int p1 = getPageNo(address+1);
-        return (p0==p1) ? isPageWriteable(p0) : isPageWriteable(p0) && isPageWriteable(p1);
-    }
-
-    public boolean isLongWriteable(int address)
-    {
-        int p0 = getPageNo(address);
-        int p1 = getPageNo(address+4);
-        return (p0==p1) ? isPageWriteable(p0) : isPageWriteable(p0) && isPageWriteable(p1);
-    }
-
-    /**
-     * Returns this memory's end address (exclusive).
-     *
-     * @return
-     */
-    public int getEndAddress() {
-        return data.length;
-    }
-
-    public void reset() {
-        Arrays.fill(pageFlags,(byte) 0);
-        Arrays.fill(data,(byte) 0);
     }
 
     public short readWord(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits when assigned to int later on
     {
         assertReadWordAligned(address);
-        int hi = data[address];
-        int lo = data[address+1];
-        return (short) (hi<<8|(lo & 0xff));
+        return readWordNoCheck(address);
     }
 
     public short readWordNoCheck(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits when assigned to int later on
     {
-        int hi = data[address];
-        int lo = data[address+1];
+        final int p0 = mmu.getPageNo( address );
+        final MemoryPage page = mmu.getPage( p0 );
+        final int offset = mmu.getOffsetInPage( address );
+        int hi = page.readByte(offset);
+        int lo;
+        if ( (offset+1) < 4096  ) {
+            lo = page.readByte(offset+1);
+        } else {
+            lo = mmu.getPage( p0+1 ).readByte(0);
+        }
         return (short) (hi<<8|(lo & 0xff));
     }
 
     public void writeWord(int address,int value)
     {
         assertWriteWordAligned(address);
-        assertWordWritable(address);
-        data[address] = (byte) (value>>8);
-        data[address+1] = (byte) value;
+        writeWordNoCheck(address,value);
+    }
+
+    private void checkPageWriteable(MemoryPage page, int pageNo)
+    {
+        if ( ! page.isWriteable() ) {
+            final int pageStart = mmu.getPageStartAddress( pageNo );
+            throw new MemoryWriteProtectedException( "Memory at "+Misc.hex(pageStart)+" is not writeable", MemoryAccessException.Operation.WRITE_BYTE,pageStart);
+        }
     }
 
     private void writeWordNoCheck(int address,int value)
     {
-        data[address] = (byte) (value>>8);
-        data[address+1] = (byte) value;
+        int p0 = mmu.getPageNo( address );
+        MemoryPage page = mmu.getPage( p0 );
+        checkPageWriteable(page,p0);
+        final int offset = mmu.getOffsetInPage( address );
+        page.writeByte(offset,value>>8); // hi
+        if ( (offset+1) < 4096  ) {
+            page.writeByte(offset+1,value); // lo
+        } else {
+            p0++;
+            page = mmu.getPage( p0 );
+            checkPageWriteable(page,p0);
+            page.writeByte(0,value); // lo
+        }
     }
 
     public byte readByte(int address) // return type NEEDS to be byte, used for implicit sign extension 8 bits -> 32 bits when assigned to int later on
     {
-        return data[address];
+        final int pageNo = mmu.getPageNo( address );
+        final int offset = mmu.getOffsetInPage( address );
+        return mmu.getPage( pageNo ).readByte( offset );
     }
 
     public void writeByte(int address,int value)
     {
-        assertByteWritable(address);
-        data[address] = (byte) value;
+        final int offset = mmu.getOffsetInPage( address );
+        final int pageNo = mmu.getPageNo( address );
+        final MemoryPage page = mmu.getPage( pageNo );
+        checkPageWriteable( page, pageNo );
+        page.writeByte( offset, value);
     }
 
     public void writeBytes(int address,byte[] data)
     {
-        for ( int current = address, end = current + data.length ; current < end ; current += PAGE_SIZE_IN_BYTES ) {
-            assertByteWritable(current);
-        }
-
-        for ( int i = 0,len=data.length,ptr = address ; i < len ; i++,ptr++ ) {
-            this.data[ptr] = data[i];
+        int pageNo = mmu.getPageNo( address );
+        int offset = mmu.getOffsetInPage( address );
+        int count = data.length;
+        int srcIdx = 0;
+        while ( count > 0 ) {
+            final MemoryPage page = mmu.getPage( pageNo );
+            checkPageWriteable( page, pageNo );
+            while ( count > 0 && offset < 4096 ) {
+                page.writeByte( offset++, data[srcIdx++] );
+                count--;
+            }
+            offset = 0;
+            pageNo++;
         }
     }
 
@@ -228,15 +178,12 @@ public class Memory {
     public int readLong(int address)
     {
         assertReadLongAligned(address);
-        int hi = readWordNoCheck(address);
-        int lo = readWordNoCheck(address+2);
-        return (hi << 16) | (lo & 0xffff);
+        return readLongNoCheck(address);
     }
 
     public void writeLong(int address,int value)
     {
         assertWriteLongAligned(address);
-        assertLongWritable(address);
         writeWordNoCheck(address,value>>16);
         writeWordNoCheck(address+2,value);
     }
@@ -260,7 +207,6 @@ public class Memory {
 
     private static String dump(int startAddress, byte[] data, int offset, int count, HexConverter converter)
     {
-
         final StringBuilder result = new StringBuilder();
         final StringBuilder ascii = new StringBuilder();
         while ( count > 0 )
@@ -284,7 +230,7 @@ public class Memory {
                   result.append(' ');
                 }
             }
-            result.append(" ").append( ascii );
+            result.append(" ").append( ascii ).append("\n");
         }
         return result.toString();
     }
@@ -315,14 +261,5 @@ public class Memory {
         if ( (address & 1 ) != 0 ) {
             throw new BadAlignmentException(MemoryAccessException.Operation.WRITE_LONG,address);
         }
-    }
-
-    public int getPageSize() {
-        return PAGE_SIZE_IN_BYTES;
-    }
-
-    public int getMaxPageNo()
-    {
-        return data.length / PAGE_SIZE_IN_BYTES;
     }
 }

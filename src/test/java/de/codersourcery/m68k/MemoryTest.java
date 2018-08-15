@@ -1,18 +1,90 @@
 package de.codersourcery.m68k;
 
+import de.codersourcery.m68k.emulator.MMU;
+import de.codersourcery.m68k.emulator.Memory;
 import de.codersourcery.m68k.emulator.cpu.BadAlignmentException;
-import de.codersourcery.m68k.emulator.cpu.MemoryAccessException;
+import de.codersourcery.m68k.emulator.cpu.MemoryWriteProtectedException;
+import de.codersourcery.m68k.emulator.cpu.RAMPage;
 import junit.framework.TestCase;
+
+import java.util.Random;
 
 public class MemoryTest extends TestCase
 {
+    private MMU mmu;
     private Memory memory;
 
     @Override
     protected void setUp() throws Exception
     {
         super.setUp();
-        memory = new Memory(1024);
+        mmu = new MMU( new MMU.PageFaultHandler() );
+        memory = new Memory(mmu);
+    }
+
+    public void testBadAlignment() {
+
+        assertBadAlignment( () -> memory.readWord(1) );
+        assertBadAlignment( () -> memory.writeWord(1 ,1 ) );
+        assertBadAlignment( () -> memory.readLong(1) );
+        assertBadAlignment( () -> memory.writeLong(1 , 1) );
+
+    }
+    public void testWriteProtect()
+    {
+        mmu.setWriteProtection( MMU.PAGE_SIZE, MMU.PAGE_SIZE, true );
+
+        for (int i = MMU.PAGE_SIZE, len = MMU.PAGE_SIZE; len > 0; len--, i++)
+        {
+            final int idx = i;
+            assertWriteProtected( () -> memory.writeByte( idx, 0x12 ) );
+            assertEquals(0,memory.readByte(i) );
+        }
+
+        memory.writeLong(MMU.PAGE_SIZE-4, 0x12345678);
+        assertEquals(0x12345678, memory.readLong( MMU.PAGE_SIZE-4 ) );
+
+        memory.writeByte(MMU.PAGE_SIZE-1, 0x12);
+        assertEquals(0x12, memory.readByte( MMU.PAGE_SIZE-1 ) );
+
+        assertWriteProtected( () -> memory.writeLong(MMU.PAGE_SIZE-2,0x12345678) );
+    }
+
+    private void assertBadAlignment( Runnable operation)
+    {
+        try
+        {
+            operation.run();
+            fail( "Should've failed" );
+        }
+        catch (BadAlignmentException e)
+        {
+            /* ok */
+        }
+    }
+
+    private void assertWriteProtected( Runnable operation)
+    {
+        try
+        {
+            operation.run();
+            fail( "Should've failed" );
+        }
+        catch (MemoryWriteProtectedException e)
+        {
+            /* ok */
+        }
+    }
+
+    public void testWriteBytes()
+    {
+        final Random rnd = new Random();
+        final byte[] data = new byte[MMU.PAGE_SIZE*10 + 31];
+        rnd.nextBytes( data );
+        memory.writeBytes( 0,data );
+        for ( int i = 0 ; i < data.length ; i++ ) {
+            assertEquals(data[i],memory.readByte( i ) );
+        }
     }
 
     public void testBytes() {
@@ -75,6 +147,13 @@ public class MemoryTest extends TestCase
         } catch(BadAlignmentException e) {
             // ok
         }
+    }
+
+    public void testWriteLongPageBoundary()
+    {
+        int adr = MMU.PAGE_SIZE-2;
+        memory.writeLong(adr,0x12345678);
+        assertEquals(0x12345678,memory.readLong(adr));
     }
 
     private static void assertHexEquals(int expected,int actual) {

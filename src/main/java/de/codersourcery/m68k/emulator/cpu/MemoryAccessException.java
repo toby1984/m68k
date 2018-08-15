@@ -2,16 +2,17 @@ package de.codersourcery.m68k.emulator.cpu;
 
 public abstract class MemoryAccessException extends RuntimeException
 {
-    public final int offendingAddress;
-    public final ViolationType violationType;
+    public int offendingAddress;
+    public ViolationType violationType;
 
     public enum ViolationType {
         BAD_ALIGNMENT,
-        WRITE_PROTECTED;
+        WRITE_PROTECTED, PAGE_FAULT;
     }
 
     public enum Operation
     {
+        UNSPECIFIED(true), // used during double page-fault
         READ_BYTE(true),
         WRITE_BYTE(true),
         READ_WORD(true),
@@ -34,5 +35,9 @@ public abstract class MemoryAccessException extends RuntimeException
         this.operation = operation;
         this.offendingAddress = offendingAddress;
         this.violationType = violation;
+    }
+
+    public MemoryAccessException(String message,Operation operation,ViolationType type) {
+        this(message,operation,0,type);
     }
 }

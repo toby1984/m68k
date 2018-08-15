@@ -1,6 +1,6 @@
 package de.codersourcery.m68k.assembler;
 
-import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.emulator.Memory;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.ConditionalInstructionType;
 import de.codersourcery.m68k.assembler.arch.Instruction;

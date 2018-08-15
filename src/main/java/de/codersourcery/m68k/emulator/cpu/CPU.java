@@ -1,6 +1,6 @@
 package de.codersourcery.m68k.emulator.cpu;
 
-import de.codersourcery.m68k.Memory;
+import de.codersourcery.m68k.emulator.Memory;
 import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.CPUType;
