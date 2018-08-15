@@ -120,6 +120,29 @@ public class DisassemblerTest extends TestCase
         compile("divs.w d4,d3");
     }
 
+    public void testCmp() {
+        compile("cmp.b $1200,d2");
+        compile("cmp.w (a3)+,d3");
+        compile("cmp.l -(a4),d4");
+    }
+
+    public void testNegx() {
+        compile("negx.b $12000");
+        compile("negx.w d3");
+        compile("negx.l (a4)+");
+    }
+
+    public void testSubx()
+    {
+        compile("subx.b -(a1),-(a2)");
+        compile("subx.w -(a1),-(a2)");
+        compile("subx.l -(a1),-(a2)");
+        compile("subx.b d1,d2");
+        compile("subx.w d1,d2");
+        compile("subx.l d1,d2");
+
+    }
+
     public void testSub() {
         compile("sub.b d3,$1200");
         compile("sub.b $1200,d3");
@@ -151,9 +174,9 @@ public class DisassemblerTest extends TestCase
     }
 
     public void testCmpm() {
-       compile("cmpm.b (a3)+,(a4)+");
-       compile("cmpm.w (a3)+,(a4)+");
-       compile("cmpm.l (a3)+,(a4)+");
+        compile("cmpm.b (a3)+,(a4)+");
+        compile("cmpm.w (a3)+,(a4)+");
+        compile("cmpm.l (a3)+,(a4)+");
     }
 
     public void testCmpi() {
@@ -183,9 +206,9 @@ public class DisassemblerTest extends TestCase
     }
 
     public void testSuba() {
-       compile("suba.w $1200,a4");
-       compile("suba.l $1200,a4");
-       compile("suba.l (a3)+,a3");
+        compile("suba.w $1200,a4");
+        compile("suba.l $1200,a4");
+        compile("suba.l (a3)+,a3");
     }
 
     public void testAdda() {
@@ -206,14 +229,14 @@ public class DisassemblerTest extends TestCase
     }
 
     public void testADDQ() {
-       compile("addq.b #1,d3");
-       compile("addq.b #1,$1200");
-       compile("addq.w #8,d3");
-       compile("addq.w #8,a3");
-       compile("addq.w #8,$1200");
-       compile("addq.l #8,d3");
-       compile("addq.l #8,a3");
-       compile("addq.l #8,$1200");
+        compile("addq.b #1,d3");
+        compile("addq.b #1,$1200");
+        compile("addq.w #8,d3");
+        compile("addq.w #8,a3");
+        compile("addq.w #8,$1200");
+        compile("addq.l #8,d3");
+        compile("addq.l #8,a3");
+        compile("addq.l #8,$1200");
     }
 
     public void testMulu()
@@ -343,9 +366,9 @@ public class DisassemblerTest extends TestCase
     }
     public void testBSR() {
         compile("org $2000\n" +
-                        "bsr sub\n" +
-                        "illegal\n" +
-                        "sub:\n","00000000: bsr $4\n" +
+                "bsr sub\n" +
+                "illegal\n" +
+                "sub:\n","00000000: bsr $4\n" +
                 "00000002: illegal");
     }
 

@@ -10,6 +10,7 @@ import de.codersourcery.m68k.parser.ast.RegisterNode;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.xml.crypto.Data;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,6 +32,16 @@ import static de.codersourcery.m68k.assembler.arch.AddressingMode.IMMEDIATE_VALU
  */
 public enum Instruction
 {
+    NEGX("NEGX",1)
+    {
+        @Override public boolean supportsExplicitOperandSize() { return true; }
+
+        @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkSourceAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+        }
+    },
     CMPM("CMPM",2)
     {
         @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -42,6 +53,39 @@ public enum Instruction
             Instruction.checkDestinationAddressingMode( node,AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT );
         }
     },
+    CMP("CMP",2)
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    Instruction.checkDestinationAddressingMode(node,AddressingMode.DATA_REGISTER_DIRECT);
+                }
+            },
+    SUBX("SUBX",2)
+            {
+                @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+                {
+                    if ( node.source().getValue().isDataRegister() || node.destination().getValue().isDataRegister() ) {
+                        // assert both are data registers
+                        Instruction.checkSourceAddressingMode(node,AddressingMode.DATA_REGISTER_DIRECT);
+                        Instruction.checkDestinationAddressingMode(node,AddressingMode.DATA_REGISTER_DIRECT);
+                    } else if ( node.source().hasAddressingMode(AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT) ||
+                        node.destination().hasAddressingMode(AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT) )
+                    {
+                        Instruction.checkSourceAddressingMode(node,AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT);
+                        Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT);
+                    }
+                    else
+                    {
+                        throw new RuntimeException("SUBX needs either two data registers or two address-register pre-decrement operands");
+                    }
+                }
+            },
     SUB("SUB",2)
             {
                 @Override public boolean supportsExplicitOperandSize() { return true; }
@@ -1263,6 +1307,16 @@ public enum Instruction
                 insn.setImplicitOperandSize(OperandSize.WORD);
                 extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
                 return DIVU_ENCODING.append(extraInsnWords);
+            case CMP:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return CMP_ENCODING.append(extraInsnWords);
+            case SUBX:
+                insn.setImplicitOperandSize(OperandSize.WORD);
+                if ( insn.source().getValue().isDataRegister() ) {
+                    return SUBX_DATA_REG_ENCODING;
+                }
+                return SUBX_ADDR_REG_ENCODING;
             case SUB:
                 if ( insn.destination().hasAddressingMode(DATA_REGISTER_DIRECT) )
                 {
@@ -1285,6 +1339,10 @@ public enum Instruction
                     return ADDX_DATAREG_ENCODING;
                 }
                 return ADDX_ADDRREG_ENCODING;
+            case NEGX:
+                insn.setImplicitOperandSize( OperandSize.WORD );
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return NEGX_ENCODING.append(extraInsnWords);
             case CMPM:
                 insn.setImplicitOperandSize( OperandSize.WORD );
                 return CMPM_ENCODING;
@@ -2566,6 +2624,9 @@ D/A   |     |   |           |
     public static final InstructionEncoding NOT_ENCODING = // NOT
             InstructionEncoding.of( "01000110SSmmmsss");
 
+    public static final InstructionEncoding NEGX_ENCODING = // NEGX <ea>
+            InstructionEncoding.of( "01000000SSmmmsss");
+
     // comparisons
 
     public static final InstructionEncoding CMPA_WORD_ENCODING = // CMPA.W <ea>,An
@@ -2583,7 +2644,16 @@ D/A   |     |   |           |
     public static final InstructionEncoding CMPM_ENCODING = // CMPM (Ay)+,(Ax)+
             InstructionEncoding.of( "1011DDD1SS001sss");
 
+    public static final InstructionEncoding CMP_ENCODING = // CMP.W <ea>,Dn
+            InstructionEncoding.of( "1011DDD0SSmmmsss");
+
     // subtractions
+
+    public static final InstructionEncoding SUBX_DATA_REG_ENCODING = //  SUBX Dx,Dy
+            InstructionEncoding.of( "1001DDD1SS000sss");
+
+    public static final InstructionEncoding SUBX_ADDR_REG_ENCODING = //  SUBX -(Ax),-(Ay)
+            InstructionEncoding.of( "1001DDD1SS001sss");
 
     public static final InstructionEncoding SUBA_WORD_ENCODING = // SUB.W <ea>,An
             InstructionEncoding.of( "1001DDD011mmmsss");
@@ -2755,6 +2825,7 @@ D/A   |     |   |           |
         put(SCC_ENCODING,SCC);
         put(STOP_ENCODING,STOP);
         put(TAS_ENCODING,TAS);
+        put(NEGX_ENCODING,NEGX);
 
         put(ANDI_TO_SR_ENCODING, AND);
         put(ANDI_TO_CCR_ENCODING, AND);
@@ -2803,6 +2874,7 @@ D/A   |     |   |           |
         put(CMPI_LONG_ENCODING,CMPI);
         put(CMPI_WORD_ENCODING,CMPI);
         put(CMPM_ENCODING,CMPM);
+        put(CMP_ENCODING,CMP);
 
         // subtractions
         put(SUBA_WORD_ENCODING,SUBA);
@@ -2814,6 +2886,9 @@ D/A   |     |   |           |
 
         put(SUB_DST_DATA_ENCODING,SUB);
         put(SUB_DST_EA_ENCODING,SUB);
+
+        put(SUBX_DATA_REG_ENCODING,SUBX);
+        put(SUBX_ADDR_REG_ENCODING,SUBX);
 
         // sanity check
         for ( Instruction insn : Instruction.values() ) {

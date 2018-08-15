@@ -2,6 +2,8 @@ package de.codersourcery.m68k;
 
 import de.codersourcery.m68k.emulator.cpu.BadAlignmentException;
 import de.codersourcery.m68k.emulator.cpu.MemoryAccessException;
+import de.codersourcery.m68k.emulator.cpu.MemoryWriteProtectedException;
+import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.core.config.plugins.convert.HexConverter;
 
@@ -11,8 +13,15 @@ public class Memory {
 
     private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
 
+    private static final int PAGE_SIZE_IN_BYTES = 4096;
+    private static final int PAGE_SIZE_LEFT_SHIFT = 12;
+
     private static final HexConverter HEX_CONVERTER = new HexConverter();
     private static final HexConverter BIN_CONVERTER = new BinConverter();
+
+    public static final byte FLAG_WRITE_PROTECTED = 1<<0;
+
+    private final byte[] pageFlags;
 
     private static class HexConverter
     {
@@ -60,6 +69,88 @@ public class Memory {
     public Memory(int sizeInBytes)
     {
         this.data = new byte[ sizeInBytes ];
+        this.pageFlags = new byte[1+sizeInBytes/PAGE_SIZE_IN_BYTES];
+    }
+
+    public void bulkWrite(int startAddress,byte[] data,int offset,int count)
+    {
+        System.arraycopy(data,offset,this.data,startAddress,count);
+    }
+
+    public void setWriteProtection(int startaddress,int count,boolean onOff)
+    {
+        if ( onOff )
+        {
+            setPageFlags(startaddress, count, FLAG_WRITE_PROTECTED );
+        } else {
+            clearPageFlags(startaddress, count, FLAG_WRITE_PROTECTED );
+        }
+    }
+
+    public void setPageFlags(int startaddress,int count,byte flags)
+    {
+        int firstPage = getPageNo(startaddress );
+        int lastPage = getPageNo(startaddress+count);
+        for ( int pageNo = firstPage ; pageNo <= lastPage ; pageNo++) {
+            pageFlags[pageNo] |= flags;
+        }
+    }
+
+    public void clearPageFlags(int startaddress,int count,byte flags)
+    {
+        final byte negated = (byte) ~flags;
+        int firstPage = getPageNo(startaddress );
+        int lastPage = getPageNo(startaddress+count);
+        for ( int pageNo = firstPage ; pageNo <= lastPage ; pageNo++) {
+            pageFlags[pageNo] &= negated;
+        }
+    }
+
+    public int getPageNo(int address)
+    {
+        return (address >> PAGE_SIZE_LEFT_SHIFT);
+    }
+
+    private boolean isPageWriteable(int pageNo)
+    {
+        return (pageFlags[ pageNo ] & FLAG_WRITE_PROTECTED) == 0;
+    }
+
+    public boolean isByteWriteable(int address) {
+
+        return isPageWriteable(getPageNo(address));
+    }
+
+    private void assertByteWritable(int address) {
+        if ( ! isByteWriteable(address ) ) {
+            throw new MemoryWriteProtectedException("Cannot write to write-protected memory at "+Misc.hex(address), MemoryAccessException.Operation.WRITE_BYTE,address);
+        }
+    }
+
+    private void assertWordWritable(int address) {
+        if ( ! isWordWriteable(address) ) {
+            throw new MemoryWriteProtectedException("Cannot write to write-protected memory at "+Misc.hex(address), MemoryAccessException.Operation.WRITE_WORD,address);
+        }
+    }
+
+    private void assertLongWritable(int address) {
+        if ( ! isLongWriteable(address) ) {
+            throw new MemoryWriteProtectedException("Cannot write to write-protected memory at "+Misc.hex(address), MemoryAccessException.Operation.WRITE_LONG,address);
+        }
+    }
+
+    public boolean isWordWriteable(int address)
+    {
+        int p0 = getPageNo(address);
+        int p1 = getPageNo(address+1);
+        return (p0==p1) ? isPageWriteable(p0) : isPageWriteable(p0) && isPageWriteable(p1);
+    }
+
+    public boolean isLongWriteable(int address)
+    {
+        int p0 = getPageNo(address);
+        int p1 = getPageNo(address+4);
+        return (p0==p1) ? isPageWriteable(p0) : isPageWriteable(p0) && isPageWriteable(p1);
     }
 
     /**
@@ -72,6 +163,7 @@ public class Memory {
     }
 
     public void reset() {
+        Arrays.fill(pageFlags,(byte) 0);
         Arrays.fill(data,(byte) 0);
     }
 
@@ -93,6 +185,7 @@ public class Memory {
     public void writeWord(int address,int value)
     {
         assertWriteWordAligned(address);
+        assertWordWritable(address);
         data[address] = (byte) (value>>8);
         data[address+1] = (byte) value;
     }
@@ -110,11 +203,16 @@ public class Memory {
 
     public void writeByte(int address,int value)
     {
+        assertByteWritable(address);
         data[address] = (byte) value;
     }
 
     public void writeBytes(int address,byte[] data)
     {
+        for ( int current = address, end = current + data.length ; current < end ; current += PAGE_SIZE_IN_BYTES ) {
+            assertByteWritable(current);
+        }
+
         for ( int i = 0,len=data.length,ptr = address ; i < len ; i++,ptr++ ) {
             this.data[ptr] = data[i];
         }
@@ -138,6 +236,7 @@ public class Memory {
     public void writeLong(int address,int value)
     {
         assertWriteLongAligned(address);
+        assertLongWritable(address);
         writeWordNoCheck(address,value>>16);
         writeWordNoCheck(address+2,value);
     }
@@ -216,5 +315,14 @@ public class Memory {
         if ( (address & 1 ) != 0 ) {
             throw new BadAlignmentException(MemoryAccessException.Operation.WRITE_LONG,address);
         }
+    }
+
+    public int getPageSize() {
+        return PAGE_SIZE_IN_BYTES;
+    }
+
+    public int getMaxPageNo()
+    {
+        return data.length / PAGE_SIZE_IN_BYTES;
     }
 }

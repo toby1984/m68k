@@ -1165,6 +1165,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 {
                     // MOVE_TO_CCR_ENCODING
                     decodeSourceOperand(instruction,2,false);
+                    System.out.println("Move To CCR: "+value);
                     statusRegister = (statusRegister & ~0b11111) | (value & 0b11111);
                     return;
                 }
@@ -1317,6 +1318,27 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     pushLong( value );
                     return;
                 }
+
+                if ( ( instruction & 0b1111111100000000 ) == 0b0100000000000000 )
+                {
+                    // NEGX
+                    final int sizeBits = (instruction &0b11000000) >> 6;
+                    final int eaMode = (instruction&0b111000) >> 3;
+                    final int eaRegister = (instruction&0b111);
+                    final int operandSize = 1 << sizeBits;
+                    decodeSourceOperand(instruction,operandSize,false,false);
+                    final int srcValue = value;
+                    final int dstValue = 0;
+                    final int result = dstValue - srcValue - (isExtended() ? 1 : 0);
+                    value = result;
+                    updateFlags(srcValue,dstValue,result,operandSize,CCOperation.SUBTRACTION,FLAG_EXTENDED|FLAG_NEGATIVE|FLAG_OVERFLOW|FLAG_CARRY);
+                    if ( result != 0 ) {
+                        statusRegister &= ~CPU.FLAG_ZERO;
+                    }
+                    storeValue(eaMode,eaRegister,operandSize);
+                    return;
+                }
+
                 if ( ( instruction & 0b1111000001000000 ) == 0b0100000000000000 )
                 {
                     // CHK_ENCODING
@@ -1355,6 +1377,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     }
                     return;
                 }
+
                 break;
             /* ================================
              * ADDQ/SUBQ/Scc/DBcc/TRAPc c
@@ -1667,6 +1690,100 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     return;
                 }
 
+                if ((instruction & 0b1111000100111000) == 0b1001000100001000 ||
+                    (instruction & 0b1111000100111000) == 0b1001000100000000)
+                {
+                    // SUBX
+                    final int sizeBits = (instruction & 0b11000000) >> 6;
+                    final int operandSizeInBytes = 1<<sizeBits;
+                    final int srcReg = instruction & 0b111;
+                    final int dstReg = (instruction & 0b111000000000) >> 9;
+                    final boolean isDataRegister = (instruction & 1<<3) == 0;
+
+                    // load
+                    int srcValue;
+                    int dstValue;
+                    switch(operandSizeInBytes)
+                    {
+                        case 1:
+                            if ( isDataRegister ) {
+                                srcValue = (dataRegisters[ srcReg ] << 24) >> 24;
+                                dstValue = (dataRegisters[ dstReg ] << 24) >> 24;
+                            } else {
+                                addressRegisters[srcReg] -= 1;
+                                addressRegisters[dstReg] -= 1;
+                                srcValue = memory.readByte(addressRegisters[srcReg]);
+                                dstValue = memory.readByte(addressRegisters[dstReg]);
+                            }
+                            break;
+                        case 2:
+                            if ( isDataRegister ) {
+                                srcValue = (dataRegisters[ srcReg ] << 16) >> 16;
+                                dstValue = (dataRegisters[ dstReg ] << 16) >> 16;
+                            } else {
+                                addressRegisters[srcReg] -= 2;
+                                addressRegisters[dstReg] -= 2;
+                                srcValue = memory.readWord(addressRegisters[srcReg]);
+                                dstValue = memory.readWord(addressRegisters[dstReg]);
+                            }
+                            break;
+                        case 4:
+                            if ( isDataRegister ) {
+                                srcValue = dataRegisters[ srcReg ];
+                                dstValue = dataRegisters[ dstReg ];
+                            } else {
+                                addressRegisters[srcReg] -= 4;
+                                addressRegisters[dstReg] -= 4;
+                                srcValue = memory.readLong(addressRegisters[srcReg]);
+                                dstValue = memory.readLong(addressRegisters[dstReg]);
+                            }
+                            break;
+                        default:
+                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction );
+                    }
+                    final int carry = isExtended() ? 1 : 0;
+                    final int result = dstValue - srcValue - carry;
+                    // store
+                    switch(operandSizeInBytes)
+                    {
+                        case 1:
+                            if ( isDataRegister ) {
+                                dataRegisters[dstReg] = (dataRegisters[dstReg] & 0xffffff00) | (result & 0xff);
+                            } else {
+                                memory.writeByte(addressRegisters[dstReg],result);
+                            }
+                            break;
+                        case 2:
+                            if ( isDataRegister ) {
+                                dataRegisters[dstReg] = (dataRegisters[dstReg] & 0xffff0000) | (result & 0xffff);
+                            } else {
+                                memory.writeWord(addressRegisters[dstReg],result);
+                            }
+                            break;
+                        case 4:
+                            if ( isDataRegister ) {
+                                dataRegisters[dstReg] = result;
+                            } else {
+                                memory.writeLong(addressRegisters[dstReg],result);
+                            }
+                            break;
+                        default:
+                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction );
+                    }
+                    /*
+X — Set to the value of the carry bit.
+N — Set if the result is negative; cleared otherwise.
+Z — Cleared if the result is nonzero; unchanged otherwise.
+V — Set if an overflow occurs; cleared otherwise.
+C — Set if a borrow occurs; cleared otherwise.
+                     */
+                    updateFlags(srcValue,dstValue,result,operandSizeInBytes,CCOperation.SUBTRACTION,FLAG_EXTENDED|FLAG_NEGATIVE|FLAG_OVERFLOW|FLAG_CARRY);
+                    if ( result != 0 ) {
+                        statusRegister &= ~FLAG_ZERO;
+                    }
+                    return;
+                }
+
                 if ( (instruction & 0b1111000100000000) == 0b1001000000000000 ||
                      (instruction & 0b1111000100000000) == 0b1001000100000000)
                 {
@@ -1687,7 +1804,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b1011_0000_0000_0000:
 
                 if ( ( instruction & 0b1111000100111000 ) == 0b1011000100001000 ) {
-                    // CMPM_ENCODING
+                    // CMPM
                     final int srcRegNum = (instruction & 0b000000000111);
                     final int dstRegNum = (instruction & 0b111000000000)>>9;
                     final int sizeBits = (instruction&0b11000000)>>6;
@@ -1730,6 +1847,33 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     final int result = dst - src;
                     updateFlags(src,dst,result,4,CCOperation.SUBTRACTION,USERMODE_FLAGS_NO_X);
                     cycles += 6;
+                    return;
+                }
+
+                if ( ( instruction & 0b1111000100000000 ) == 0b1011000000000000 )
+                {
+                    // CMP
+                    final int dstRegNum = (instruction & 0b111000000000)>>9;
+                    final int sizeBits = (instruction&0b11000000)>>6;
+                    final int sizeInBytes = 1<<sizeBits;
+                    decodeSourceOperand(instruction,sizeInBytes,false);
+                    final int srcValue = value;
+                    final int dstValue;
+                    switch(sizeInBytes) {
+                        case 1:
+                            dstValue = (dataRegisters[dstRegNum] << 24 )>>24;
+                            break;
+                        case 2:
+                            dstValue = (dataRegisters[dstRegNum] << 16 )>>16;
+                            break;
+                        case 4:
+                            dstValue = dataRegisters[dstRegNum];
+                            break;
+                        default:
+                            throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
+                    }
+                    final int result = dstValue - srcValue;
+                    updateFlags( srcValue, dstValue,result,sizeInBytes,CCOperation.SUBTRACTION,CPU.USERMODE_FLAGS_NO_X );
                     return;
                 }
 
@@ -3315,7 +3459,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
                 ( ( statusRegister & FLAG_ZERO     ) != 0 ? "X" : "-" )+"|"+
                 ( ( statusRegister & FLAG_OVERFLOW ) != 0 ? "X" : "-" )+"|"+
                 ( ( statusRegister & FLAG_CARRY    ) != 0 ? "X" : "-" )+"|";
-        return "CPU[ pc = "+ Misc.hex(pc)+" , insn="+binaryInsn+", sp="+Misc.hex(addressRegisters[7])+",IRQ="+activeIrq+"]\n"+flagHelp+"\n"+flags;
+        return "CPU[ pc = "+ Misc.hex(pc)+" , insn="+binaryInsn+", sr="+Misc.hex(statusRegister)+", sp="+Misc.hex(addressRegisters[7])+",IRQ="+activeIrq+"]\n"+flagHelp+"\n"+flags;
     }
 
     private void movepFromMemoryToRegister(int instruction, int operandSizeInBytes)
@@ -3593,7 +3737,6 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
                     clearMask &= ~FLAG_CARRY;
                     break;
             }
-            statusRegister = (statusRegister & clearMask) | setMask;
         }
 
         if ( (flagsToUpdate & FLAG_OVERFLOW) != 0)

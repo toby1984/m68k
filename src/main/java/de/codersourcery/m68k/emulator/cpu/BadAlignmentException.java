@@ -11,12 +11,12 @@ public class BadAlignmentException extends MemoryAccessException
     public final Integer pc;
 
     public BadAlignmentException(Operation operation,int offendingAddress) {
-        super("Misaligned "+operation+" access,offending address: "+Misc.hex(offendingAddress),operation,offendingAddress);
+        super("Misaligned "+operation+" access,offending address: "+Misc.hex(offendingAddress),operation,offendingAddress,ViolationType.BAD_ALIGNMENT);
         this.pc=null;
     }
 
     public BadAlignmentException(String message,Operation operation,int pc,int offendingAddress) {
-        super(message,operation,offendingAddress);
+        super(message,operation,offendingAddress,ViolationType.BAD_ALIGNMENT);
         this.pc=pc;
     }
 }

@@ -19,7 +19,7 @@
 [X] BTST
 [X] CHK
 [X] CLR
-[ ] CMP
+[X] CMP
 [X] CMPA
 [X] CMPI
 [X] CMPM
@@ -52,7 +52,7 @@
 [X] MULU
 [ ] NBCD
 [X] NEG
-[ ] NEGX
+[X] NEGX
 [X] NOP
 [X] NOT
 [X] OR
@@ -75,7 +75,7 @@
 [X] SUBA
 [X] SUBI
 [X] SUBQ
-[ ] SUBX
+[X] SUBX
 [X] SWAP
 [X] TAS
 [X] TRAP

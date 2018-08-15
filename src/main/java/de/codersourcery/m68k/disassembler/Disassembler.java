@@ -18,6 +18,8 @@ import java.util.Set;
 
 public class Disassembler
 {
+    private static final boolean DEBUG = false;
+
     private final Memory memory;
 
     private final StringBuilder outputBuffer = new StringBuilder();
@@ -67,7 +69,10 @@ public class Disassembler
         while ( pc < endAddress )
         {
             pcAtStartOfInstruction = pc;
-            System.out.println("Disassembling at "+Misc.hex(pc) );
+            if ( DEBUG )
+            {
+                System.out.println("Disassembling at " + Misc.hex(pc));
+            }
 
             final int insnWord = readWord();
 
@@ -80,7 +85,10 @@ public class Disassembler
                 boolean matches = matches( insnWord, encoding );
                 if ( matches )
                 {
-                    System.out.println( entry.getValue()+" matches (mask: "+Misc.hex(encoding.getInstructionWordAndMask() )+" with len "+getMaskLength(encoding)+" , expected: "+encoding.getInstructionWordMask() );
+                    if ( DEBUG )
+                    {
+                        System.out.println(entry.getValue() + " matches (mask: " + Misc.hex(encoding.getInstructionWordAndMask()) + " with len " + getMaskLength(encoding) + " , expected: " + encoding.getInstructionWordMask());
+                    }
                     candidates.put(encoding, entry.getValue());
                 }
             }
@@ -112,7 +120,7 @@ public class Disassembler
                     {
                         throw new RuntimeException("Same mask len: " + mostSpecific + " <-> " + sortedByMaskLength.get(1));
                     }
-                    System.err.println("WARNING: Found multiple matching encodings for "+instructions);
+                    // System.err.println("WARNING: Found multiple matching encodings for "+instructions);
                 }
                 // same instruction
                 encoding = mostSpecific;
@@ -122,7 +130,10 @@ public class Disassembler
                 instruction = candidates.values().iterator().next();
             }
 
-            System.out.println("Using: "+encoding+" => "+instruction);
+            if ( DEBUG )
+            {
+                System.out.println("Using: " + encoding + " => " + instruction);
+            }
             try
             {
                 disassemble(instruction, insnWord);
@@ -558,6 +569,32 @@ public class Disassembler
                 append(",");
                 decodeOperand(1<<sizeBits, (insnWord&0b111000)>>3, insnWord&0b111);
                 return;
+            case NEGX:
+                appendln("negx");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                appendOperandSize(sizeBits);
+                decodeOperand(1<<sizeBits,(insnWord&0b111000)>>3 , insnWord&0b111);
+                return;
+            case CMP:
+                appendln("cmp");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                appendOperandSize(sizeBits);
+                decodeOperand(1<<sizeBits,(insnWord&0b111000)>>3 , insnWord&0b111);
+                append(",").appendDataRegister((insnWord&0b111000000000)>>9);
+                return;
+            case SUBX:
+                appendln("subx");
+                sizeBits = (insnWord & 0b11000000) >> 6;
+                appendOperandSize(sizeBits);
+                int srcReg = insnWord & 0b111;
+                int dstReg = (insnWord & 0b111000000000) >> 9;
+                final boolean isDataRegister = (insnWord & 1<<3) == 0;
+                if ( isDataRegister ) {
+                    appendDataRegister(srcReg).append(",").appendDataRegister(dstReg);
+                } else {
+                    append("-(").appendAddressRegister(srcReg).append("),-(").appendAddressRegister(dstReg).append(")");
+                }
+                return;
             case SUB:
                 appendln("sub");
                 sizeBits = (insnWord & 0b11000000) >> 6;
@@ -596,8 +633,8 @@ public class Disassembler
                 appendln("addx");
                 appendOperandSize( (insnWord & 0b11000000) >> 6 );
                 final boolean isDataReg = (insnWord & 1<<3) == 0;
-                int srcReg = (insnWord&0b111);
-                int dstReg = (insnWord&0b111000000000) >> 9;
+                srcReg = (insnWord&0b111);
+                dstReg = (insnWord&0b111000000000) >> 9;
                 if ( isDataReg ) {
                     appendDataRegister( srcReg ).append(",").appendDataRegister( dstReg );
                 } else {

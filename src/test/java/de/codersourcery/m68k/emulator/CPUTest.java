@@ -7,6 +7,7 @@ import de.codersourcery.m68k.assembler.CompilationUnit;
 import de.codersourcery.m68k.assembler.IResource;
 import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.arch.CPUType;
+import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.emulator.cpu.CPU;
 import de.codersourcery.m68k.parser.Identifier;
@@ -43,6 +44,68 @@ public class CPUTest extends TestCase
         super.setUp();
         memory = new Memory(MEM_SIZE);
         cpu = new CPU(CPUType.BEST,memory);
+    }
+
+    public void testSubx()
+    {
+        final int adr = PROGRAM_START_ADDRESS + 0x100;
+
+        execute(cpu->{},
+                "lea "+adr+",a0",
+                "move.l #$ffffff02,(a0)+",
+                "move.l #$ffffff03,(a0)+",
+                "lea "+(adr+4)+",a1",
+                "lea "+(adr+8)+",a2",
+                "move.w #0,ccr",
+                "subx.b -(a1),-(a2)") // 3 - 2
+                .expectA1( adr+3 )
+                .expectA2( adr+7 )
+                .expectMemoryLong(adr+4,0xffffff01)
+                .notZero()
+                .noCarry()
+                .noExtended()
+                .noOverflow()
+                .notNegative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->{},
+                "move.l #$ffffff02,d0",
+                "move.l #$ffffff03,d1",
+                "move.w #0,ccr",
+                "subx.b d0,d1") // 3 - 2
+                .expectD1( 0xffffff01 )
+                .notZero()
+                .noCarry()
+                .noExtended()
+                .noOverflow()
+                .notNegative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->{},
+                "move.l #$ffffff02,d0",
+                "move.l #$ffffff03,d1",
+                "move.w #"+CPU.FLAG_EXTENDED+",ccr",
+                "subx.b d0,d1") // 3 - 2 -1
+                .expectD1( 0xffffff00 )
+                .notZero()
+                .noCarry()
+                .noExtended()
+                .noOverflow()
+                .notNegative()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->{},
+                "move.l #$ffffff02,d0",
+                "move.l #$ffffff03,d1",
+                "move.w #"+(CPU.FLAG_EXTENDED|CPU.FLAG_ZERO)+",ccr",
+                "subx.b d0,d1") // 3 - 2 -1
+                .expectD1( 0xffffff00 )
+                .zero()
+                .noCarry()
+                .noExtended()
+                .noOverflow()
+                .notNegative()
+                .notSupervisor().noIrqActive();
     }
 
     public void testSub() {
@@ -111,6 +174,81 @@ public class CPUTest extends TestCase
                 .notSupervisor().noIrqActive();
     }
 
+    public void testNegx()
+    {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$aaaaaa00,d1",
+                "move.w #"+(CPU.FLAG_ZERO|CPU.FLAG_EXTENDED)+",ccr", // clear X flag
+                "negx.b d1")
+                .expectD1( 0xaaaaaaff )
+                .negative()
+                .notZero()
+                .carry()
+                .extended()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$aaaaaa00,d1",
+                "move.w #"+CPU.FLAG_ZERO+",ccr", // Set zero flag, clear everything else
+                "negx.b d1")
+                .expectD1( 0xaaaaaaff )
+                .negative()
+                .notZero()
+                .carry()
+                .extended()
+                .notSupervisor().noIrqActive();
+    }
+
+    public void testCmp()
+    {
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$aaaaaa01,d0",
+                "move.l #$bbbbbb01,d1",
+                "cmp.b d0,d1")
+                .expectD1( 0xbbbbbb01)
+                .equals()
+                .extended()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$aaaa0001,d0",
+                "move.l #$bbbb0001,d1",
+                "cmp.w d0,d1")
+                .expectD1( 0xbbbb0001)
+                .equals()
+                .extended()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #1,d0",
+                "move.l #1,d1",
+                "cmp.w d0,d1")
+                .expectD1( 1 )
+                .equals()
+                .extended()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$aaaa0002,d0",
+                "move.l #$bbbb0003,d1",
+                "cmp.w d0,d1") // d1 - d0 = 1
+                .expectD1( 0xbbbb0003)
+                .greaterThan()
+                .greaterThanEquals()
+                .extended()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu -> cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.l #$aaaa0003,d0",
+                "move.l #$bbbb0002,d1",
+                "cmp.w d0,d1") // d1 - d0 = 1
+                .expectD1( 0xbbbb0002)
+                .lessThan()
+                .lessThanEquals()
+                .extended()
+                .notSupervisor().noIrqActive();
+    }
+
     public void testCmpi()
     {
         execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
@@ -147,8 +285,58 @@ public class CPUTest extends TestCase
                 .notSupervisor().noIrqActive();
     }
 
-    public void testCMPM() {
-        fail("Implement me");
+    public void testCMPM()
+    {
+        final int adr = PROGRAM_START_ADDRESS+256;
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.b #2,"+adr,
+                "move.b #1,"+(adr+1),
+                "lea "+adr+",a0",
+                "lea "+(adr+1)+",a1",
+                "cmpm.b (a0)+,(a1)+") // 1 cmp 2
+                .expectA0( adr+1 )
+                .expectA1( adr+2 )
+                .notZero() // not equals
+                .notGreaterThan()
+                .notGreaterOrEquals()
+                .lessThanEquals()
+                .lessThan()
+                .extended()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.b #1,"+adr,
+                "move.b #1,"+(adr+1),
+                "lea "+adr+",a0",
+                "lea "+(adr+1)+",a1",
+                "cmpm.b (a0)+,(a1)+") // 1 cmp 1
+                .expectA0( adr+1 )
+                .expectA1( adr+2 )
+                .equals()
+                .greaterThanEquals()
+                .lessThanEquals()
+                .notLessThan()
+                .notGreaterThan()
+                .extended()
+                .notSupervisor().noIrqActive();
+
+        execute(cpu->cpu.setFlags(CPU.ALL_USERMODE_FLAGS),
+                "move.b #1,"+adr,
+                "move.b #2,"+(adr+1),
+                "lea "+adr+",a0",
+                "lea "+(adr+1)+",a1",
+                "cmpm.b (a0)+,(a1)+") // 2 cmp 1
+                .expectA0( adr+1 )
+                .expectA1( adr+2 )
+                .notZero() // not equals
+                .greaterThan()
+                .greaterThanEquals()
+                .notLessThan()
+                .notLessThanEquals()
+                .extended()
+                .notSupervisor().noIrqActive();
+
     }
 
     public void testSUBI()
@@ -3091,6 +3279,67 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 
         public ExpectionBuilder extended() { assertTrue( "X flag not set ?" , cpu.isExtended() ); return this; };
         public ExpectionBuilder noExtended() { assertTrue("X flag set ?" , cpu.isNotExtended() ); return this; };
+
+
+        public ExpectionBuilder lessThan() {
+
+            assertTrue( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BLT.bits));
+            return this;
+        }
+
+        public ExpectionBuilder notLessThan() {
+
+            assertFalse( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BLT.bits));
+            return this;
+        }
+
+        public ExpectionBuilder lessThanEquals()
+        {
+            assertTrue( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BLE.bits));
+            return this;
+        }
+
+        public ExpectionBuilder notLessThanEquals()
+        {
+            assertFalse( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BLE.bits));
+            return this;
+        }
+
+        public ExpectionBuilder greaterThan()
+        {
+            assertTrue( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BGT.bits));
+            return this;
+        }
+
+        public ExpectionBuilder notGreaterThan()
+        {
+            assertFalse( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BGT.bits));
+            return this;
+        }
+        
+        public ExpectionBuilder greaterThanEquals()
+        {
+            assertTrue( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BGE.bits));
+            return this;
+        }
+
+        public ExpectionBuilder notGreaterOrEquals()
+        {
+            assertFalse( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BGE.bits));
+            return this;
+        }
+
+        public ExpectionBuilder equals()
+        {
+            assertTrue( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BEQ.bits));
+            return this;
+        }
+
+        public ExpectionBuilder notEquals()
+        {
+            assertTrue( "CC mismatch: "+cpu,Condition.isTrue(cpu,Condition.BNE.bits));
+            return this;
+        }
 
         public ExpectionBuilder supervisor() { assertTrue( "S flag not set ?" , cpu.isSupervisorMode() ); return this; };
         public ExpectionBuilder notSupervisor() { assertTrue( "S flag set ?" , ! cpu.isSupervisorMode()); return this; };

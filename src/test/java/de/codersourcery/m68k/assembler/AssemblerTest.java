@@ -400,6 +400,29 @@ public class AssemblerTest extends TestCase
         assertArrayEquals(compile("mulu.w d4,d3"),0xc6,0xc4);
     }
 
+    public void testCmp()
+    {
+        assertArrayEquals(compile("cmp.b $1200,d2") ,0xb4,0x38,0x12,0x00);
+        assertArrayEquals(compile("cmp.w (a3)+,d3") ,0xb6,0x5b);
+        assertArrayEquals(compile("cmp.l -(a4),d4") ,0xb8,0xa4);
+    }
+
+    public void testSubx() {
+        assertArrayEquals(compile("subx.b d1,d2"),0x95,0x01);
+        assertArrayEquals(compile("subx.w d1,d2"),0x95,0x41);
+        assertArrayEquals(compile("subx.l d1,d2"),0x95,0x81);
+        assertArrayEquals(compile("subx.b -(a1),-(a2)"),0x95,0x09);
+        assertArrayEquals(compile("subx.w -(a1),-(a2)"),0x95,0x49);
+        assertArrayEquals(compile("subx.l -(a1),-(a2)"),0x95,0x89);
+    }
+
+    public void testNegx()
+    {
+        assertArrayEquals(compile("negx.b $12000"),0x40,0x39,0x00,0x01,0x20,0x00);
+        assertArrayEquals(compile("negx.w d3")    ,0x40,0x43);
+        assertArrayEquals(compile("negx.l (a4)+") ,0x40,0x9c);
+    }
+
     public void testSub() {
         assertArrayEquals(compile("sub.b d3,$1200"),0x97,0x38,0x12,0x00);
         assertArrayEquals(compile("sub.b $1200,d3"),0x96,0x38,0x12,0x00);
