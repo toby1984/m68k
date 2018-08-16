@@ -1,7 +1,6 @@
 package de.codersourcery.m68k;
 
 import de.codersourcery.m68k.emulator.MMU;
-import de.codersourcery.m68k.emulator.cpu.MemoryWriteProtectedException;
 import junit.framework.TestCase;
 
 public class MMUTest extends TestCase

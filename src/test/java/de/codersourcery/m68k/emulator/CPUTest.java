@@ -8,7 +8,6 @@ import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
-import de.codersourcery.m68k.emulator.cpu.CPU;
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;

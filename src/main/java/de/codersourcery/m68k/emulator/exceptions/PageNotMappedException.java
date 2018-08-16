@@ -1,4 +1,4 @@
-package de.codersourcery.m68k.emulator.cpu;
+package de.codersourcery.m68k.emulator.exceptions;
 
 public class PageNotMappedException extends MemoryAccessException
 {

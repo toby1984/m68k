@@ -1,9 +1,8 @@
 package de.codersourcery.m68k.emulator;
 
-import de.codersourcery.m68k.emulator.cpu.BadAlignmentException;
-import de.codersourcery.m68k.emulator.cpu.MemoryPage;
-import de.codersourcery.m68k.emulator.cpu.MemoryAccessException;
-import de.codersourcery.m68k.emulator.cpu.MemoryWriteProtectedException;
+import de.codersourcery.m68k.emulator.exceptions.BadAlignmentException;
+import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
+import de.codersourcery.m68k.emulator.exceptions.MemoryWriteProtectedException;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
@@ -55,7 +54,7 @@ public class Memory {
         }
     }
 
-    private final MMU mmu;
+    public final MMU mmu;
 
     public Memory(MMU mmu)
     {

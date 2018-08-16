@@ -404,6 +404,10 @@ public class DisassemblerTest extends TestCase
         compile("rol $12345678");
     }
 
+    public void testNop() {
+        compile("nop");
+    }
+
     public void testROXL()
     {
         compile("roxl.w d1,d2");
@@ -604,6 +608,7 @@ public class DisassemblerTest extends TestCase
         final MMU mmu = new MMU( new MMU.PageFaultHandler() );
         final Memory memory = new Memory(mmu);
         memory.writeBytes( 0,executable );
+
         Disassembler asm = new Disassembler( memory );
         final String disassembled = asm.disassemble( 0, executable.length );
         assertEquals(expectedSource,disassembled);

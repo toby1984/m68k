@@ -1,4 +1,6 @@
-package de.codersourcery.m68k.emulator.cpu;
+package de.codersourcery.m68k.emulator;
+
+import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 
 public class RAMPage extends MemoryPage
 {

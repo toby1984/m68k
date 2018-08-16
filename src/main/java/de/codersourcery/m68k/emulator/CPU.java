@@ -1,10 +1,11 @@
-package de.codersourcery.m68k.emulator.cpu;
+package de.codersourcery.m68k.emulator;
 
-import de.codersourcery.m68k.emulator.Memory;
 import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
+import de.codersourcery.m68k.emulator.exceptions.IllegalInstructionException;
+import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;

@@ -1,6 +1,6 @@
 package de.codersourcery.m68k.assembler.arch;
 
-import de.codersourcery.m68k.emulator.cpu.CPU;
+import de.codersourcery.m68k.emulator.CPU;
 import de.codersourcery.m68k.utils.Misc;
 
 /**

@@ -5,7 +5,7 @@ import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
-import de.codersourcery.m68k.emulator.cpu.CPU;
+import de.codersourcery.m68k.emulator.CPU;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
@@ -15,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public class Disassembler
 {
@@ -22,12 +23,57 @@ public class Disassembler
 
     private final Memory memory;
 
-    private final StringBuilder outputBuffer = new StringBuilder();
-    private final StringBuilder tmpOutputBuffer = new StringBuilder();
+    private LineConsumer lineConsumer;
 
-    private int pcAtStartOfInstruction;
+    private final StringBuilder textBuffer = new StringBuilder();
+    private final StringBuilder asciiBuffer = new StringBuilder();
+    private final StringBuilder commentsBuffer = new StringBuilder();
+
+    private final Line currentLine = new Line();
+
+    private boolean dumpHex;
+
     private int pc;
-    private int endAddress;
+
+    public static final class Line
+    {
+        public int pc;
+        public Instruction instruction;
+        public String text;
+        public String ascii;
+        public String comments;
+
+        public Line createCopy()
+        {
+            final Line result = new Line();
+            result.pc = pc;
+            result.instruction = instruction;
+            result.text = text;
+            result.ascii = ascii;
+            result.comments = comments;
+            return result;
+        }
+
+        public boolean isData() {
+            return instruction == null;
+        }
+
+        @Override
+        public String toString()
+        {
+            final String textPadded;
+            if ( ascii != null || comments != null )
+            {
+                textPadded = StringUtils.rightPad(text, 50, ' ');
+            } else {
+                textPadded = text;
+            }
+            return StringUtils.leftPad(Integer.toHexString(pc ),8,'0')+
+                    ": "+textPadded+
+                    (ascii == null ? "" : " "+ascii) +
+                    ( comments == null ? "" : " "+comments );
+        }
+    }
 
     private static final class EndOfMemoryAccess extends RuntimeException {
     }
@@ -35,23 +81,74 @@ public class Disassembler
         this.memory = memory;
     }
 
+    public interface LineConsumer
+    {
+        boolean stop(int pc);
+
+        void consume(Line line);
+    }
+
+    public void disassemble(int startAddress, LineConsumer lineConsumer)
+    {
+        this.pc = startAddress;
+        this.lineConsumer = lineConsumer;
+        while ( true )
+        {
+            if ( lineConsumer.stop( pc ) ) {
+                return;
+            }
+
+            textBuffer.setLength(0);
+            asciiBuffer.setLength(0);
+            commentsBuffer.setLength(0);
+
+            try {
+                currentLine.pc = pc;
+                currentLine.instruction = null;
+                disassemble();
+            }
+            catch(EndOfMemoryAccess e)
+            {
+                return;
+            }
+            currentLine.text = textBuffer.toString();
+            currentLine.comments = commentsBuffer.length() > 0 ? commentsBuffer.toString() : null;
+            currentLine.ascii = asciiBuffer.length() > 0 ? asciiBuffer.toString() : null;
+            lineConsumer.consume(currentLine);
+        }
+    }
+
     public String disassemble(int startAddress,int bytes)
     {
-        pc = startAddress;
-        endAddress = startAddress + bytes;
-        tmpOutputBuffer.setLength(0);
+        final StringBuilder buffer = new StringBuilder();
 
-        try {
-            disassemble();
-        }
-        catch(EndOfMemoryAccess e) {
-            append("<...>");
-        }
-        return tmpOutputBuffer.toString();
+        disassemble( startAddress, new LineConsumer() {
+
+            @Override
+            public boolean stop( int pc)
+            {
+                return pc > startAddress+bytes;
+            }
+
+            @Override
+            public void consume(Line line)
+            {
+                if ( buffer.length() > 0 ) {
+                    buffer.append("\n");
+                }
+                buffer.append(line);
+            }
+        });
+        return buffer.toString();
     }
 
     private void disassemble() throws EndOfMemoryAccess
     {
+        if ( DEBUG )
+        {
+            System.out.println("Disassembling at " + Misc.hex(pc));
+        }
+
         Map<Integer,InstructionEncoding> existing = new HashMap<>();
         for ( var entry : Instruction.ALL_ENCODINGS.entrySet() )
         {
@@ -66,90 +163,79 @@ public class Disassembler
             }
         }
 
-        while ( pc < endAddress )
+        final int insnWord = readWord();
+
+        // TODO: Performance...maybe using a prefix tree
+        // TODO: would be faster than linear search ?
+        final Map<InstructionEncoding,Instruction> candidates = new HashMap<>();
+        for ( var entry : Instruction.ALL_ENCODINGS.entrySet() )
         {
-            pcAtStartOfInstruction = pc;
-            if ( DEBUG )
+            var encoding = entry.getKey();
+            boolean matches = matches( insnWord, encoding );
+            if ( matches )
             {
-                System.out.println("Disassembling at " + Misc.hex(pc));
-            }
-
-            final int insnWord = readWord();
-
-            // TODO: Performance...maybe using a prefix tree
-            // TODO: would be faster than linear search ?
-            final Map<InstructionEncoding,Instruction> candidates = new HashMap<>();
-            for ( var entry : Instruction.ALL_ENCODINGS.entrySet() )
-            {
-                var encoding = entry.getKey();
-                boolean matches = matches( insnWord, encoding );
-                if ( matches )
+                if ( DEBUG )
                 {
-                    if ( DEBUG )
-                    {
-                        System.out.println(entry.getValue() + " matches (mask: " + Misc.hex(encoding.getInstructionWordAndMask()) + " with len " + getMaskLength(encoding) + " , expected: " + encoding.getInstructionWordMask());
-                    }
-                    candidates.put(encoding, entry.getValue());
+                    System.out.println(entry.getValue() + " matches (mask: " + Misc.hex(encoding.getInstructionWordAndMask()) + " with len " + getMaskLength(encoding) + " , expected: " + encoding.getInstructionWordMask());
                 }
-            }
-            if ( candidates.isEmpty() ) {
-                illegalOperation(insnWord);
-                continue;
-
-            }
-
-            InstructionEncoding encoding;
-            Instruction instruction;
-            if ( candidates.size() > 1 )
-            {
-                List<InstructionEncoding> sortedByMaskLength = new ArrayList<>( candidates.keySet() );
-                sortedByMaskLength.sort( (b,a) -> Integer.compare( getMaskLength(a), getMaskLength(b) ) );
-
-                final InstructionEncoding mostSpecific = sortedByMaskLength.get(0);
-                final Set<Instruction> instructions = new HashSet<>();
-                final List<InstructionEncoding> clashes = new ArrayList<>();
-                for ( var entry : sortedByMaskLength ) {
-                    if ( getMaskLength(entry ) == getMaskLength(mostSpecific) ) {
-                        instructions.add( candidates.get( entry ) );
-                        clashes.add( entry );
-                    }
-                }
-                if ( clashes.size() > 1 )
-                {
-                    if ( instructions.size() > 1 )
-                    {
-                        throw new RuntimeException("Same mask len: " + mostSpecific + " <-> " + sortedByMaskLength.get(1));
-                    }
-                    // System.err.println("WARNING: Found multiple matching encodings for "+instructions);
-                }
-                // same instruction
-                encoding = mostSpecific;
-                instruction = candidates.get(mostSpecific);
-            } else {
-                encoding = candidates.keySet().iterator().next();
-                instruction = candidates.values().iterator().next();
-            }
-
-            if ( DEBUG )
-            {
-                System.out.println("Using: " + encoding + " => " + instruction);
-            }
-            try
-            {
-                disassemble(instruction, insnWord);
-                commit();
-            }
-            catch(Exception e)
-            {
-                outputBuffer.append("dc.w ").append( Misc.hex(insnWord) ).append(" ; ").append(Misc.binary16Bit(insnWord) );
-                pc = pcAtStartOfInstruction+2;
+                candidates.put(encoding, entry.getValue());
             }
         }
-    }
+        if ( candidates.isEmpty() )
+        {
+            illegalOperation(insnWord);
+            return;
+        }
 
-    private void commit()
-    {
-        outputBuffer.append( tmpOutputBuffer );
+        InstructionEncoding encoding;
+        Instruction instruction;
+        if ( candidates.size() > 1 )
+        {
+            List<InstructionEncoding> sortedByMaskLength = new ArrayList<>( candidates.keySet() );
+            sortedByMaskLength.sort( (b,a) -> Integer.compare( getMaskLength(a), getMaskLength(b) ) );
+
+            final InstructionEncoding mostSpecific = sortedByMaskLength.get(0);
+            final Set<Instruction> instructions = new HashSet<>();
+            final List<InstructionEncoding> clashes = new ArrayList<>();
+            for ( var entry : sortedByMaskLength ) {
+                if ( getMaskLength(entry ) == getMaskLength(mostSpecific) ) {
+                    instructions.add( candidates.get( entry ) );
+                    clashes.add( entry );
+                }
+            }
+            if ( clashes.size() > 1 )
+            {
+                if ( instructions.size() > 1 )
+                {
+                    throw new RuntimeException("Same mask len: " + mostSpecific + " <-> " + sortedByMaskLength.get(1));
+                }
+                // System.err.println("WARNING: Found multiple matching encodings for "+instructions);
+            }
+            // same instruction
+            encoding = mostSpecific;
+            instruction = candidates.get(mostSpecific);
+        } else {
+            encoding = candidates.keySet().iterator().next();
+            instruction = candidates.values().iterator().next();
+        }
+
+        if ( DEBUG )
+        {
+            System.out.println("Using: " + encoding + " => " + instruction);
+        }
+
+        try
+        {
+            currentLine.instruction = instruction;
+            disassemble(instruction, insnWord);
+        }
+        catch(Exception e)
+        {
+            e.printStackTrace();
+            textBuffer.append("dc.w ").append( Misc.hex(insnWord) );
+            commentsBuffer.append(" ; ").append( Misc.binary16Bit(insnWord) ).append(" , caught "+e.getMessage());
+            pc = currentLine.pc+2;
+        }
     }
 
     private static int getMaskLength(InstructionEncoding encoding) {
@@ -379,9 +465,6 @@ public class Disassembler
                 // ROXR register
                 printRotateOperands(insnWord,CPU.RotateOperandMode.REGISTER);
                 return;
-                /*
-                 ==========
-                 */
             case ASL:
                 appendln("asl");
                 if ( ( insnWord & 0b1111000100111000 ) == 0b1110000100000000 )
@@ -909,7 +992,7 @@ public class Disassembler
                 cond = Condition.fromBits( (insnWord & 0b0000111100000000) >>> 8 );
                 int register = insnWord & 0b111;
                 int offset = readWord();
-                int destinationAdress = pcAtStartOfInstruction + offset;
+                int destinationAdress = currentLine.pc + offset;
                 appendln("db").append(cond.suffix.toLowerCase()).append(" d").append( register ).append(",").append(
                         Misc.hex(destinationAdress));
                 return;
@@ -946,12 +1029,12 @@ public class Disassembler
                 } else {
                     break;
                 }
-                append( Misc.hex( pcAtStartOfInstruction+offset ) );
+                append( Misc.hex( currentLine.pc + offset ) );
                 return;
             // Misc
             case NOP:
                 appendln("nop");
-                break;
+                return;
             case EXG:
                 final int opMode = (insnWord & 0b0000000011111000) >>> 3;
                 final int rX =   (insnWord & 0b0000111000000000) >>> 9;
@@ -968,7 +1051,7 @@ public class Disassembler
                         appendDataRegister(rX).append(",").appendAddressRegister(rY);
                         return;
                 }
-                break;
+                return;
             case MOVEQ:
                 value = insnWord & 0xff;
                 value = (value <<24) >> 24;
@@ -983,28 +1066,28 @@ public class Disassembler
                 if ( ( insnWord & 0b1111000111111000 ) == 0b0000000101001000 ) {
                     // MOVEP_LONG_FROM_MEMORY_ENCODING
                     append(".l ").appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append("),")
-                        .appendDataRegister(dataReg );
+                            .appendDataRegister(dataReg );
                     return;
                 }
 
                 if ( ( insnWord & 0b1111000111111000 ) == 0b0000000111001000 ) {
                     // MOVEP_LONG_TO_MEMORY_ENCODING
                     append(".l ").appendDataRegister(dataReg ).append(",")
-                        .appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append(")");
+                            .appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append(")");
                     return;
                 }
 
                 if ( ( insnWord & 0b1111000111111000 ) == 0b0000000100001000 ) {
                     // MOVEP_LONG_FROM_MEMORY_ENCODING
                     append(".w ").appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append("),")
-                        .appendDataRegister(dataReg );
+                            .appendDataRegister(dataReg );
                     return;
                 }
 
                 if ( ( insnWord & 0b1111000111111000 ) == 0b0000000110001000 ) {
                     // MOVEP_WORD_TO_MEMORY_ENCODING
                     append(".w ").appendDataRegister(dataReg ).append(",")
-                        .appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append(")");
+                            .appendHex16Bit(offset).append("(").appendAddressRegister(adrReg).append(")");
                     return;
                 }
                 break;
@@ -1134,7 +1217,7 @@ public class Disassembler
     // print MOVEM register list
     private void printRegisterList(int registerMask)
     {
-       // Always assumes bitmask bits in A7-A0|D7-D0 order
+        // Always assumes bitmask bits in A7-A0|D7-D0 order
         // print data registers first
         String list1 = printRegisterList("d",0,registerMask);
         String list2 = printRegisterList("a",8,registerMask);
@@ -1196,39 +1279,57 @@ public class Disassembler
 
     private int readLong()
     {
-        if ( (pc + 4 ) > endAddress ) {
+        if ( lineConsumer.stop(pc + 4 ) ) {
             throw new EndOfMemoryAccess();
         }
         int result = memory.readLong( pc );
+        if ( dumpHex )
+        {
+            appendHexByte(asciiBuffer, result >> 24);
+            appendHexByte(asciiBuffer, result >> 16);
+            appendHexByte(asciiBuffer, result >> 8);
+            appendHexByte(asciiBuffer, result);
+        }
         pc+=4;
         return result;
     }
 
-    private int readWord() {
-        if ( (pc + 2 ) > endAddress ) {
+    private int readWord()
+    {
+        if ( lineConsumer.stop((pc + 2 ) ) ) {
             throw new EndOfMemoryAccess();
         }
-        int result = memory.readWord( pc );
+        final int result = memory.readWord( pc );
+        if ( dumpHex )
+        {
+            appendHexByte(asciiBuffer, result >> 8);
+            appendHexByte(asciiBuffer, result);
+        }
         pc+=2;
         return result;
     }
 
-    private Disassembler appendln(String s) {
-        if ( tmpOutputBuffer.length() > 0 || outputBuffer.length() > 0 )
-        {
-            append("\n");
-        }
-        final String address = StringUtils.leftPad( Integer.toHexString( pcAtStartOfInstruction ),8,"0");
-        return append( address).append(": ").append( s );
+    private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
+
+    private static void appendHexByte(StringBuilder buffer,int value) {
+
+       final char low = HEX_CHARS[ value & 0b1111 ];
+       final char hi = HEX_CHARS[ (value & 0b11110000)>>4 ];
+       buffer.append(hi).append(low);
+    }
+
+    private Disassembler appendln(String s)
+    {
+        return append( s );
     }
 
     private Disassembler append(String s) {
-        tmpOutputBuffer.append( s );
+        textBuffer.append( s );
         return this;
     }
 
     private Disassembler append(int value) {
-        tmpOutputBuffer.append( Integer.toString( value ) );
+        textBuffer.append( Integer.toString( value ) );
         return this;
     }
 
@@ -1241,13 +1342,13 @@ public class Disassembler
     }
 
     private Disassembler appendHex(int value) {
-        tmpOutputBuffer.append( "$").append( Integer.toHexString( value ) );
+        textBuffer.append( "$").append( Integer.toHexString( value ) );
         return this;
     }
 
     private Disassembler appendHex16Bit(int value)
     {
-        tmpOutputBuffer.append( "$").append( Integer.toHexString( value & 0xffff ) );
+        textBuffer.append( "$").append( Integer.toHexString( value & 0xffff ) );
         return this;
     }
 
@@ -1659,5 +1760,10 @@ public class Disassembler
         pc += 2;
         append("#").append(bitToTest).append(",");
         decodeOperand( 2,(insnWord&0b111000)>>3,(insnWord&0b111) );
+    }
+
+    public void setDumpHex(boolean dumpHex)
+    {
+        this.dumpHex = dumpHex;
     }
 }

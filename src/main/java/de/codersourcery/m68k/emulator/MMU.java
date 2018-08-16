@@ -1,9 +1,7 @@
 package de.codersourcery.m68k.emulator;
 
-import de.codersourcery.m68k.emulator.cpu.MemoryPage;
-import de.codersourcery.m68k.emulator.cpu.MemoryAccessException;
-import de.codersourcery.m68k.emulator.cpu.PageNotMappedException;
-import de.codersourcery.m68k.emulator.cpu.RAMPage;
+import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
+import de.codersourcery.m68k.emulator.exceptions.PageNotMappedException;
 import de.codersourcery.m68k.utils.Misc;
 import gnu.trove.map.hash.TIntObjectHashMap;
 

@@ -1,4 +1,4 @@
-package de.codersourcery.m68k.emulator.cpu;
+package de.codersourcery.m68k.emulator.exceptions;
 
 import de.codersourcery.m68k.utils.Misc;
 

@@ -2,9 +2,8 @@ package de.codersourcery.m68k;
 
 import de.codersourcery.m68k.emulator.MMU;
 import de.codersourcery.m68k.emulator.Memory;
-import de.codersourcery.m68k.emulator.cpu.BadAlignmentException;
-import de.codersourcery.m68k.emulator.cpu.MemoryWriteProtectedException;
-import de.codersourcery.m68k.emulator.cpu.RAMPage;
+import de.codersourcery.m68k.emulator.exceptions.BadAlignmentException;
+import de.codersourcery.m68k.emulator.exceptions.MemoryWriteProtectedException;
 import junit.framework.TestCase;
 
 import java.util.Random;
