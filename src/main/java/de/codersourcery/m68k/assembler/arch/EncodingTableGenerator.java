@@ -483,7 +483,8 @@ outer:
             System.out.println(position+": "+Misc.binary16Bit(value)+" => "+instruction.name());
             position++;
             if ( result.containsKey(value) ) {
-                throw new RuntimeException("Internal error,duplicate mapping "+Misc.binary16Bit(value)+" for "+instruction);
+                throw new RuntimeException("Internal error,duplicate mapping "+
+                    Misc.binary16Bit(value)+" for "+instruction+" already used by "+result.get(value));
             }
             result.put(value,instruction);
 
@@ -498,6 +499,8 @@ outer:
 
     public static void main(String[] args) throws IOException
     {
+        final CPUType cpuType = CPUType.M68000;
+
         final Map<Instruction,List<InstructionEncoding>> allEncodings =
             new HashMap<>();
         allEncodings.put(Instruction.NEGX,Arrays.asList(Instruction.NEGX_ENCODING));
@@ -509,10 +512,118 @@ outer:
         allEncodings.put(Instruction.ADDX,Arrays.asList(Instruction.ADDX_ADDRREG_ENCODING,Instruction.ADDX_DATAREG_ENCODING));
         allEncodings.put(Instruction.SUBI,Arrays.asList(Instruction.SUBI_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
         allEncodings.put(Instruction.CMPI,Arrays.asList(Instruction.CMPI_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
+        allEncodings.put(Instruction.ADDI,Arrays.asList(Instruction.ADDI_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
+        allEncodings.put(Instruction.CMPA,Arrays.asList(Instruction.CMPA_WORD_ENCODING,Instruction.CMPA_LONG_ENCODING));
+        allEncodings.put(Instruction.SUBA,Arrays.asList(Instruction.SUBA_WORD_ENCODING,Instruction.SUBA_LONG_ENCODING));
+        allEncodings.put(Instruction.ADDA,Arrays.asList(Instruction.ADDA_WORD_ENCODING,Instruction.ADDA_LONG_ENCODING));
+        allEncodings.put(Instruction.SUBQ,Arrays.asList(Instruction.SUBQ_ENCODING));
+        allEncodings.put(Instruction.ADDQ,Arrays.asList(Instruction.ADDQ_ENCODING));
+        allEncodings.put(Instruction.DIVS,Arrays.asList(Instruction.DIVS_ENCODING));
+        allEncodings.put(Instruction.DIVU,Arrays.asList(Instruction.DIVU_ENCODING));
+        allEncodings.put(Instruction.MULS,Arrays.asList(Instruction.MULS_ENCODING));
+        allEncodings.put(Instruction.MULU,Arrays.asList(Instruction.MULU_ENCODING));
+        allEncodings.put(Instruction.EORI,Arrays.asList(
+            Instruction.EORI_WORD_ENCODING,
+            Instruction.EORI_TO_CCR_ENCODING,
+            Instruction.EORI_TO_SR_ENCODING));
+        allEncodings.put(Instruction.ORI,Arrays.asList(
+            Instruction.ORI_WORD_ENCODING,
+            Instruction.ORI_TO_CCR_ENCODING,
+            Instruction.ORI_TO_SR_ENCODING));
 
-        /*
-         ***************************
-         */
+        allEncodings.put(Instruction.MOVEP,Arrays.asList(
+            Instruction.MOVEP_WORD_FROM_MEMORY_ENCODING,
+            Instruction.MOVEP_LONG_FROM_MEMORY_ENCODING,
+            Instruction.MOVEP_WORD_TO_MEMORY_ENCODING,
+            Instruction.MOVEP_LONG_TO_MEMORY_ENCODING));
+
+        allEncodings.put(Instruction.MOVEM,Arrays.asList(Instruction.MOVEM_FROM_REGISTERS_ENCODING, Instruction.MOVEM_TO_REGISTERS_ENCODING));
+        allEncodings.put(Instruction.CHK,Arrays.asList(Instruction.CHK_WORD_ENCODING,Instruction.CHK_LONG_ENCODING));
+        allEncodings.put(Instruction.TAS,Arrays.asList(Instruction.TAS_ENCODING));
+        allEncodings.put(Instruction.STOP,Arrays.asList(Instruction.STOP_ENCODING));
+        allEncodings.put(Instruction.NOT,Arrays.asList(Instruction.NOT_ENCODING));
+        allEncodings.put(Instruction.TRAPV,Arrays.asList(Instruction.TRAPV_ENCODING));
+        allEncodings.put(Instruction.TST,Arrays.asList(Instruction.TST_ENCODING));
+        allEncodings.put(Instruction.CLR,Arrays.asList(Instruction.CLR_ENCODING));
+        allEncodings.put(Instruction.BCHG, Arrays.asList(Instruction.BCHG_DYNAMIC_ENCODING, Instruction.BCHG_STATIC_ENCODING));
+        allEncodings.put(Instruction.BSET, Arrays.asList(Instruction.BSET_DYNAMIC_ENCODING, Instruction.BSET_STATIC_ENCODING));
+        allEncodings.put(Instruction.BCLR, Arrays.asList(Instruction.BCLR_DYNAMIC_ENCODING, Instruction.BCLR_STATIC_ENCODING));
+        allEncodings.put(Instruction.BTST, Arrays.asList(Instruction.BTST_DYNAMIC_ENCODING, Instruction.BTST_STATIC_ENCODING));
+        allEncodings.put(Instruction.EXT, Arrays.asList(Instruction.EXTW_ENCODING, Instruction.EXTL_ENCODING));
+        allEncodings.put(Instruction.ASL,
+            Arrays.asList(
+                Instruction.ASL_IMMEDIATE_ENCODING,
+                Instruction.ASL_MEMORY_ENCODING,
+                Instruction.ASL_REGISTER_ENCODING));
+        allEncodings.put(Instruction.ASR,Arrays.asList(
+                Instruction.ASR_IMMEDIATE_ENCODING,
+                Instruction.ASR_MEMORY_ENCODING,
+                Instruction.ASR_REGISTER_ENCODING));
+        allEncodings.put(Instruction.ROXL,Arrays.asList(
+                Instruction.ROXL_IMMEDIATE_ENCODING,
+                Instruction.ROXL_MEMORY_ENCODING,
+                Instruction.ROXL_REGISTER_ENCODING));
+        allEncodings.put(Instruction.ROXR,Arrays.asList(
+                Instruction.ROXR_IMMEDIATE_ENCODING,
+                Instruction.ROXR_MEMORY_ENCODING,
+                Instruction.ROXR_REGISTER_ENCODING));
+        allEncodings.put(Instruction.LSL,Arrays.asList(
+            Instruction.LSL_IMMEDIATE_ENCODING,
+            Instruction.LSL_MEMORY_ENCODING,
+            Instruction.LSL_REGISTER_ENCODING));
+        allEncodings.put(Instruction.LSR,Arrays.asList(
+            Instruction.LSR_IMMEDIATE_ENCODING,
+            Instruction.LSR_MEMORY_ENCODING,
+            Instruction.LSR_REGISTER_ENCODING));
+        allEncodings.put(Instruction.ROL,Arrays.asList(
+            Instruction.ROL_IMMEDIATE_ENCODING,
+            Instruction.ROL_MEMORY_ENCODING,
+            Instruction.ROL_REGISTER_ENCODING));
+        allEncodings.put(Instruction.ROR,Arrays.asList(
+            Instruction.ROR_IMMEDIATE_ENCODING,
+            Instruction.ROR_MEMORY_ENCODING,
+            Instruction.ROR_REGISTER_ENCODING));
+        allEncodings.put(Instruction.NEG,Arrays.asList(Instruction.NEG_ENCODING));
+        allEncodings.put(Instruction.PEA,Arrays.asList(Instruction.PEA_ENCODING));
+        allEncodings.put(Instruction.RTR,Arrays.asList(Instruction.RTR_ENCODING));
+        allEncodings.put(Instruction.RESET,Arrays.asList(Instruction.RESET_ENCODING));
+        allEncodings.put(Instruction.UNLK,Arrays.asList(Instruction.UNLK_ENCODING));
+        allEncodings.put(Instruction.LINK,Arrays.asList(Instruction.LINK_ENCODING));
+        allEncodings.put(Instruction.RTS,Arrays.asList(Instruction.RTS_ENCODING));
+        allEncodings.put(Instruction.JSR,Arrays.asList(Instruction.JSR_ENCODING));
+        allEncodings.put(Instruction.SWAP,Arrays.asList(Instruction.SWAP_ENCODING));
+        allEncodings.put(Instruction.JMP,Arrays.asList(Instruction.JMP_INDIRECT_ENCODING) ); // only one encoding needed (differ only in bits 16+)
+        allEncodings.put(Instruction.EOR,Arrays.asList(Instruction.EOR_DST_EA_ENCODING));
+        allEncodings.put(Instruction.OR,Arrays.asList(Instruction.OR_DST_EA_ENCODING,Instruction.OR_SRC_EA_ENCODING));
+        allEncodings.put(Instruction.AND,Arrays.asList(Instruction.AND_DST_EA_ENCODING,Instruction.AND_SRC_EA_ENCODING));
+        allEncodings.put(Instruction.SCC,Arrays.asList(Instruction.SCC_ENCODING));
+        allEncodings.put(Instruction.DBCC,Arrays.asList(Instruction.DBCC_ENCODING));
+
+        allEncodings.put(Instruction.BCC,Arrays.asList(
+            Instruction.BCC_8BIT_ENCODING,
+            Instruction.BCC_16BIT_ENCODING,
+            Instruction.BCC_32BIT_ENCODING));
+
+        allEncodings.put(Instruction.NOP,Arrays.asList(Instruction.NOP_ENCODING));
+
+        allEncodings.put(Instruction.EXG,Arrays.asList(
+            Instruction.EXG_ADR_ADR_ENCODING,
+            Instruction.EXG_DATA_ADR_ENCODING,
+            Instruction.EXG_DATA_DATA_ENCODING));
+
+        allEncodings.put(Instruction.MOVEA,Arrays.asList(Instruction.MOVEA_WORD_ENCODING,Instruction.MOVEA_LONG_ENCODING));
+        allEncodings.put(Instruction.MOVEQ,Arrays.asList(Instruction.MOVEQ_ENCODING));
+
+        allEncodings.put(Instruction.MOVE,Arrays.asList(
+            Instruction.MOVE_WORD_ENCODING     ,
+            Instruction.MOVE_TO_CCR_ENCODING   ,
+            Instruction.MOVE_FROM_SR_ENCODING  ,
+            Instruction.MOVE_TO_SR_ENCODING    ,
+            Instruction.MOVE_AX_TO_USP_ENCODING,
+            Instruction.MOVE_USP_TO_AX_ENCODING));
+            
+        allEncodings.put(Instruction.LEA,Arrays.asList(Instruction.LEA_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
+
         final Map<Integer, Instruction> mappings = new HashMap<>();
 
         for ( var entry : allEncodings.entrySet() )
@@ -520,8 +631,11 @@ outer:
             final Instruction instruction = entry.getKey();
             for (InstructionEncoding enc : entry.getValue() )
             {
-                System.out.println("Processing encoding: " + enc);
-                new EncodingTableGenerator().addMappings(enc, instruction, CPUType.M68000, mappings);
+                if ( cpuType.supports(enc) )
+                {
+                    System.out.println("Processing encoding: " + enc);
+                    new EncodingTableGenerator().addMappings(enc, instruction, cpuType, mappings);
+                }
             }
         }
 

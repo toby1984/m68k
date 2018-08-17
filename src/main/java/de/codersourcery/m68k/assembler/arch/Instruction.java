@@ -10,14 +10,13 @@ import de.codersourcery.m68k.parser.ast.RegisterNode;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -243,20 +242,27 @@ public enum Instruction
                 @Override public boolean supportsExplicitOperandSize() { return true; }
 
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sizeBits().with( Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE));
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
-                    Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.ALTERABLE );
-                    if ( node.destination().hasAddressingMode(ADDRESS_REGISTER_DIRECT) &&
-                            node.destination().getValue().isAddressRegister() )
-                    {
-                        throw new RuntimeException("Cannot use ADDI for address registers");
-                    }
+                    Instruction.checkDestinationAddressingModeKind(node,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE );
                 }
             },
     CMPA("CMPA",2)
         {
             @Override public boolean supportsExplicitOperandSize() { return true; }
+
+            @Override
+            public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+            {
+                return Instruction.sourceAddressingModes().with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+            }
 
             @Override
             public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -272,6 +278,12 @@ public enum Instruction
                 @Override public boolean supportsExplicitOperandSize() { return true; }
 
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sourceAddressingModes().with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_DIRECT);
@@ -285,6 +297,12 @@ public enum Instruction
                 @Override public boolean supportsExplicitOperandSize() { return true; }
 
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sourceAddressingModes().with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     Instruction.checkDestinationAddressingMode(node,AddressingMode.ADDRESS_REGISTER_DIRECT);
@@ -296,6 +314,13 @@ public enum Instruction
     SUBQ("SUBQ",2)
             {
                 @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sizeBits().with( Instruction.destAddressingModes(cpuType,AddressingModeKind.ALTERABLE) )
+                        .with( Instruction.range(Field.SRC_VALUE,0,8 ) );
+                }
 
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -320,6 +345,14 @@ public enum Instruction
                 @Override public boolean supportsExplicitOperandSize() { return true; }
 
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sizeBits()
+                        .with( Instruction.destAddressingModes(cpuType,AddressingModeKind.ALTERABLE) )
+                        .with( Instruction.range(Field.SRC_VALUE,0,8 ) );
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     Instruction.checkSourceAddressingMode(node,AddressingMode.IMMEDIATE_VALUE);
@@ -342,6 +375,13 @@ public enum Instruction
                 @Override public boolean supportsExplicitOperandSize() { return true; }
 
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA)
+                        .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     checkMultiplyDivide(node);
@@ -350,6 +390,13 @@ public enum Instruction
     DIVU("DIVU",2)
             {
                 @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA)
+                        .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                }
 
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -362,6 +409,13 @@ public enum Instruction
                 @Override public boolean supportsExplicitOperandSize() { return true; }
 
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA)
+                        .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     checkMultiplyDivide(node);
@@ -370,6 +424,13 @@ public enum Instruction
     MULU("MULU",2)
             {
                 @Override public boolean supportsExplicitOperandSize() { return true; }
+
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA)
+                        .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                }
 
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -383,6 +444,12 @@ public enum Instruction
                 public boolean supportsExplicitOperandSize()
                 {
                     return true;
+                }
+
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sizeBits().with( Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE));
                 }
 
                 @Override
@@ -400,6 +467,12 @@ public enum Instruction
                 }
 
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sizeBits().with( Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE));
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     checkBinaryLogicalOperation(node,estimateSizeOnly,ctx);
@@ -411,6 +484,12 @@ public enum Instruction
                 public boolean supportsExplicitOperandSize()
                 {
                     return true;
+                }
+
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.registerRange(Field.SRC_BASE_REGISTER).with(Instruction.registerRange(Field.DST_BASE_REGISTER));
                 }
 
                 @Override
@@ -444,6 +523,25 @@ public enum Instruction
                 }
 
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    if ( encoding == MOVEM_FROM_REGISTERS_ENCODING ) { // registers->memory
+                        return intValues(Field.SIZE,0,1).with(
+                            Instruction.destAddressingModes(cpuType,
+                            mode-> mode == AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT ||
+                                mode.hasKinds(AddressingModeKind.ALTERABLE,AddressingModeKind.CONTROL)));
+                    }
+                    if ( encoding == MOVEM_TO_REGISTERS_ENCODING ) { // memory->registers
+                        return intValues(Field.SIZE,0,1).with(
+                            Instruction.sourceAddressingModes(cpuType,
+                                mode-> mode == AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT ||
+                                    mode.hasKind(AddressingModeKind.CONTROL)));
+                    } else {
+                        throw new RuntimeException("Unreachable code reached");
+                    }
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     if ( node.hasExplicitOperandSize() && !(node.hasOperandSize(OperandSize.WORD) || node.hasOperandSize(OperandSize.LONG) ) )
@@ -462,52 +560,42 @@ public enum Instruction
                     if ( registersToMemory )
                     {
                         // registers -> memory
-                        switch( node.destination().addressingMode )
-                        {
-                            case ADDRESS_REGISTER_INDIRECT:
-                            case ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT:
-                            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
-                            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
-                            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
-                            case ABSOLUTE_SHORT_ADDRESSING:
-                            case ABSOLUTE_LONG_ADDRESSING:
-                                break;
-                            default:
-                                throw new RuntimeException("Invalid addressing mode "+node.destination().addressingMode+" for MOVEM destination operand");
-                        }
-                        // TODO: 68020+ supports more addressing modes here...
+                        Instruction.checkDestinationAddressingMode(node,
+                            mode-> mode == AddressingMode.ADDRESS_REGISTER_INDIRECT_PRE_DECREMENT ||
+                                mode.hasKinds(AddressingModeKind.ALTERABLE,AddressingModeKind.CONTROL));
                     }
                     else
                     {
                         // memory -> registers
-                        switch( node.source().addressingMode )
-                        {
-                            case ADDRESS_REGISTER_INDIRECT:
-                            case ADDRESS_REGISTER_INDIRECT_POST_INCREMENT:
-                            case ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT:
-                            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
-                            case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
-                            case PC_INDIRECT_WITH_DISPLACEMENT:
-                            case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
-                            case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
-                            case ABSOLUTE_SHORT_ADDRESSING:
-                            case ABSOLUTE_LONG_ADDRESSING:
-                                break;
-                            default:
-                                throw new RuntimeException("Invalid addressing mode for MOVEM source operand");
-                        }
-                        // TODO: 68020+ supports more addressing modes here...
+                        Instruction.checkSourceAddressingMode(node,
+                            mode-> mode == AddressingMode.ADDRESS_REGISTER_INDIRECT_POST_INCREMENT ||
+                                mode.hasKind(AddressingModeKind.CONTROL));
                     }
                 }
             },
-    CHK("CHK",2) {
-        @Override
+    CHK("CHK",2)
+        {
+            @Override
+            public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+            {
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA);
+            }
+
+            @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingModeKind( node,AddressingModeKind.DATA );
             Instruction.checkDestinationAddressingMode( node,AddressingMode.DATA_REGISTER_DIRECT );
-            if ( ! node.useImpliedOperandSize && node.getOperandSize() == OperandSize.BYTE ) {
-                throw new RuntimeException("CHK only supports .w or .l operand sizes");
+
+            if ( ! node.useImpliedOperandSize )
+            {
+                if ( node.getOperandSize() == OperandSize.BYTE )
+                {
+                    throw new RuntimeException("CHK only supports .w or .l operand sizes");
+                }
+                if ( node.hasOperandSize(OperandSize.LONG) && ! ctx.options().cpuType.supports(CHK_LONG_ENCODING) ) {
+                    throw new RuntimeException("CHK.L needs 68020 or higher");
+                }
             }
         }
 
@@ -517,11 +605,18 @@ public enum Instruction
             return true;
         }
     },
-    TAS("TAS",1) {
+    TAS("TAS",1)
+    {
+        @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE);
+        }
+
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
-            Instruction.checkSourceAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+            Instruction.checkSourceAddressingModeKind(node,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE);
         }
     },
     STOP("STOP",1) {
@@ -531,11 +626,19 @@ public enum Instruction
             Instruction.checkSourceAddressingMode(node,IMMEDIATE_VALUE);
         }
     },
-    NOT("NOT",1) {
-        @Override
+    NOT("NOT",1)
+        {
+            @Override
+            public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+            {
+                return Instruction.sizeBits().with( Instruction.sourceAddressingModes(cpuType,
+                    AddressingModeKind.ALTERABLE,AddressingModeKind.DATA));
+            }
+
+            @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
-            Instruction.checkSourceAddressingModeKind( node,AddressingModeKind.ALTERABLE );
+            Instruction.checkSourceAddressingModeKind( node,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA);
         }
 
         @Override
@@ -550,8 +653,15 @@ public enum Instruction
         {
         }
     },
-    TST("TST",1) {
-        @Override
+    TST("TST",1)
+        {
+            @Override
+            public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+            {
+                return Instruction.sizeBits().with( Instruction.sourceAddressingModes());
+            }
+
+            @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             final AddressingMode mode = node.source().addressingMode;
@@ -573,36 +683,103 @@ public enum Instruction
             return true;
         }
     },
-    CLR("CLR",1) {
-        @Override
+    CLR("CLR",1)
+        {
+            @Override
+            public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+            {
+                /*
+                    InstructionEncoding.of( "01000010SSmmmsss");
+                 */
+                return Instruction.sizeBits().with( Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,
+                    AddressingModeKind.DATA));
+            }
+
+            @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
-            Instruction.checkSourceAddressingModeKind(node,AddressingModeKind.ALTERABLE);
+            Instruction.checkSourceAddressingModeKind(node,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA);
         }
         @Override public boolean supportsExplicitOperandSize() { return true; }
     },
     BCHG("BCHG",2) {
         @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
         {
-            Instruction.checkBitInstructionValid( node,ctx );
+            if ( encoding == BCHG_DYNAMIC_ENCODING ) {
+                return Instruction.registerRange(Field.SRC_BASE_REGISTER).with(
+                    Instruction.destAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA));
+            }
+            if ( encoding == BCHG_STATIC_ENCODING ) {
+                return Instruction.destAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA);
+            }
+            throw new RuntimeException("Unreachable code reached");
         }
-    },
-    BSET("BSET",2) {
+
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkBitInstructionValid( node,ctx );
         }
     },
-    BCLR("BCLR",2) {
+    BSET("BSET",2)
+        {
+            @Override
+            public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+            {
+                if ( encoding == BSET_DYNAMIC_ENCODING ) {
+                    return Instruction.registerRange(Field.SRC_BASE_REGISTER).with(
+                        Instruction.destAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA));
+                }
+                if ( encoding == BSET_STATIC_ENCODING ) {
+                    return Instruction.destAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA);
+                }
+                throw new RuntimeException("Unreachable code reached");
+            }
+
+            @Override
+        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
+        {
+            Instruction.checkBitInstructionValid( node,ctx );
+        }
+    },
+    BCLR("BCLR",2)
+        {
+            @Override
+            public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+            {
+                if ( encoding == BCLR_DYNAMIC_ENCODING ) {
+                    return Instruction.registerRange(Field.SRC_BASE_REGISTER).with(
+                        Instruction.destAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA));
+                }
+                if ( encoding == BCLR_STATIC_ENCODING ) {
+                    return Instruction.destAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA);
+                }
+                throw new RuntimeException("Unreachable code reached");
+            }
+
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkBitInstructionValid( node,ctx );
         }
     },
-    BTST("BTST",2) {
+    BTST("BTST",2)
+        {
+
+            @Override
+            public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+            {
+                if ( encoding == BTST_DYNAMIC_ENCODING ) {
+                    return Instruction.registerRange(Field.SRC_BASE_REGISTER).with(
+                        Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA));
+                }
+                if ( encoding == BTST_STATIC_ENCODING ) {
+                    return Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA);
+                }
+                throw new RuntimeException("Unreachable code reached");
+            }
+
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
@@ -627,6 +804,12 @@ public enum Instruction
     },
     EXT("EXT",1) {
         @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            return Instruction.registerRange(Field.SRC_BASE_REGISTER);
+        }
+
+        @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             Instruction.checkSourceAddressingMode( node,AddressingMode.DATA_REGISTER_DIRECT );
@@ -641,6 +824,23 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            if ( encoding == ASL_IMMEDIATE_ENCODING ) {
+                return Instruction.sizeBits().with( Instruction.range(Field.SRC_VALUE,0,8))
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
+            }
+            if ( encoding == ASL_MEMORY_ENCODING ) {
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.MEMORY);
+            }
+            if ( encoding == ASL_REGISTER_ENCODING ) {
+                return Instruction.sizeBits().with( range(Field.DST_VALUE,0,8) )
+                    .with( Instruction.registerRange(Field.SRC_BASE_REGISTER));
+            }
+            throw new RuntimeException("Unreachable code reached");
+        }
+
+        @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
@@ -653,6 +853,23 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            if ( encoding == ASR_IMMEDIATE_ENCODING ) {
+                return Instruction.sizeBits().with( Instruction.range(Field.SRC_VALUE,0,8))
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
+            }
+            if ( encoding == ASR_MEMORY_ENCODING ) {
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.MEMORY);
+            }
+            if ( encoding == ASR_REGISTER_ENCODING ) {
+                return Instruction.sizeBits().with( range(Field.DST_VALUE,0,8) )
+                    .with( Instruction.registerRange(Field.SRC_BASE_REGISTER));
+            }
+            throw new RuntimeException("Unreachable code reached");
+        }
+
+        @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
@@ -662,6 +879,23 @@ public enum Instruction
     },
     ROXL("ROXL",2) {
         @Override public int getMinOperandCount() { return 1; }
+
+        @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            if ( encoding == ROXL_IMMEDIATE_ENCODING ) {
+                return Instruction.sizeBits().with( Instruction.range(Field.SRC_VALUE,0,8))
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
+            }
+            if ( encoding == ROXL_MEMORY_ENCODING ) {
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.MEMORY);
+            }
+            if ( encoding == ROXL_REGISTER_ENCODING ) {
+                return Instruction.sizeBits().with( range(Field.DST_VALUE,0,8) )
+                    .with( Instruction.registerRange(Field.SRC_BASE_REGISTER));
+            }
+            throw new RuntimeException("Unreachable code reached");
+        }
 
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -676,6 +910,23 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            if ( encoding == ROXR_IMMEDIATE_ENCODING ) {
+                return Instruction.sizeBits().with( Instruction.range(Field.SRC_VALUE,0,8))
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
+            }
+            if ( encoding == ROXR_MEMORY_ENCODING ) {
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.MEMORY);
+            }
+            if ( encoding == ROXR_REGISTER_ENCODING ) {
+                return Instruction.sizeBits().with( range(Field.DST_VALUE,0,8) )
+                    .with( Instruction.registerRange(Field.SRC_BASE_REGISTER));
+            }
+            throw new RuntimeException("Unreachable code reached");
+        }
+
+        @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
@@ -685,6 +936,23 @@ public enum Instruction
     },
     LSL("LSL",2) {
         @Override public int getMinOperandCount() { return 1; }
+
+        @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            if ( encoding == LSL_IMMEDIATE_ENCODING ) {
+                return Instruction.sizeBits().with( Instruction.range(Field.SRC_VALUE,0,8))
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
+            }
+            if ( encoding == LSL_MEMORY_ENCODING ) {
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.MEMORY);
+            }
+            if ( encoding == LSL_REGISTER_ENCODING ) {
+                return Instruction.sizeBits().with( range(Field.DST_VALUE,0,8) )
+                    .with( Instruction.registerRange(Field.SRC_BASE_REGISTER));
+            }
+            throw new RuntimeException("Unreachable code reached");
+        }
 
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -699,6 +967,23 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            if ( encoding == LSR_IMMEDIATE_ENCODING ) {
+                return Instruction.sizeBits().with( Instruction.range(Field.SRC_VALUE,0,8))
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
+            }
+            if ( encoding == LSR_MEMORY_ENCODING ) {
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.MEMORY);
+            }
+            if ( encoding == LSR_REGISTER_ENCODING ) {
+                return Instruction.sizeBits().with( range(Field.DST_VALUE,0,8) )
+                    .with( Instruction.registerRange(Field.SRC_BASE_REGISTER));
+            }
+            throw new RuntimeException("Unreachable code reached");
+        }
+
+        @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
@@ -709,6 +994,23 @@ public enum Instruction
     ROL("ROL",2) {
 
         @Override public int getMinOperandCount() { return 1; }
+
+        @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            if ( encoding == ROL_IMMEDIATE_ENCODING ) {
+                return Instruction.sizeBits().with( Instruction.range(Field.SRC_VALUE,0,8))
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
+            }
+            if ( encoding == ROL_MEMORY_ENCODING ) {
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.MEMORY);
+            }
+            if ( encoding == ROL_REGISTER_ENCODING ) {
+                return Instruction.sizeBits().with( range(Field.DST_VALUE,0,8) )
+                    .with( Instruction.registerRange(Field.SRC_BASE_REGISTER));
+            }
+            throw new RuntimeException("Unreachable code reached");
+        }
 
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
@@ -723,6 +1025,23 @@ public enum Instruction
         @Override public int getMinOperandCount() { return 1; }
 
         @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            if ( encoding == ROR_IMMEDIATE_ENCODING ) {
+                return Instruction.sizeBits().with( Instruction.range(Field.SRC_VALUE,0,8))
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
+            }
+            if ( encoding == ROR_MEMORY_ENCODING ) {
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.MEMORY);
+            }
+            if ( encoding == ROR_REGISTER_ENCODING ) {
+                return Instruction.sizeBits().with( range(Field.DST_VALUE,0,8) )
+                    .with( Instruction.registerRange(Field.SRC_BASE_REGISTER));
+            }
+            throw new RuntimeException("Unreachable code reached");
+        }
+
+        @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             checkRotateInstructionValid(node,ctx);
@@ -730,16 +1049,30 @@ public enum Instruction
 
         @Override public boolean supportsExplicitOperandSize() { return true; }
     },
-    NEG("NEG",1) {
+    NEG("NEG",1)
+    {
+        @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            return Instruction.sizeBits().with( Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA));
+        }
+
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
-            Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.ALTERABLE );
+            Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.DATA,AddressingModeKind.ALTERABLE );
         }
 
         @Override public boolean supportsExplicitOperandSize() { return true; }
     },
-    PEA("PEA",1) {
+    PEA("PEA",1)
+    {
+        @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.CONTROL);
+        }
+
         @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
@@ -759,6 +1092,12 @@ public enum Instruction
     UNLK("UNLK",1)
             {
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.registerRange(Field.SRC_BASE_REGISTER);
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     if ( ! node.source().getValue().isAddressRegister() ) {
@@ -768,6 +1107,12 @@ public enum Instruction
             },
     LINK("LINK",2)
             {
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.registerRange(Field.SRC_BASE_REGISTER);
+                }
+
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
@@ -791,6 +1136,12 @@ public enum Instruction
     JSR("JSR",1)
             {
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.CONTROL);
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
@@ -798,6 +1149,12 @@ public enum Instruction
             },
     SWAP("SWAP",1)
             {
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.registerRange(Field.SRC_BASE_REGISTER);
+                }
+
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
@@ -818,6 +1175,12 @@ public enum Instruction
     JMP("JMP",1)
             {
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.CONTROL);
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     Instruction.checkSourceAddressingModeKind(node, AddressingModeKind.CONTROL);
@@ -825,6 +1188,14 @@ public enum Instruction
             },
     EOR("EOR",2)
             {
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sizeBits()
+                        .with( Instruction.registerRange(Field.SRC_BASE_REGISTER))
+                        .with( Instruction.destAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA));
+                }
+
                 @Override
                 public boolean supportsExplicitOperandSize()
                 {
@@ -840,6 +1211,22 @@ public enum Instruction
     OR("OR",2)
             {
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    if ( encoding == OR_SRC_EA_ENCODING ) { // OR <ea>,Dn
+                        return Instruction.sizeBits().with(
+                            Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA) )
+                            .with(Instruction.registerRange(Field.DST_BASE_REGISTER));
+                    }
+                    if ( encoding == OR_DST_EA_ENCODING ) { // OR Dn,<ea>
+                        return Instruction.sizeBits().with(
+                            Instruction.destAddressingModes(cpuType,AddressingModeKind.MEMORY,AddressingModeKind.ALTERABLE) )
+                            .with(Instruction.registerRange(Field.SRC_BASE_REGISTER));
+                    }
+                    throw new RuntimeException("Unreachable code reached");
+                }
+
+                @Override
                 public boolean supportsExplicitOperandSize()
                 {
                     return true;
@@ -853,6 +1240,22 @@ public enum Instruction
             },
     AND("AND",2)
             {
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    if ( encoding == AND_SRC_EA_ENCODING ) { // AND <ea>,Dn
+                        return Instruction.sizeBits().with(
+                            Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA) )
+                            .with(Instruction.registerRange(Field.DST_BASE_REGISTER));
+                    }
+                    if ( encoding == AND_DST_EA_ENCODING ) { // AND Dn,<ea>
+                        return Instruction.sizeBits().with(
+                            Instruction.destAddressingModes(cpuType,AddressingModeKind.MEMORY,AddressingModeKind.ALTERABLE) )
+                            .with(Instruction.registerRange(Field.SRC_BASE_REGISTER));
+                    }
+                    throw new RuntimeException("Unreachable code reached");
+                }
+
                 @Override
                 public boolean supportsExplicitOperandSize()
                 {
@@ -909,6 +1312,7 @@ public enum Instruction
      * Scc instructions
      */
     ST("ST",1, 0b0000,Condition.BRT,ConditionalInstructionType.SCC) { // always true
+
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SF("SF",1, 0b0001,Condition.BSR,ConditionalInstructionType.SCC) { // always false
@@ -917,10 +1321,20 @@ public enum Instruction
     SHI("SHI",1, 0b0010,Condition.BHI,ConditionalInstructionType.SCC) {
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
-    SLS("SLS",1, 0b0011,Condition.BLS,ConditionalInstructionType.SCC) {
+    SLS("SLS",1, 0b0011,Condition.BLS,ConditionalInstructionType.SCC)
+        {
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
-    SCC("SCC",1, 0b0100,Condition.BCC,ConditionalInstructionType.SCC) {
+    SCC("SCC",1, 0b0100,Condition.BCC,ConditionalInstructionType.SCC)
+    {
+        // note that this getValueIterator() actually produces bit-patterns for
+        // all Scc instructions and not just SCC
+        @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE)
+                .with( Instruction.range(Field.CONDITION_CODE,0,16));
+        }
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkSccInstructionValid(node,ctx); }
     },
     SCS("SCS",1, 0b0101,Condition.BCS,ConditionalInstructionType.SCC) {
@@ -971,7 +1385,17 @@ public enum Instruction
     DBLS("DBLS",2, 0b0011,Condition.BLS,ConditionalInstructionType.DBCC) {
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
-    DBCC("DBCC",2, 0b0100,Condition.BCC,ConditionalInstructionType.DBCC) {
+    DBCC("DBCC",2, 0b0100,Condition.BCC,ConditionalInstructionType.DBCC)
+    {
+        // note that this getValueIterator() actually produces bit-patterns for
+        // all DBcc instructions and not just dbcc
+        @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            return Instruction.range(Field.CONDITION_CODE,0,16)
+                .with( Instruction.registerRange(Field.SRC_BASE_REGISTER));
+        }
+
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkDBccInstructionValid(node,ctx); }
     },
     DBCS("DBCS",2, 0b0101,Condition.BCS,ConditionalInstructionType.DBCC) {
@@ -1022,7 +1446,19 @@ public enum Instruction
     BLS("BLS",1, 0b0011,Condition.BLS,ConditionalInstructionType.BCC) {
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
-    BCC("BCC",1, 0b0100,Condition.BCC,ConditionalInstructionType.BCC) {
+    BCC("BCC",1, 0b0100,Condition.BCC,ConditionalInstructionType.BCC)
+    {
+        // note that this getValueIterator() actually produces bit-patterns for
+        // all Bcc instructions and not just bcc
+        @Override
+        public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+        {
+            if ( encoding == BCC_8BIT_ENCODING ) {
+                return Instruction.range(Field.CONDITION_CODE,0,16)
+                    .with( range(Field.RELATIVE_OFFSET,1,255) );
+            }
+            return Instruction.range(Field.CONDITION_CODE,0,16);
+        }
         @Override public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly) { checkBranchInstructionValid(node,ctx); }
     },
     BCS("BCS",1, 0b0101,Condition.BCS,ConditionalInstructionType.BCC) {
@@ -1072,6 +1508,13 @@ public enum Instruction
     EXG("exg",2, 0b1100)
             {
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.registerRange(Field.EXG_ADDRESS_REGISTER)
+                        .with( Instruction.registerRange(Field.EXG_DATA_REGISTER ) );
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     final OperandNode source = node.source();
@@ -1091,8 +1534,15 @@ public enum Instruction
                     }
                 }
             },
-    MOVEA("movea", 2, 0b0000) {
-        @Override
+    MOVEA("movea", 2, 0b0000)
+        {
+            @Override
+            public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+            {
+                return Instruction.sourceAddressingModes();
+            }
+
+            @Override
         public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
         {
             if ( ! node.destination().getValue().isAddressRegister() ) {
@@ -1112,6 +1562,13 @@ public enum Instruction
     MOVEQ("moveq", 2, 0b0111)
             {
                 @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.registerRange(Field.DST_BASE_REGISTER)
+                        .with( range(Field.SRC_VALUE,0,256 ) );
+                }
+
+                @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
                     final OperandNode source = node.source();
@@ -1130,6 +1587,32 @@ public enum Instruction
             },
     MOVE("move", 2, 0b0000)
             {
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    if ( encoding == MOVE_BYTE_ENCODING || encoding == MOVE_WORD_ENCODING || encoding == MOVE_LONG_ENCODING) {
+                        return Instruction.sourceAddressingModes()
+                            .with( Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE));
+                    }
+                    if ( encoding == MOVE_TO_CCR_ENCODING )
+                    {
+                        return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA);
+                    }
+                    if ( encoding == MOVE_AX_TO_USP_ENCODING ) {
+                        return Instruction.registerRange(Field.SRC_BASE_REGISTER);
+                    }
+                    if ( encoding == MOVE_USP_TO_AX_ENCODING ) {
+                        return Instruction.registerRange(Field.DST_BASE_REGISTER);
+                    }
+                    if ( encoding == MOVE_FROM_SR_ENCODING ) {
+                        return Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE);
+                    }
+                    if ( encoding == MOVE_TO_SR_ENCODING ) {
+                        return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA);
+                    }
+                    throw new RuntimeException("Unreachable code reached");
+                }
+
                 @Override
                 public int getOperationCode(InstructionNode insn)
                 {
@@ -1154,6 +1637,13 @@ public enum Instruction
             },
     LEA("lea", 2, 0b0100)
             {
+                @Override
+                public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
+                {
+                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.CONTROL)
+                        .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                }
+
                 @Override
                 public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
                 {
@@ -1616,7 +2106,7 @@ destination Dn mode, not the destination < ea > mode.
             case RESET:
                 return RESET_ENCODING;
             case UNLK:
-                return UNLINK_ENCODING;
+                return UNLK_ENCODING;
             case LINK:
                 return LINK_ENCODING;
             case RTS:
@@ -2119,6 +2609,7 @@ D/A   |     |   |           |
     }
 
     private static void checkMultiplyDivide(InstructionNode node) {
+        checkSourceAddressingModeKind(node,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE);
         if ( node.hasExplicitOperandSize() && ! node.hasOperandSize(OperandSize.WORD ) ) {
             throw new RuntimeException(node.instruction.getMnemonic()+"on 68000 only supports word operands");
         }
@@ -2199,7 +2690,7 @@ D/A   |     |   |           |
 
     private static void checkBitInstructionValid(InstructionNode node,ICompilationContext ctx)
     {
-        Instruction.checkDestinationAddressingModeKind( node,AddressingModeKind.ALTERABLE );
+        Instruction.checkDestinationAddressingModeKind( node,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE );
         if ( node.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
             final Integer bitNum = node.source().getValue().getBits( ctx );
             if ( node.destination().addressingMode.hasKind( AddressingModeKind.MEMORY ) ) {
@@ -2381,53 +2872,40 @@ D/A   |     |   |           |
         }
     }
 
-    private static void checkSourceAddressingMode(InstructionNode insn, AddressingMode mode1,AddressingMode...additional)
+    private static void checkSourceAddressingMode(InstructionNode insn, AddressingMode mode1,AddressingMode...additional) {
+        final Set<AddressingMode> set = toSet(mode1, additional);
+        checkSourceAddressingMode(insn, set::contains );
+    }
+
+    private static void checkSourceAddressingMode(InstructionNode insn, Predicate<AddressingMode> pred)
     {
         if ( insn.operandCount() < 1 ) {
             throw new RuntimeException( insn+" lacks source operand");
         }
-        if (noMatchingAddressingMode(insn.source(), mode1, additional))
+        if ( ! pred.test( insn.source().addressingMode) )
         {
-            final List<AddressingMode> modes = new ArrayList<>();
-            modes.add(mode1);
-            if ( additional != null ) {
-                modes.addAll(Arrays.asList(additional));
-            }
-            throw new RuntimeException("Unsupported addressing mode in source operand, instruction "+insn.instruction+" only supports "+modes);
+            final List<AddressingMode> modes = Stream.of(AddressingMode.values()).filter(pred).collect(Collectors.toList());
+            throw new RuntimeException("Unsupported addressing mode in source operand, " +
+                "instruction "+insn.instruction+" only supports "+modes);
         }
     }
 
-    private static void checkDestinationAddressingMode(InstructionNode insn, AddressingMode mode1,AddressingMode...additional)
+    private static void checkDestinationAddressingMode(InstructionNode insn, AddressingMode mode1,AddressingMode...additional) {
+        final Set<AddressingMode> set = toSet(mode1, additional);
+        checkDestinationAddressingMode(insn, set::contains );
+    }
+
+    private static void checkDestinationAddressingMode(InstructionNode insn, Predicate<AddressingMode> pred)
     {
         if ( insn.operandCount() < 2 ) {
             throw new RuntimeException( insn+" lacks destination operand");
         }
-        if (noMatchingAddressingMode(insn.destination(), mode1, additional))
+        if ( ! pred.test( insn.destination().addressingMode) )
         {
-            final List<AddressingMode> modes = new ArrayList<>();
-            modes.add(mode1);
-            if ( additional != null ) {
-                modes.addAll(Arrays.asList(additional));
-            }
-            throw new RuntimeException("Unsupported addressing mode in destination operand, instruction "+insn.instruction+" only supports "+modes);
+            final List<AddressingMode> modes = Stream.of(AddressingMode.values()).filter(pred).collect(Collectors.toList());
+            throw new RuntimeException("Unsupported addressing mode in destination operand, " +
+                "instruction "+insn.instruction+" only supports "+modes);
         }
-    }
-
-    private static boolean noMatchingAddressingMode(OperandNode operand, AddressingMode mode1, AddressingMode...additional)
-    {
-        if ( operand.hasAddressingMode(mode1) ) {
-            return false;
-        }
-        if ( additional != null )
-        {
-            for ( AddressingMode expected : additional)
-            {
-                if ( operand.hasAddressingMode(expected ) ) {
-                    return false;
-                }
-            }
-        }
-        return true;
     }
 
     private static void checkSourceAddressingModeKind(InstructionNode insn, AddressingModeKind kind1,AddressingModeKind...additional)
@@ -2545,8 +3023,8 @@ D/A   |     |   |           |
     public static final InstructionEncoding RTE_ENCODING = InstructionEncoding.of( "0100111001110011");
 
     public static final InstructionEncoding JMP_INDIRECT_ENCODING = InstructionEncoding.of( "0100111011mmmsss");
-    public static final InstructionEncoding JMP_SHORT_ENCODING = InstructionEncoding.of(    "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding JMP_LONG_ENCODING = InstructionEncoding.of(     "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding JMP_SHORT_ENCODING =    InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding JMP_LONG_ENCODING =     InstructionEncoding.of( "0100111011mmmsss","vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
 
     public static final InstructionEncoding MOVEP_WORD_FROM_MEMORY_ENCODING = // MOVEP.W d16(An),Dx
             InstructionEncoding.of("0000DDD100001sss", "bbbbbbbb_bbbbbbbb");
@@ -2560,18 +3038,16 @@ D/A   |     |   |           |
     public static final InstructionEncoding MOVE_BYTE_ENCODING = InstructionEncoding.of("0001DDDMMMmmmsss");
     public static final InstructionEncoding MOVE_WORD_ENCODING = InstructionEncoding.of("0011DDDMMMmmmsss");
     public static final InstructionEncoding MOVE_LONG_ENCODING = InstructionEncoding.of("0010DDDMMMmmmsss");
+    public static final InstructionEncoding MOVE_TO_CCR_ENCODING = InstructionEncoding.of("0100010011mmmsss");
+    public static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
+    public static final InstructionEncoding MOVE_USP_TO_AX_ENCODING = InstructionEncoding.of("0100111001101DDD");
+    public static final InstructionEncoding MOVE_FROM_SR_ENCODING = InstructionEncoding.of(  "0100000011MMMDDD");
+    public static final InstructionEncoding MOVE_TO_SR_ENCODING   = InstructionEncoding.of(  "0100011011mmmsss");
 
     public static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
 
     public static final InstructionEncoding LEA_LONG_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
     public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv");
-
-    public static final InstructionEncoding MOVE_TO_CCR_ENCODING =
-            InstructionEncoding.of("0100010011mmmsss");
-
-    public static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
-
-    public static final InstructionEncoding MOVE_USP_TO_AX_ENCODING = InstructionEncoding.of("0100111001101DDD");
 
     public static final InstructionEncoding ILLEGAL_ENCODING = InstructionEncoding.of( "0100101011111100");
 
@@ -2586,19 +3062,12 @@ D/A   |     |   |           |
     public static final InstructionEncoding DBCC_ENCODING = InstructionEncoding.of( "0101cccc11001sss",
             "CCCCCCCC_CCCCCCCC");
 
-    public static final InstructionEncoding BCC_8BIT_ENCODING =
-            InstructionEncoding.of(  "0110ccccCCCCCCCC");
-
+    public static final InstructionEncoding BCC_8BIT_ENCODING = InstructionEncoding.of(  "0110ccccCCCCCCCC");
     public static final InstructionEncoding BCC_16BIT_ENCODING = InstructionEncoding.of( "0110cccc00000000","CCCCCCCC_CCCCCCCC");
-
-    public static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111",
-            "CCCCCCCC_CCCCCCCC_CCCCCCCC_CCCCCCCC");
+    public static final InstructionEncoding BCC_32BIT_ENCODING = InstructionEncoding.of( "0110cccc11111111", "CCCCCCCC_CCCCCCCC_CCCCCCCC_CCCCCCCC");
 
     public static final InstructionEncoding MOVEA_WORD_ENCODING = InstructionEncoding.of(  "0011DDD001mmmsss");
     public static final InstructionEncoding MOVEA_LONG_ENCODING = InstructionEncoding.of(  "0010DDD001mmmsss");
-
-    public static final InstructionEncoding MOVE_FROM_SR_ENCODING = InstructionEncoding.of(  "0100000011MMMDDD");
-    public static final InstructionEncoding MOVE_TO_SR_ENCODING   = InstructionEncoding.of(  "0100011011mmmsss");
 
     public static final InstructionEncoding SWAP_ENCODING = InstructionEncoding.of(  "0100100001000sss");
 
@@ -2609,7 +3078,7 @@ D/A   |     |   |           |
     // TODO: 68020+ supports LONG displacement value as well
     public static final InstructionEncoding LINK_ENCODING = InstructionEncoding.of( "0100111001010sss",
             "VVVVVVVV_VVVVVVVV");
-    public static final InstructionEncoding UNLINK_ENCODING = InstructionEncoding.of( "0100111001011sss");
+    public static final InstructionEncoding UNLK_ENCODING = InstructionEncoding.of( "0100111001011sss");
 
     public static final InstructionEncoding RESET_ENCODING = InstructionEncoding.of( "0100111001110000");
 
@@ -2702,7 +3171,7 @@ D/A   |     |   |           |
     public static final InstructionEncoding CMPA_WORD_ENCODING = // CMPA.W <ea>,An
         InstructionEncoding.of( "1011DDD011mmmsss");
 
-    public static final InstructionEncoding CMPA_LONG_ENCODING = // CMPA.W <ea>,An
+    public static final InstructionEncoding CMPA_LONG_ENCODING = // CMPA.L <ea>,An
         InstructionEncoding.of( "1011DDD111mmmsss");
 
     public static final InstructionEncoding CMPI_WORD_ENCODING = // CMPI.w #xx,<ea>
@@ -2842,7 +3311,7 @@ D/A   |     |   |           |
         put(JSR_ENCODING,JSR);
         put(RTS_ENCODING,RTS);
         put(LINK_ENCODING,LINK);
-        put(UNLINK_ENCODING,UNLK);
+        put(UNLK_ENCODING,UNLK);
         put(RESET_ENCODING,RESET);
         put(RTR_ENCODING,RTR);
         put(PEA_ENCODING,PEA);
@@ -2996,7 +3465,7 @@ D/A   |     |   |           |
 
     private static EncodingTableGenerator.IValueIterator sizeBits()
     {
-        return values(Field.SIZE,0b00,0b01,0b10);
+        return intValues(Field.SIZE,0b00,0b01,0b10);
     }
 
 
@@ -3008,7 +3477,7 @@ D/A   |     |   |           |
         return new EncodingTableGenerator.RangedValueIterator(field,startInclusive,endValueExclusive);
     }
 
-    private static EncodingTableGenerator.IValueIterator values(Field field,int value1,int... values) {
+    private static EncodingTableGenerator.IValueIterator intValues(Field field,int value1,int... values) {
         return new EncodingTableGenerator.IntValueIterator(field,value1,values);
     }
 
@@ -3036,14 +3505,7 @@ D/A   |     |   |           |
     private static EncodingTableGenerator.IValueIterator sourceAddressingModes(CPUType cpuType,AddressingModeKind kind1,AddressingModeKind... kinds)
     {
         final Set<AddressingModeKind> set = toSet(kind1, kinds);
-        final List<AddressingMode> values =
-            Stream.of(AddressingMode.values()).filter(mode -> mode.hasKinds(set)).collect(Collectors.toList() );
-        values.removeIf(x -> ! cpuType.supports(x) );
-        if ( values.size() <= 1 ) {
-            return sourceAddressingModes(values.get(0));
-        }
-        final AddressingMode[] subArray = values.stream().skip(1).toArray(size->new AddressingMode[size]);
-        return sourceAddressingModes(values.get(0),subArray);
+        return sourceAddressingModes(cpuType, mode -> mode.hasKinds(set) );
     }
 
     private static EncodingTableGenerator.IValueIterator destAddressingModes()
@@ -3061,13 +3523,34 @@ D/A   |     |   |           |
     private static EncodingTableGenerator.IValueIterator destAddressingModes(CPUType cpuType,AddressingModeKind kind1,AddressingModeKind... kinds)
     {
         final Set<AddressingModeKind> set = toSet(kind1, kinds);
-        final List<AddressingMode> values =
-            Stream.of(AddressingMode.values()).filter(mode -> mode.hasKinds(set)).collect(Collectors.toList() );
-        values.removeIf(x -> ! cpuType.supports(x) );
+        return destAddressingModes(cpuType, mode -> mode.hasKinds(set ) );
+    }
+
+    private static EncodingTableGenerator.IValueIterator destAddressingModes(CPUType cpuType, Predicate<AddressingMode> pred)
+    {
+        final List<AddressingMode> values = Stream.of(AddressingMode.values())
+            .filter( x -> x != AddressingMode.IMPLIED )
+            .filter( cpuType::supports )
+            .filter( pred )
+            .collect(Collectors.toList());
         if ( values.size() <= 1 ) {
             return destAddressingModes(values.get(0));
         }
         final AddressingMode[] subArray = values.stream().skip(1).toArray(size->new AddressingMode[size]);
         return destAddressingModes(values.get(0),subArray);
+    }
+
+    private static EncodingTableGenerator.IValueIterator sourceAddressingModes(CPUType cpuType, Predicate<AddressingMode> pred)
+    {
+        final List<AddressingMode> values = Stream.of(AddressingMode.values())
+            .filter( x -> x != AddressingMode.IMPLIED )
+            .filter( cpuType::supports )
+            .filter( pred )
+            .collect(Collectors.toList());
+        if ( values.size() <= 1 ) {
+            return sourceAddressingModes(values.get(0));
+        }
+        final AddressingMode[] subArray = values.stream().skip(1).toArray(size->new AddressingMode[size]);
+        return sourceAddressingModes(values.get(0),subArray);
     }
 }

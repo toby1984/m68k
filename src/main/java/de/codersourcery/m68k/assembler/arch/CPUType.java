@@ -6,8 +6,29 @@ import de.codersourcery.m68k.parser.ast.InstructionNode;
 @SuppressWarnings("unused")
 public enum CPUType
 {
-    M68000(0b0000_0001),
-    M68010(0b0000_0011),
+    M68000(0b0000_0001) {
+        @Override
+        public boolean supports(InstructionEncoding encoding)
+        {
+            if ( encoding == Instruction.CHK_LONG_ENCODING) {
+                return false;
+            }
+            if ( encoding == Instruction.MOVE_FROM_SR_ENCODING ) {
+                return false;
+            }
+            return super.supports(encoding);
+        }
+    },
+    M68010(0b0000_0011) {
+        @Override
+        public boolean supports(InstructionEncoding encoding)
+        {
+            if ( encoding == Instruction.CHK_LONG_ENCODING) {
+                return false;
+            }
+            return super.supports(encoding);
+        }
+    },
     M68020(0b0000_0111),
     M68030(0b0000_1111),
     M68040(0b0001_1111);
@@ -38,6 +59,10 @@ public enum CPUType
 
     public boolean supports(AddressingMode mode)
     {
+        return true;
+    }
+
+    public boolean supports(InstructionEncoding encoding) {
         return true;
     }
 

@@ -276,18 +276,20 @@ public enum AddressingMode
 
     /**
      * Returns whether this addressing mode has all the given kinds.
-     * @param requiredKinds
+     * @param kind1
+     * @param additional
      * @return
      */
-    public boolean hasKinds(AddressingModeKind[] requiredKinds)
+    public boolean hasKinds(AddressingModeKind kind1,AddressingModeKind...additional)
     {
-        if ( requiredKinds == null || requiredKinds.length == 0 ) {
-            throw new IllegalArgumentException("Need at least one kind");
+        if ( ! hasKind(kind1) ) {
+            return false;
         }
-        for ( AddressingModeKind k : requiredKinds )
-        {
-            if ( ! hasKind(k) ) {
-                return false;
+        if ( additional != null ) {
+            for ( AddressingModeKind k : additional ) {
+                if ( ! hasKind(k) ) {
+                    return false;
+                }
             }
         }
         return true;
