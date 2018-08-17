@@ -1,0 +1,21 @@
+
+
+Mode                                        | eaMode  | eaRegister | Comments
+Data register direct                        |   000   |   0-7      |
+Address register direct                     |   001   |   0-7      |
+Address register indirect                   |   010   |   0-7      |
+Address register indirect postinc           |   011   |   0-7      |
+Address register indirect predecrement      |   100   |   0-7      |
+Address register indirect + displacement    |   101   |   0-7      | 32 bit displacement
+Address register indirect + index           |   110   |   0-7      | 8-bit displacement
+Address register indirect + index           |   110   |   0-7      | Base displacement
+Memory indirect postindexed                 |   110   |   0-7      |
+Memory indirect preindexed                  |   110   |   0-7      |
+Program Counter Indirect + displacement     |   111   |   010      | 32 bit displacement
+Program Counter indirect + index            |   111   |   011      | 8 bit displacement
+Program Counter indirect + index            |   111   |   011      | Base displacement
+Program Counter Memory Indirect postindexed |   111   |   011      |
+Program Counter Memory Indirect preindexed  |   111   |   011      |
+Absolute Short Addressing Mode              |   111   |   000      |
+Absolute Long Addressing Mode               |   111   |   001      |
+Immediate                                   |   111   |   100      |
