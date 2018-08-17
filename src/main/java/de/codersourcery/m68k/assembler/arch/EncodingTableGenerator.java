@@ -1,5 +1,8 @@
 package de.codersourcery.m68k.assembler.arch;
 
+import de.codersourcery.m68k.disassembler.Disassembler;
+import de.codersourcery.m68k.emulator.MMU;
+import de.codersourcery.m68k.emulator.Memory;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
 
@@ -14,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.IntSupplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -661,6 +666,9 @@ outer:
             {
                 final String insName = insn.name().toUpperCase();
                 currentMethodBuffer.append("\n    opcodes[").append(index).append("] = ").append(insName).append("; // ").append(Misc.binary16Bit(index));
+
+                sanityCheck(insn,index);
+
                 currentMethodSize++;
                 insnCount++;
 
@@ -692,5 +700,32 @@ outer:
         FileOutputStream out = new FileOutputStream("/tmp/Test.java");
         out.write(classBuffer.toString().getBytes());
         out.close();
+    }
+
+    private static final Pattern DISASM_PATTERN =
+        Pattern.compile("^00000000: ([a-zA-Z]+)[\\s\\.]*.*");
+
+    private static void sanityCheck(Instruction insn,int opcode) {
+
+        final MMU mmu = new MMU(new MMU.PageFaultHandler());
+        final Memory memory = new Memory(mmu);
+        final Disassembler disassembler = new Disassembler(memory);
+        memory.writeWord(0,opcode);
+        final String[] disasm = disassembler.disassemble(0, 2 + 4 + 4).split("\n");
+        final Matcher matcher = DISASM_PATTERN.matcher(disasm[0]);
+        if ( ! matcher.matches() ) {
+            System.err.println("No regex match for '"+ disasm[0]+"'");
+            throw new IllegalStateException();
+        }
+        final String actual = matcher.group(1).toUpperCase();
+        final String expected = insn.name().toUpperCase();
+        if ( ! actual.toUpperCase().equals(expected) )
+        {
+            if ( insn.condition == null )
+            {
+                System.out.println("DISASSEMBLY: " + Misc.binary16Bit(opcode) + " => (" + actual + ") " + disasm[0]);
+                throw new RuntimeException("Disassembling failed, expected '" + expected + "' but got '" + actual + "'");
+            }
+        }
     }
 }
