@@ -158,7 +158,7 @@ public enum AddressingMode
     // 1,2,4, OR 6, EXCEPT FOR PACKED DECIMAL REAL OPERANDS
     IMMEDIATE_VALUE(0b111,fixedValue(100), 6, AddressingModeKind.DATA, AddressingModeKind.MEMORY),   // move #XXXX
     /**
-     * no or implied operand.
+     * Internal use only.
      */
     IMPLIED(0b000,fixedValue(0b000),0);
 
@@ -166,6 +166,15 @@ public enum AddressingMode
     public final int eaModeField;
     public final int maxExtensionWords;
     private final int kinds;
+
+    @Override
+    public String toString()
+    {
+        if ( hasFixedEaRegisterValue() ) {
+            return name()+" / eaMode: "+Misc.binary3Bit(eaModeField)+" / eaRegister: "+Misc.binary3Bit(eaRegisterField.value());
+        }
+        return name()+" / eaMode: "+Misc.binary3Bit(eaModeField)+" / eaRegister: 0-7";
+    }
 
     public boolean isRegisterDirect()
     {
@@ -196,7 +205,6 @@ public enum AddressingMode
         public FixedValue(int bits) {
             this.bits = bits;
         }
-
 
         @Override
         public int value()
@@ -264,6 +272,44 @@ public enum AddressingMode
     public boolean hasFixedEaRegisterValue()
     {
         return eaRegisterField.isFixedValue();
+    }
+
+    /**
+     * Returns whether this addressing mode has all the given kinds.
+     * @param requiredKinds
+     * @return
+     */
+    public boolean hasKinds(AddressingModeKind[] requiredKinds)
+    {
+        if ( requiredKinds == null || requiredKinds.length == 0 ) {
+            throw new IllegalArgumentException("Need at least one kind");
+        }
+        for ( AddressingModeKind k : requiredKinds )
+        {
+            if ( ! hasKind(k) ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Returns whether this addressing mode has all the given kinds.
+     * @param requiredKinds
+     * @return
+     */
+    public boolean hasKinds(Set<AddressingModeKind> requiredKinds)
+    {
+        if ( requiredKinds == null || requiredKinds.isEmpty() ) {
+            throw new IllegalArgumentException("Need at least one kind");
+        }
+        for ( AddressingModeKind k : requiredKinds )
+        {
+            if ( ! hasKind(k) ) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public boolean hasKind(AddressingModeKind kind) {

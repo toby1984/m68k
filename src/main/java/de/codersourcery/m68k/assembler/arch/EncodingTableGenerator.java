@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,11 +34,19 @@ public class EncodingTableGenerator
     {
         protected final Set<Field> fields = new HashSet<>();
 
+        public IValueIterator(Set<Field> fields)
+        {
+            Validate.notNull(fields, "fields must not be null");
+            if ( fields.isEmpty() ) {
+                throw new IllegalArgumentException("Fields cannot be empty");
+            }
+            this.fields.addAll(fields);
+        }
+
         public IValueIterator(Field field1,Field...additional)
         {
             Validate.notNull(field1, "field must not be null");
             Stream.concat(Stream.of(new Field[]{field1}), Stream.of(additional)).forEach(fields::add);
-            reset();
         }
 
         /**
@@ -48,6 +57,10 @@ public class EncodingTableGenerator
          */
         public boolean handles(Field field) {
             return fields.contains(field);
+        }
+
+        public final Set<Field> getFields() {
+            return fields;
         }
 
         @Override
@@ -97,6 +110,74 @@ public class EncodingTableGenerator
          * Resets this iterator to start over.
          */
         public abstract void reset();
+
+        public final IValueIterator with(IValueIterator other) {
+            return new CompoundValueIterator(this,other);
+        }
+    }
+
+    public static final class CompoundValueIterator extends IValueIterator {
+
+        private final IValueIterator[] iterators;
+
+        private int maxPtr = 0;
+
+
+        public CompoundValueIterator(IValueIterator it1,IValueIterator it2)
+        {
+            super( Stream.concat(it1.getFields().stream(),it2.getFields().stream()).collect(Collectors.toSet()));
+            iterators = new IValueIterator[]{it1,it2};
+        }
+
+        @Override
+        public boolean hasNext()
+        {
+            for ( int i = 0 ; i < iterators.length ; i++)
+            {
+                if (iterators[i].hasNext())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        protected int internalGetValue(Field field)
+        {
+            for ( IValueIterator it : iterators ) {
+                if ( it.handles(field ) ) {
+                    return it.getValue(field);
+                }
+            }
+            throw new IllegalArgumentException("No iterator handles field "+field);
+        }
+
+        @Override
+        protected void doIncrement()
+        {
+            for ( int i = 0 ; i < iterators.length ; i++)
+            {
+                if (iterators[i].hasNext())
+                {
+                    iterators[i].doIncrement();
+                    return;
+                }
+                if ( (i+1) == iterators.length ) {
+                    break;
+                }
+                iterators[i].reset();
+            }
+            throw new IllegalStateException("Cannot increment any more");
+        }
+
+        @Override
+        public void reset()
+        {
+            for ( IValueIterator it : iterators ) {
+                it.reset();;
+            }
+        }
     }
 
     public static final class RangedValueIterator extends IValueIterator
@@ -219,26 +300,52 @@ public class EncodingTableGenerator
         private int modePtr = 0;
         private int eaRegisterValue = 0;
 
-        public AddressingModeIterator(Field field1,Field field2,Set<AddressingMode> modes) {
-            super(field1,field2);
-            if ( modes.size() < 1 ) {
-                throw new IllegalArgumentException("Need at least 1 addressing mode");
-            }
-            for ( AddressingMode m : modes ) {
-                if ( m == null ) {
-                    throw new IllegalArgumentException("Mode cannot be NULL");
-                }
-            }
-            this.modes.addAll(modes);
-        }
-
-        public AddressingModeIterator(Field field1,Field field2,AddressingMode m1,AddressingMode...additional)
+        public AddressingModeIterator(Field field1,Field field2,Set<AddressingMode> modes)
         {
             super(field1,field2);
-            this.modes.add(m1);
-            if ( additional != null ) {
-                this.modes.addAll(Arrays.asList(additional));
-            }
+            this.modes.addAll(modes);
+            this.modes.removeIf(x -> x == AddressingMode.IMPLIED ); // internal use only
+            removeModesWithSameBitPattern();
+            System.out.println("AddressingModeIterator(): eaMode is now "+currentMode());
+            reset();
+        }
+
+        private void removeModesWithSameBitPattern()
+        {
+            boolean removed;
+outer:
+            do
+            {
+                removed = false;
+                for ( int i = 0 ; i < this.modes.size() ; i++ )
+                {
+                    final AddressingMode m1 = this.modes.get(i);
+                    for (Iterator<AddressingMode> it = this.modes.iterator() ; it.hasNext() ; )
+                    {
+                        final AddressingMode m2 = it.next();
+                        if ( m1 != m2 )
+                        {
+                            if ( m1.eaModeField == m2.eaModeField )
+                            {
+                                if ( m1.hasFixedEaRegisterValue() && m2.hasFixedEaRegisterValue() )
+                                {
+                                    if ( m1.eaRegisterField == m2.eaRegisterField ) {
+                                        System.out.println("WARN: Ignoring "+m2+" as it has the same bit pattern as "+m1);
+                                        removed = true;
+                                        it.remove();
+                                    }
+                                }
+                                else if ( ! ( m1.hasFixedEaRegisterValue() | m1.hasFixedEaRegisterValue() ) )
+                                {
+                                    System.out.println("WARN: Ignoring "+m2+" as it has the same bit pattern as "+m1);
+                                    removed = true;
+                                    it.remove();
+                                }
+                            }
+                        }
+                    }
+                }
+            } while ( removed );
         }
 
         private AddressingMode currentMode() {
@@ -248,26 +355,10 @@ public class EncodingTableGenerator
         @Override
         public boolean hasNext()
         {
-            if ( ! currentMode().eaRegisterField.isFixedValue() )
-            {
-                if ( (eaRegisterValue+1)<8 )
-                {
-                    return true;
-                }
+            if ( currentMode().hasFixedEaRegisterValue() ) {
+                return (modePtr+1) < modes.size();
             }
-            return (modePtr+1) < modes.size();
-        }
-
-        @Override
-        protected int internalGetValue(Field value)
-        {
-            if ( value == Field.SRC_MODE ) {
-                return currentMode().eaModeField;
-            }
-            if ( value == Field.SRC_VALUE ) {
-                return eaRegisterValue;
-            }
-            throw new RuntimeException("Unhandled field: "+value);
+            return (eaRegisterValue+1)<8;
         }
 
         @Override
@@ -275,6 +366,7 @@ public class EncodingTableGenerator
         {
             if ( currentMode().hasFixedEaRegisterValue() ) {
                 modePtr++;
+                System.out.println("doIncrement(1): eaMode is now "+currentMode());
                 resetEaRegisterValue();
                 return;
             }
@@ -282,32 +374,49 @@ public class EncodingTableGenerator
             if ( eaRegisterValue == 8 )
             {
                 modePtr++;
-                resetEaRegisterValue();;
+                System.out.println("doIncrement(2): eaMode is now "+currentMode());
+                resetEaRegisterValue();
             }
+            else
+            {
+                System.out.println("doIncrement(): eaRegister is now " + Misc.binary3Bit(eaRegisterValue));
+            }
+        }
+
+        @Override
+        protected int internalGetValue(Field value)
+        {
+            if ( value == Field.SRC_MODE || value == Field.DST_MODE) {
+                return currentMode().eaModeField;
+            }
+            if ( value == Field.SRC_BASE_REGISTER || value == Field.DST_BASE_REGISTER ) {
+                return eaRegisterValue;
+            }
+            throw new RuntimeException("Unhandled field: "+value);
         }
 
         private void resetEaRegisterValue() {
             if ( currentMode().hasFixedEaRegisterValue() ) {
-                eaRegisterValue = currentMode().eaModeField;
+                eaRegisterValue = currentMode().eaRegisterField.value();
             } else {
                 eaRegisterValue = 0;
             }
+            System.out.println("reset(): eaRegister is now "+Misc.binary3Bit(eaRegisterValue));
         }
 
         @Override
         public void reset()
         {
             modePtr = 0;
+            System.out.println("reset(): eaMode is now "+currentMode());
             resetEaRegisterValue();
         }
     }
 
-    public void addMappings(InstructionEncoding encoding,Instruction instruction,Map<Integer, Instruction> result)
+    public void addMappings(InstructionEncoding encoding,Instruction instruction,CPUType cpuType,Map<Integer, Instruction> result)
     {
         final Map<Field, List<InstructionEncoding.IBitMapping>> mappings =
                 InstructionEncoding.getMappings(encoding.getPatterns()[0]);// consider only the first 16 bit
-
-        final Map<Field,IValueIterator> iteratorMap = new HashMap<>();
 
         // Field.NONE is (ab-)used for the static '1' and '0' bits of the instruction pattern
         final List<InstructionEncoding.IBitMapping> initialMappings = mappings.get( Field.NONE );
@@ -319,11 +428,42 @@ public class EncodingTableGenerator
 
         final List<Field> fields = new ArrayList<>(mappings.keySet());
 
-        final List<IValueIterator> vars = instruction.getValueIterators(mappings.keySet());
+        final IValueIterator iterator;
+        if ( fields.isEmpty() )
+        {
+            // bit pattern is static/fixed (NOP,RTE, etc.) so now need for a real value iterator
+            iterator = new IValueIterator(Field.NONE)
+            {
+                @Override public boolean hasNext() { return false; }
 
-        int highestIteratorIdx = 0;
-        while ( highestIteratorIdx < vars.size() ) {
+                @Override
+                protected int internalGetValue(Field field)
+                {
+                    throw new UnsupportedOperationException("Method internalGetValue not implemented");
+                }
 
+                @Override
+                protected void doIncrement()
+                {
+                    throw new UnsupportedOperationException("Method doIncrement not implemented");
+                }
+
+                @Override
+                public void reset()
+                {
+                    throw new UnsupportedOperationException("Method reset not implemented");
+                }
+            };
+        }
+        else
+        {
+            System.out.println("Getting iterator for "+fields);
+            iterator = instruction.getValueIterator(encoding, cpuType);
+        }
+
+        int position = 1;
+        while(true)
+        {
             int value = 0;
             for (InstructionEncoding.IBitMapping initialMapping : initialMappings)
             {
@@ -331,57 +471,26 @@ public class EncodingTableGenerator
             }
             for ( Field f : fields)
             {
-                for ( IValueIterator it : vars )
-                {
-                    if ( it.handles(f) )
-                    {
-                        final int fieldValue = it.internalGetValue(f);
-                        final List<InstructionEncoding.IBitMapping> mappers = mappings.get(f);
+                final int fieldValue = iterator.internalGetValue(f);
+                final List<InstructionEncoding.IBitMapping> mappers = mappings.get(f);
 
-                        for (InstructionEncoding.IBitMapping mapper : mappers)
-                        {
-                            value = mapper.apply(fieldValue, value);
-                        }
-                    }
+                for (InstructionEncoding.IBitMapping mapper : mappers)
+                {
+                    value = mapper.apply(fieldValue, value);
                 }
             }
 
-            // System.out.println(Misc.binary16Bit(value)+" => "+instruction.name());
+            System.out.println(position+": "+Misc.binary16Bit(value)+" => "+instruction.name());
+            position++;
             if ( result.containsKey(value) ) {
-                throw new RuntimeException("Internal error,duplicate mapping "+value+" for "+instruction);
+                throw new RuntimeException("Internal error,duplicate mapping "+Misc.binary16Bit(value)+" for "+instruction);
             }
             result.put(value,instruction);
 
-            // increment
-            while (highestIteratorIdx < vars.size() )
+            if ( iterator.hasNext() )
             {
-                boolean atLeastOneIncrement = false;
-                for (int i = 0; i <= highestIteratorIdx; i++)
-                {
-                    final IValueIterator it = vars.get(i);
-                    if (it.hasNext())
-                    {
-//                        System.out.println("Incrementing field "+it+" by one");
-                        it.next();
-                        atLeastOneIncrement = true;
-                        break;
-                    }
-                    it.reset();
-                }
-
-                if (atLeastOneIncrement)
-                {
-                    break;
-                }
-                highestIteratorIdx++;
-                if ( highestIteratorIdx < vars.size() )
-                {
-                    final IValueIterator inc = vars.get(highestIteratorIdx);
-                    if (inc.hasNext())
-                    {
-                        inc.next();
-                    }
-                }
+                iterator.doIncrement();
+            } else {
                 break;
             }
         }
@@ -389,10 +498,32 @@ public class EncodingTableGenerator
 
     public static void main(String[] args) throws IOException
     {
-        InstructionEncoding encoding = InstructionEncoding.of("00000000_0000vvvv");
-        Instruction instruction = Instruction.TRAP;
+        final Map<Instruction,List<InstructionEncoding>> allEncodings =
+            new HashMap<>();
+        allEncodings.put(Instruction.NEGX,Arrays.asList(Instruction.NEGX_ENCODING));
+        allEncodings.put(Instruction.CMPM,Arrays.asList(Instruction.CMPM_ENCODING));
+        allEncodings.put(Instruction.CMP,Arrays.asList(Instruction.CMP_ENCODING));
+        allEncodings.put(Instruction.SUBX,Arrays.asList(Instruction.SUBX_ADDR_REG_ENCODING,Instruction.SUBX_DATA_REG_ENCODING));
+        allEncodings.put(Instruction.SUB,Arrays.asList(Instruction.SUB_DST_DATA_ENCODING,Instruction.SUB_DST_EA_ENCODING));
+        allEncodings.put(Instruction.ADD,Arrays.asList(Instruction.ADD_DST_DATA_ENCODING,Instruction.ADD_DST_EA_ENCODING));
+        allEncodings.put(Instruction.ADDX,Arrays.asList(Instruction.ADDX_ADDRREG_ENCODING,Instruction.ADDX_DATAREG_ENCODING));
+        allEncodings.put(Instruction.SUBI,Arrays.asList(Instruction.SUBI_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
+        allEncodings.put(Instruction.CMPI,Arrays.asList(Instruction.CMPI_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
+
+        /*
+         ***************************
+         */
         final Map<Integer, Instruction> mappings = new HashMap<>();
-        new EncodingTableGenerator().addMappings(encoding, instruction,mappings);
+
+        for ( var entry : allEncodings.entrySet() )
+        {
+            final Instruction instruction = entry.getKey();
+            for (InstructionEncoding enc : entry.getValue() )
+            {
+                System.out.println("Processing encoding: " + enc);
+                new EncodingTableGenerator().addMappings(enc, instruction, CPUType.M68000, mappings);
+            }
+        }
 
         final StringBuilder classBuffer = new StringBuilder();
         classBuffer.append("public static final InstructionImpl[] opcodes = new InstructionImpl[65536];\n");
@@ -408,6 +539,7 @@ public class EncodingTableGenerator
 
         int maxMethodSize = 5000;
         int currentMethodSize = 0;
+        int insnCount = 0;
         for ( int index = 0 ; index < 65536 ; index++)
         {
             final Instruction insn = mappings.get( index );
@@ -416,6 +548,7 @@ public class EncodingTableGenerator
                 final String insName = insn.name().toUpperCase();
                 currentMethodBuffer.append("\n    opcodes[").append(index).append("] = ").append(insName).append("; // ").append(Misc.binary16Bit(index));
                 currentMethodSize++;
+                insnCount++;
 
                 if ( currentMethodSize >= maxMethodSize )
                 {
@@ -440,7 +573,9 @@ public class EncodingTableGenerator
         classBuffer.append("\n").append( initMethodBuffer ).append( "\n").append( dataMethodsBuffer );
 
         System.out.println( classBuffer );
-        FileOutputStream out = new FileOutputStream("/home/tgierke/tmp/Test.java");
+
+        System.out.println("Instructions: "+insnCount);
+        FileOutputStream out = new FileOutputStream("/tmp/Test.java");
         out.write(classBuffer.toString().getBytes());
         out.close();
     }

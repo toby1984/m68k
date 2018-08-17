@@ -36,6 +36,11 @@ public enum CPUType
         return true;
     }
 
+    public boolean supports(AddressingMode mode)
+    {
+        return true;
+    }
+
     public boolean isCompatibleWith(CPUType other)
     {
         return (this.featureMask & other.featureMask) == other.featureMask;

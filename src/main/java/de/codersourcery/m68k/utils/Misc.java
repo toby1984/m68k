@@ -33,6 +33,10 @@ public class Misc
         return out;
     }
 
+    public static String binary3Bit(int value) {
+        return "%"+StringUtils.leftPad(Integer.toBinaryString( value ),3, "0");
+    }
+
     public static String binary8Bit(int value) {
         return "%"+StringUtils.leftPad(Integer.toBinaryString( value ),8, "0");
     }
