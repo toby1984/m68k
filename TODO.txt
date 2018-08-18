@@ -1,2 +1,12 @@
 - implement CPU trace support
-- implement missing instructions
+- implement 68k BCD instructions
+- change disassembler and CPU to use generated instruction table instead of (opcode & mask) == staticPattern comparisons
+- hook-up 8520 IRQ line to CPU
+- write unit-tests for 8520 
+- implement IRQ controller
+- implement DMA controller
+- implement memory buses
+- make CPU use memory buses for read & write
+- implement copper
+- implement blitter 
+- implement keyboard support 

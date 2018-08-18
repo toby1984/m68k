@@ -34,15 +34,15 @@ public class Misc
     }
 
     public static String binary3Bit(int value) {
-        return "%"+StringUtils.leftPad(Integer.toBinaryString( value ),3, "0");
+        return "%"+StringUtils.leftPad(Integer.toBinaryString( value & 0b111),3, "0");
     }
 
     public static String binary8Bit(int value) {
-        return "%"+StringUtils.leftPad(Integer.toBinaryString( value ),8, "0");
+        return "%"+StringUtils.leftPad(Integer.toBinaryString( value & 0xff),8, "0");
     }
 
     public static String binary16Bit(int value) {
-        return "%"+StringUtils.leftPad(Integer.toBinaryString( value ),16, "0");
+        return "%"+StringUtils.leftPad(Integer.toBinaryString( value & 0xffff),16, "0");
     }
 
     public static String read(InputStream in) throws IOException
