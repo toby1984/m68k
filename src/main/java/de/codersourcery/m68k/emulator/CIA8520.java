@@ -18,6 +18,20 @@ package de.codersourcery.m68k.emulator;
  *
  * Software must use byte accesses to these address, and no other.
  *
+ * SOFTWARE NOTE:
+ * The operating system kernel has already allocated the use of
+ * several of the 8520 timers.
+ *
+ * CIAA, timer A - keyboard (used continuously to handshake keystrokes). NOT AVAILABLE.
+ * CIAA, timer B - Virtual timer device (used continuously whenever system Exec is in control
+ *                 (used for task switching, interrupts and timing).
+ * CIAA, TOD - 50/60 Hz timer used by timer.device.
+ *             The A1000 uses power line tick. The A500 uses vertical sync. The A2000 has a jumper selection.
+ * CIAB, timer A - not used
+ * CIAB, timer B - not used
+ * CIAB, TOD - graphics.library video beam follower. This timer counts at the horizontal sync rate,
+ *       and is used to synchronize graphics events to the video beam.
+ *
  * CIAA Address Map
  * ---------------------------------------------------------------------------
  *  Byte    Register                  Data bits
@@ -65,8 +79,12 @@ package de.codersourcery.m68k.emulator;
  * Note:  CIAA can generate INT2.
  * Note:  CIAB can generate INT6.
  */
-public class CIA8250
+public class CIA8520
 {
+    public enum Name
+    {
+        CIAA,CIAB
+    }
     /*
 Register  Name          Function
 0 0       PRA           Port A data register
@@ -191,7 +209,7 @@ Register  Name          Function
     private static final int IRQ_TIMERA_TRIGGERED = 0;
     private static final int IRQ_TIMERB_TRIGGERED = 1;
 
-    private final String name;
+    public final Name name;
 
     private int cycle;
 
@@ -251,14 +269,17 @@ Register  Name          Function
     public static final int CTRL_CNT0 = 1<<5;
     public static final int CTRL_CNT1 = 1<<6;
 
-    public CIA8250(String name) {
+    private final IRQController irqController;
+
+    public CIA8520(CIA8520.Name name, IRQController irqController) {
         this.name = name;
+        this.irqController = irqController;
     }
 
     @Override
     public String toString()
     {
-        return name;
+        return name.toString();
     }
 
     private void writePortA(int value) {
@@ -399,9 +420,20 @@ Register  Name          Function
                 }
                 break;
             case REG_CTRLA:
+                final boolean serialModeChanged = (ctrlA & CTRL_SPMODE) != (value & CTRL_SPMODE);
                 ctrlA = value & ~CTRL_LOAD;
                 if ( (value & CTRL_LOAD) != 0 ) {
                     loadTimerA();
+                }
+                if ( serialModeChanged ) {
+                    shiftRegisterBits = 0;
+                    serialDataAvailable = false;
+                    serialShiftReg = 0;
+                    if ( isSerialOutput() ) {
+                        serialPin = false;
+                    } else {
+                        serialPin = true;
+                    }
                 }
                 break;
             case REG_CTRLB:
@@ -540,6 +572,10 @@ Register  Name          Function
         return (ctrlA & CTRL_RUNMODE) != 0;
     }
 
+    private boolean isTimerAContinous() {
+        return (ctrlA & CTRL_RUNMODE) == 0;
+    }
+
     private boolean isTimerBOneShot() {
         return (ctrlB & CTRL_RUNMODE) != 0;
     }
@@ -618,7 +654,7 @@ Register  Name          Function
         // serial input
         if ( isSerialInput() && cntPulse )
         {
-            // shift one value
+            // MSB is transmitted first
             serialShiftReg <<= 1;
             serialShiftReg |= (serialPin ? 1 : 0);
             shiftRegisterBits++;
@@ -650,7 +686,7 @@ Register  Name          Function
                 triggerInterrupt(ICR_TA);
 
                 // serial: shift-out bits at tickerA/2 rate
-                if ( isSerialOutput() && (cycle & 1) != 0 )
+                if ( isSerialOutput() && (cycle & 1) != 0 && isTimerAContinous() )
                 {
                     boolean hasData = shiftRegisterBits > 0;
                     if ( ! hasData && serialDataAvailable)
@@ -765,15 +801,9 @@ Register  Name          Function
         if ( (irqMaskRegister & maskBit) != 0)
         {
             triggeredInterrupts |= maskBit|ICR_SETCLR;
+            irqController.externalInterrupt(this);
         } else {
             triggeredInterrupts |= maskBit;
         }
-
-        /*
-         * Note:  CIAA can generate INT2.
-         * Note:  CIAB can generate INT6.
-         */
-        // TODO: Implement me
-        throw new RuntimeException("Forward IRQ to IRQ controller");
     }
 }

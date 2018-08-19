@@ -3057,6 +3057,44 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         return false;
     }
 
+    public void externalInterrupt(int priority)
+    {
+
+        // TODO: Implement support for emulating hardware interrupts, needs
+        // TODO: to honor FLAG_I2|FLAG_I1|FLAG_I0 priorities (IRQs with less than/equal priority get ignored)
+
+        final int minPrio = (statusRegister & FLAG_I2|FLAG_I1|FLAG_I0) >> 8;
+        if ( priority > minPrio )
+        {
+            switch (priority)
+            {
+                case 1:
+                    triggerIRQ(IRQ.AUTOVECTOR_LVL1, 0);
+                    return;
+                case 2:
+                    triggerIRQ(IRQ.AUTOVECTOR_LVL2, 0);
+                    return;
+                case 3:
+                    triggerIRQ(IRQ.AUTOVECTOR_LVL3, 0);
+                    return;
+                case 4:
+                    triggerIRQ(IRQ.AUTOVECTOR_LVL4, 0);
+                    return;
+                case 5:
+                    triggerIRQ(IRQ.AUTOVECTOR_LVL5, 0);
+                    return;
+                case 6:
+                    triggerIRQ(IRQ.AUTOVECTOR_LVL6, 0);
+                    return;
+                case 7:
+                    triggerIRQ(IRQ.AUTOVECTOR_LVL7, 0);
+                    return;
+                default:
+                    throw new IllegalArgumentException("Priority must be >= 1 && <= 8 but was " + priority);
+            }
+        }
+    }
+
     private void triggerIRQ(IRQ irq, long irqData)
     {
         stopped = false;
@@ -3076,9 +3114,6 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
             statusRegister = FLAG_I2|FLAG_I1|FLAG_I0|FLAG_SUPERVISOR_MODE;
             return;
         }
-
-        // TODO: Implement support for emulating hardware interrupts, needs
-        // TODO: to honor FLAG_I2|FLAG_I1|FLAG_I0 priorities (IRQs with less than/equal priority get ignored)
 
         if ( this.activeIrq != null && this.activeIrq.priority > irq.priority )
         {
