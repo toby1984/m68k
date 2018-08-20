@@ -1,7 +1,5 @@
 package de.codersourcery.m68k.emulator;
 
-import de.codersourcery.m68k.emulator.cpu.CPU;
-
 public class IRQController
 {
     private final CPU cpu;
