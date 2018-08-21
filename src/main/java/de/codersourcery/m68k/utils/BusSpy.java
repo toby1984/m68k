@@ -5,6 +5,7 @@ import org.apache.commons.lang3.Validate;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.Rectangle2D;
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -205,19 +206,28 @@ public class BusSpy
     /**
      * Show this window.
      */
-    public void show() {
-        SwingUtilities.invokeLater(() ->
+    public void show()
+    {
+        try
         {
-            if ( window == null ) {
-                window = new MyWindow();
-            }
-            if ( ! window.isVisible() )
+            SwingUtilities.invokeAndWait(() ->
             {
-                window.pack();
-                window.setLocationRelativeTo(null);
-                window.setVisible(true);
-            }
-        });
+                if ( window == null ) {
+                    window = new MyWindow();
+                }
+                if ( ! window.isVisible() )
+                {
+                    window.pack();
+                    window.setLocationRelativeTo(null);
+                    window.setVisible(true);
+                    window.toFront();
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     private int getSampleCount()
@@ -236,7 +246,7 @@ public class BusSpy
     {
         SwingUtilities.invokeLater(() ->
         {
-            if ( window.isVisible() )
+            if ( window != null && window.isVisible() )
             {
                 window.dispose();
                 window = null;
@@ -251,12 +261,25 @@ public class BusSpy
     {
         SwingUtilities.invokeLater(() ->
         {
-            if ( window.isVisible() )
+            if ( window != null && window.isVisible() )
             {
                 window.repaint();
             }
         });
     }
+
+    /**
+     * Samples the current bus state, stores it
+     * in the internal ringbuffer and updates the UI.
+     *
+     * Invoking this method does <b>not</b> repaint
+     * the UI, use {@link #repaint()} for that.
+     */
+    public void sampleAndRepaint() {
+        sampleBus();
+        repaint();
+    }
+
 
     /**
      * Samples the current bus state and stores it

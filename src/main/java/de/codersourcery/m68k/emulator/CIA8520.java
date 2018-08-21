@@ -1,5 +1,8 @@
 package de.codersourcery.m68k.emulator;
 
+import de.codersourcery.m68k.utils.IBus;
+import de.codersourcery.m68k.utils.Misc;
+
 /**
  * TODO: FLAG/PC handshake not implemented
  *
@@ -209,8 +212,26 @@ Register  Name          Function
     private static final int IRQ_TIMERA_TRIGGERED = 0;
     private static final int IRQ_TIMERB_TRIGGERED = 1;
 
+    /*
+     * Timer sources.
+     *
+     * Timer A:
+     *
+     * 00 = decrement each clock cycle
+     * 01 = decrement each HIGH pulse on CNT line
+     *
+     * Timer B:
+     * 00 = decrement each clock cycle
+     * 01 = decrement each HIGH pulse on CNT line
+     * 10 = decrement on timer A timeout
+     * 11 = Timer A timeout when the CNT line is HIGH
+     */
+    public static final int CTRL_CNT0 = 1<<5;
+    public static final int CTRL_CNT1 = 1<<6;
+
     public final Name name;
 
+    private int timerAUnderflowCount;
     private int cycle;
 
     private int portADDR; // bit set to 0 => INPUT pin
@@ -252,28 +273,12 @@ Register  Name          Function
     private int eventCounterAlarmLatch;
     private int eventCounter;
 
-    /*
-     * Timer sources.
-     *
-     * Timer A:
-     *
-     * 00 = decrement each clock cycle
-     * 01 = decrement each HIGH pulse on CNT line
-     *
-     * Timer B:
-     * 00 = decrement each clock cycle
-     * 01 = decrement each HIGH pulse on CNT line
-     * 10 = decrement on timer A timeout
-     * 11 = Timer A timeout when the CNT line is HIGH
-     */
-    public static final int CTRL_CNT0 = 1<<5;
-    public static final int CTRL_CNT1 = 1<<6;
-
     private final IRQController irqController;
 
     public CIA8520(CIA8520.Name name, IRQController irqController) {
         this.name = name;
         this.irqController = irqController;
+        reset();
     }
 
     @Override
@@ -296,12 +301,6 @@ Register  Name          Function
         value &= portBDDR;
         portBLine &= ~portBDDR; // clear value of all output pins
         portBLine |= value; // set output pins accordingly
-    }
-
-    private int readIRQs() {
-        int result = triggeredInterrupts;
-        triggeredInterrupts = 0;
-        return result;
     }
 
     private int readPortA() {
@@ -378,6 +377,7 @@ Register  Name          Function
             case REG_EVENT_LO:
                 if ( (ctrlB & CTRL_ALARM) != 0 ) {
                     eventCounterAlarmLatch = (eventCounterAlarmLatch & 0xffff00) | (value & 0xff);
+                    eventCounterAlarm = eventCounterAlarmLatch;
                 }
                 else
                 {
@@ -413,11 +413,13 @@ Register  Name          Function
             case REG_IRQ_CTRL:
                 if ( (value & ICR_SETCLR) != 0 ) { // bit = 1
                     // set bits
-                    irqMaskRegister |= (value& ~ICR_SETCLR);
+                    irqMaskRegister |= (value & ~ICR_SETCLR);
                 } else {
                     // clear bits
                     irqMaskRegister &= ~value;
                 }
+                System.out.println("IRQ mask is now: "+ Misc.binary8Bit(irqMaskRegister));
+                System.out.println("IRQs active    : "+ Misc.binary8Bit(triggeredInterrupts));
                 break;
             case REG_CTRLA:
                 final boolean serialModeChanged = (ctrlA & CTRL_SPMODE) != (value & CTRL_SPMODE);
@@ -523,7 +525,9 @@ Register  Name          Function
             case REG_SERIAL_DATA:
                 return serialDataReg;
             case REG_IRQ_CTRL:
-                return triggeredInterrupts;
+                int result = triggeredInterrupts;
+                triggeredInterrupts = 0;
+                return result;
             case REG_CTRLA:
                 return ctrlA;
             case REG_CTRLB:
@@ -634,6 +638,7 @@ Register  Name          Function
 
     public void tick() {
 
+        System.out.println("--- TICK ---");
         cycle++;
 
         // event counter (counting TOD positive edges)
@@ -686,7 +691,7 @@ Register  Name          Function
                 triggerInterrupt(ICR_TA);
 
                 // serial: shift-out bits at tickerA/2 rate
-                if ( isSerialOutput() && (cycle & 1) != 0 && isTimerAContinous() )
+                if ( isSerialOutput() && (++timerAUnderflowCount & 1) != 0 && isTimerAContinous() )
                 {
                     boolean hasData = shiftRegisterBits > 0;
                     if ( ! hasData && serialDataAvailable)
@@ -700,13 +705,21 @@ Register  Name          Function
 
                     if ( hasData )
                     {
-                        serialPin = (serialShiftReg & 0b1000_0000) != 0;
-                        serialShiftReg <<= 1;
-                        shiftRegisterBits--;
                         cntOut = ! cntOut;
-                        if (shiftRegisterBits == 0)
+                        System.out.println("CNT: "+cntOut);
+                        if ( cntOut )
                         {
-                            triggerInterrupt(ICR_SP);
+                            // data becomes available on the rising edge of CNT
+                            // and stays available until the next rising edge
+                            serialPin = (serialShiftReg & 0b1000_0000) != 0;
+                            System.out.println("BIT OUT: "+serialPin);
+                            serialShiftReg <<= 1;
+                            shiftRegisterBits--;
+                            if (shiftRegisterBits == 0)
+                            {
+                                System.out.println("Shift register empty.");
+                                triggerInterrupt(ICR_SP);
+                            }
                         }
                     }
                 }
@@ -741,7 +754,7 @@ Register  Name          Function
 
         if ( isTimerBRunning() )
         {
-            switch( ctrlB & (CTRL_INMODE0|CTRL_INMODE1) >> 5 )
+            switch( (ctrlB & (CTRL_INMODE0|CTRL_INMODE1)) >> 5 )
             {
                 case 0b00:
                     // clk cycles
@@ -750,7 +763,7 @@ Register  Name          Function
                 case 0b01:
                     // cnt pulses
                     if ( cntPulse ) {
-                          timerB--;
+                        timerB--;
                     }
                     break;
                 case 0b10:
@@ -783,7 +796,7 @@ Register  Name          Function
                 }
                 loadTimerB();
                 if ( isTimerBOneShot() ) {
-                    ctrlA &= ~CTRL_START; // stop timer
+                    ctrlB &= ~CTRL_START; // stop timer
                 }
             } else if ( ( ctrlB & CTRL_PBON ) != 0 ) {
                 // output to PB7
@@ -798,12 +811,101 @@ Register  Name          Function
 
     private void triggerInterrupt(int maskBit)
     {
+        System.out.println("IRQ triggered: "+ Misc.binary8Bit(maskBit));
+        System.out.println("IRQ mask: "+ Misc.binary8Bit(irqMaskRegister));
         if ( (irqMaskRegister & maskBit) != 0)
         {
-            triggeredInterrupts |= maskBit|ICR_SETCLR;
+            System.out.println("Triggered external IRQ");
+            triggeredInterrupts |= (maskBit|ICR_SETCLR);
             irqController.externalInterrupt(this);
         } else {
             triggeredInterrupts |= maskBit;
         }
+    }
+
+    public void reset()
+    {
+        ctrlA = ctrlB = 0;
+        portA = portB = 0;
+        portADDR = portBDDR = 0;
+        timerA = timerALatch = 0;
+        timerB = timerBLatch = 0;
+        previousCnt = false;
+        cntIn = cntOut = false;
+        serialPin = true;
+        serialDataAvailable = false;
+        shiftRegisterBits = 0;
+        serialShiftReg = 0;
+        serialDataReg = 0;
+        triggeredInterrupts = 0;
+        irqMaskRegister = 0;
+        previousTODLine = false;
+        currentTODLine = false;
+        eventCounter = 0;
+        eventCounterAlarmLatch = 0;
+        eventCounterAlarm = 0;
+        eventCounterRunning = false;
+        eventCounterLatched = false;
+    }
+
+    private final IBus bus = new IBus()
+    {
+        private final String[] pins = {
+            "Serial","CNT_OUT","CNT_IN","IRQ"
+        };
+
+        @Override
+        public String getName()
+        {
+            return name.toString();
+        }
+
+        @Override
+        public String[] getPinNames()
+        {
+            return pins;
+        }
+
+        @Override
+        public int readPins()
+        {
+            int result = 0;
+            if ( serialPin ) {
+                result |= 1<<0;
+            }
+            if ( cntOut ) {
+                result |= 1<<1;
+            }
+            if ( cntIn ) {
+                result |= 1<<2;
+            }
+            if ( (triggeredInterrupts & ICR_SETCLR) != 0 ) {
+                result |= 1<<3;
+            }
+            return result;
+        }
+    };
+
+    public IBus getBus()
+    {
+        return bus;
+    }
+
+    public void setSerialPin(boolean value)
+    {
+        serialPin = value;
+    }
+
+    public boolean readSerialPin()
+    {
+        return serialPin;
+    }
+
+    public boolean readCnt() {
+        return cntOut;
+    }
+
+    public void setCntIn(boolean value) {
+        this.cntIn = value;
     }
 }

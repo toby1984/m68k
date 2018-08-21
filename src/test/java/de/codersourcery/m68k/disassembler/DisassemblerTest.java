@@ -381,7 +381,6 @@ public class DisassemblerTest extends TestCase
     public void testChk()
     {
         compile("chk.w $1200,d3");
-        compile("chk.l (a4),d7");
     }
 
     public void testCLR() {

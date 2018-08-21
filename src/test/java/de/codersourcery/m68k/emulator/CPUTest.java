@@ -1320,9 +1320,9 @@ public class CPUTest extends TestCase
                 "clr.l d0",
                 "clr.l d1",
                 "clr.l d2",
-                "clr.l a0",
-                "clr.l a1",
-                "clr.l a2",
+                "movea #0,a0",
+                "movea #0,a1",
+                "movea #0,a2",
                 "movem.l (a3)+,d0-d2/a0-a2"
         ).notSupervisor().noIrqActive()
                 .expectD0(1)
@@ -2184,28 +2184,28 @@ public class CPUTest extends TestCase
                 .negative().noIrqActive();
     }
 
-    public void testChkLong() { // MC68020+
-
-        // $ffff < 0 || $ffff > $0a
-        execute( cpu -> cpu.setFlags(CPU.FLAG_NEGATIVE),
-                "move.l #$1234ffff,d5", // value to check
-                "move.l #$2234000a,d4", // upper bound
-                "chk.l d4,d5")
-                .negative().noIrqActive();
-
-        // $b < 0 || $b > $0a
-        execute( cpu -> {},
-                "move.l #$1234000b,d5", // value to check
-                "move.l #$2234000a,d4", // upper bound
-                "chk.l d4,d5").notNegative().noIrqActive();
-
-        // $9 < 0 || $9 > $0a
-        execute( cpu -> cpu.setFlags(CPU.FLAG_NEGATIVE),
-                "move.l #$12340009,d5", // value to check
-                "move.l #$2234000a,d4", // upper bound
-                "chk.l d4,d5")
-                .negative().noIrqActive();
-    }
+//    public void testChkLong() { // MC68020+
+//
+//        // $ffff < 0 || $ffff > $0a
+//        execute( cpu -> cpu.setFlags(CPU.FLAG_NEGATIVE),
+//                "move.l #$1234ffff,d5", // value to check
+//                "move.l #$2234000a,d4", // upper bound
+//                "chk.l d4,d5")
+//                .negative().noIrqActive();
+//
+//        // $b < 0 || $b > $0a
+//        execute( cpu -> {},
+//                "move.l #$1234000b,d5", // value to check
+//                "move.l #$2234000a,d4", // upper bound
+//                "chk.l d4,d5").notNegative().noIrqActive();
+//
+//        // $9 < 0 || $9 > $0a
+//        execute( cpu -> cpu.setFlags(CPU.FLAG_NEGATIVE),
+//                "move.l #$12340009,d5", // value to check
+//                "move.l #$2234000a,d4", // upper bound
+//                "chk.l d4,d5")
+//                .negative().noIrqActive();
+//    }
 
     public void testRorWord()
     {
