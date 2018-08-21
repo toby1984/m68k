@@ -4,24 +4,32 @@ import org.apache.commons.lang3.Validate;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.font.LineMetrics;
 import java.awt.geom.Rectangle2D;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
 
+/**
+ * Tiny UI application that implements a logic analyzer to
+ * display {@link IBus Bus} state.
+ *
+ * Samples get stored in a ring-buffer with a fixed (configurable) size.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class BusSpy
 {
-    private static final int ROW_HEIGHT = 25;
-
-    private static final Stroke CURRENT =
+    private static final Stroke DASHED =
             new BasicStroke(1, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{9}, 0);
 
+    private final Color[] lineColors;
     private final IBus bus;
 
     private MyWindow window;
 
+    private int readPtr;
     private int writePtr;
-    private boolean[][] dataArray;
+    private int[] dataArray;
     private boolean isFull;
 
     protected final class MyWindow extends JFrame
@@ -33,64 +41,98 @@ public class BusSpy
             final JPanel panel = new JPanel()
             {
                 @Override
-                protected void paintComponent(Graphics g)
+                protected void paintComponent(Graphics gfx)
                 {
-                    final Graphics2D gfx = (Graphics2D) g;
-                    super.paintComponent(g);
+                    final Graphics2D g = (Graphics2D) gfx;
 
+                    // clear background
+                    g.setColor(Color.WHITE);
+                    g.fillRect(0,0,getWidth(),getHeight());
                     g.setColor(Color.BLACK);
 
-                    final int maxIdx = isFull ? dataArray.length : writePtr;
-                    System.out.println("Painting "+maxIdx+" states...");
-                    final IBus.Pin[] pins = bus.getPins();
+                    // calculate size of header area
+                    // by using the max width/height of the
+                    // pin name's bounding box as
+                    // header width / row height
+                    final String[] pinNames = bus.getPinNames();
+                    final Rectangle2D[] stringBounds = new Rectangle2D[pinNames.length];
 
-                    for ( int j = 0 ; j < pins.length ; j++)
+                    int maxWidth = 0;
+
+                    for ( int j = 0 ; j < pinNames.length ; j++)
                     {
-                        final int yBaseline = ROW_HEIGHT + (int) (j * ROW_HEIGHT * 1.25f);
-                        final IBus.Pin pin = pins[j];
-                        final LineMetrics metrics = g.getFontMetrics().getLineMetrics(pin.name, g);
-                        final Rectangle2D bounds = g.getFontMetrics().getStringBounds(pin.name, g);
-                        final int textBaselineY = yBaseline - ROW_HEIGHT / 2;
-                        g.drawString(pin.name, 5, (int) (textBaselineY + metrics.getDescent()));
-
+                        final Rectangle2D bounds = g.getFontMetrics().getStringBounds(pinNames[j], g);
+                        stringBounds[j]=bounds;
+                        if ( bounds.getWidth() > maxWidth ) {
+                            maxWidth = (int) bounds.getWidth();
+                        }
                     }
-                    final int xStep = getWidth() / (maxIdx+1);
 
-                    boolean[] previousState = dataArray[0];
-                    int previousX = 100;
-                    for ( int i = 1 ; i < maxIdx ; i++ )
+                    final int yStartOffset = 5;
+                    final int xStartOffset = 5;
+
+                    final int rowHeight = (getHeight()-yStartOffset) / pinNames.length;
+                    final int headerWidth = xStartOffset + (int) (maxWidth*1.1);
+                    final int chartRowHeight = (int) (rowHeight*0.5f);
+                    final int chartBaselineYOffset = (rowHeight - chartRowHeight)/2;
+
+                    // render pin names
+                    final Rectangle rect = new Rectangle();
+                    rect.x = xStartOffset;
+                    rect.height = rowHeight;
+                    for ( int j = 0 ; j < pinNames.length ; j++)
+                    {
+                        rect.y = yStartOffset + j*rowHeight;
+                        g.setColor(lineColors[j]);
+                        drawString(g,g.getFontMetrics(),pinNames[j],rect);
+
+                        g.setColor(Color.LIGHT_GRAY);
+                        final Stroke old = g.getStroke();
+                        g.setStroke(DASHED);
+                        g.drawLine(0,rect.y + rect.height ,getWidth() ,rect.y+rect.height);
+                        g.setColor(Color.BLACK);
+                        g.setStroke(old);
+                    }
+                    g.drawLine(headerWidth,0,headerWidth,getHeight());
+
+                    final int sampleCount = getSampleCount();
+                    if ( sampleCount == 0 ) {
+                        return;
+                    }
+
+                    final int drawingAreaWidth = getWidth() - xStartOffset - headerWidth;
+
+                    final int xStep = drawingAreaWidth / (sampleCount+1);
+
+                    int previousState = dataArray[readPtr];
+                    int previousX = headerWidth;
+                    for ( int itemIdx = (readPtr+1)%dataArray.length, pos = 0 ; pos < sampleCount; itemIdx = (itemIdx+1) % dataArray.length , pos++)
                     {
                         int currentX = previousX + xStep;
-                        final boolean[] currentState = dataArray[i];
-                        if ( i == writePtr ) {
-                            g.setColor(Color.RED);
-                            final Stroke oldStroke = gfx.getStroke();
-                            gfx.setStroke( CURRENT );
-                            g.drawLine(currentX,0,currentX,getHeight());
-                            g.setColor(Color.BLACK);
-                            gfx.setStroke( oldStroke );
-                        }
-                        for ( int j = 0 ; j < pins.length ; j++)
+                        final int currentState = dataArray[itemIdx];
+                        int mask = 1<<0;
+                        for ( int pinIdx = 0 ; pinIdx < pinNames.length ; pinIdx++, mask<<=1)
                         {
-                            final int yBaseline = ROW_HEIGHT+(int) (j*ROW_HEIGHT*1.25f);
-
-                            if ( currentState[j] )
+                            g.setColor(lineColors[pinIdx]);
+                            final int yBaseline = yStartOffset + (1+pinIdx)*rowHeight - chartBaselineYOffset ;
+                            if ( (currentState & mask) != 0 )
                             {
-                                if ( previousState[j] ) {
+                                if ( ( previousState & mask ) != 0) {
                                     // high -> high
-                                    final int y = yBaseline - ROW_HEIGHT + 1;
+                                    final int y = yBaseline - chartRowHeight;
                                     g.drawLine(previousX,y,currentX,y);
                                 } else {
                                     // low -> high
                                     g.drawLine(previousX,yBaseline,currentX,yBaseline);
-                                    final int y = yBaseline - ROW_HEIGHT + 1;
+                                    final int y = yBaseline - chartRowHeight;
                                     g.drawLine(currentX,yBaseline,currentX,y);
                                 }
-                            } else
+                            }
+                            else
                             {
-                                if ( previousState[j] ) {
+                                if ( ( previousState & mask ) != 0 ) {
                                     // high -> low
-                                    final int y0 = yBaseline - ROW_HEIGHT + 1;
+                                    final int y0 = yBaseline - chartRowHeight;
                                     g.drawLine(previousX,y0,currentX,y0);
                                     final int y1 = yBaseline;
                                     g.drawLine(currentX,y0,currentX,y1);
@@ -103,22 +145,66 @@ public class BusSpy
                         previousX = currentX;
                         previousState = currentState;
                     }
+                    Toolkit.getDefaultToolkit().sync();
                 }
             };
             panel.setPreferredSize(new Dimension(320,200));
             getContentPane().add( panel );
         }
+
+        public void drawString(Graphics g, FontMetrics metrics, String text, Rectangle rect)
+        {
+            final int y = rect.y + ((rect.height - metrics.getHeight()) / 2) + metrics.getAscent();
+            g.drawString(text, rect.x, y);
+        }
     }
 
-    public BusSpy(IBus bus,int maxLen) {
+    /**
+     * Create instance.
+     *
+     * @param bus the bus to display
+     * @param bufferSize size of ring buffer.
+     *
+     * @see #sampleBus()
+     */
+    public BusSpy(IBus bus,int bufferSize)
+    {
         Validate.notNull(bus, "bus must not be null");
-        if ( maxLen < 1 ) {
+        if ( bufferSize < 1 ) {
             throw new IllegalArgumentException("maxLen needs to be >= 1");
         }
         this.bus = bus;
-        dataArray = new boolean[maxLen][];
+        this.dataArray = new int[bufferSize];
+        this.lineColors = genColors(bus.getPinNames().length);
     }
 
+    private static Color[] genColors(int count)
+    {
+        final Set<Integer> existing = new HashSet<>();
+        final Color[] colors = new Color[count];
+        final Random rnd = new Random(0xdeadbeef);
+        for ( int i = 0 ; i <count ; i++ ) {
+            final int color = rnd.nextInt(0xffffff + 1 );
+            if ( ! existing.contains(color) )
+            {
+                final int r = (color & 0xff0000)>>16;
+                final int g = (color & 0x00ff00)>> 8;
+                final int b = (color & 0x0000ff);
+                colors[i] = new Color( r,g,b);
+                existing.add(color);
+            }
+        }
+        return colors;
+    }
+
+    public boolean isVisible()
+    {
+        return window.isVisible();
+    }
+
+    /**
+     * Show this window.
+     */
     public void show() {
         SwingUtilities.invokeLater(() ->
         {
@@ -134,7 +220,20 @@ public class BusSpy
         });
     }
 
-    public void hide() {
+    private int getSampleCount()
+    {
+        return isFull ? dataArray.length : writePtr;
+    }
+
+    private boolean hasData() {
+        return getSampleCount() != 0;
+    }
+
+    /**
+     * Hide this window.
+     */
+    public void hide()
+    {
         SwingUtilities.invokeLater(() ->
         {
             if ( window.isVisible() )
@@ -145,7 +244,11 @@ public class BusSpy
         });
     }
 
-    public void repaint() {
+    /**
+     * Force UI repaint.
+     */
+    public void repaint()
+    {
         SwingUtilities.invokeLater(() ->
         {
             if ( window.isVisible() )
@@ -155,32 +258,41 @@ public class BusSpy
         });
     }
 
-    public void takeSample()
+    /**
+     * Samples the current bus state and stores it
+     * in the internal ringbuffer.
+     *
+     * Invoking this method does <b>not</b> repaint
+     * the UI, use {@link #repaint()} for that.
+     */
+    public void sampleBus()
     {
-        final IBus.Pin[] pins = bus.getPins();
-        final boolean[] states = new boolean[pins.length];
-        for (int i = 0; i < pins.length ; i++)
+        dataArray[writePtr] = bus.readPins();
+        if ( isFull )
         {
-            states[i] = bus.readPin( pins[i] );
-        }
-        dataArray[writePtr] = states;
-        System.out.println("Sampled states, now got "+writePtr+" samples");
-        writePtr++;
-        if ( writePtr == dataArray.length ) {
-            isFull = true;
-            writePtr = 0;
+            readPtr = (readPtr+1) % dataArray.length;
+            writePtr = (writePtr+1) % dataArray.length;
+        } else {
+            writePtr++;
+            if ( writePtr == dataArray.length )
+            {
+                isFull = true;
+                writePtr = 0;
+            }
         }
     }
 
     public static void main(String[] args) throws InterruptedException
     {
-        final IBus.Pin[] pins = {
-                new IBus.Pin("Pin #0",0),
-                new IBus.Pin("Pin #1",1),
-                new IBus.Pin("Pin #2",2),
-                new IBus.Pin("Pin #3",3),
+        final String[] pins = {
+                "Pin #0",
+                "Pin #1",
+                "Pin #2",
+                "Pin #3"
         };
-        final IBus bus = new IBus() {
+        final IBus bus = new IBus()
+        {
+            private final Random rnd = new Random(0xdeadbeef);
 
             @Override
             public String getName()
@@ -189,24 +301,23 @@ public class BusSpy
             }
 
             @Override
-            public Pin[] getPins()
+            public String[] getPinNames()
             {
                 return pins;
             }
 
             @Override
-            public boolean readPin(Pin pin)
+            public int readPins()
             {
-                return new Random().nextBoolean();
+                return rnd.nextInt(16);
             }
         };
-        final BusSpy spy =
-                new BusSpy(bus, 10);
+        final BusSpy spy = new BusSpy(bus, 10);
 
         spy.show();
         while ( true )
         {
-            spy.takeSample();
+            spy.sampleBus();
             spy.repaint();
             Thread.sleep(500);
         }
