@@ -22,7 +22,8 @@ public class UI extends JFrame
 {
     final JDesktopPane desktop = new JDesktopPane();
 
-    private File kickstartRom = new File("/home/tgierke/Downloads/kickstart_1.2.rom");
+//    private File kickstartRom = new File("/home/tgierke/Downloads/kickstart_1.2.rom");
+    private File kickstartRom = new File("/home/tobi/Downloads/kickstart_1.3.rom");
     private Emulator emulator;
 
     private final List<AppWindow> windows = new ArrayList<>();
@@ -61,7 +62,35 @@ public class UI extends JFrame
 
         emulator = new Emulator(Amiga.AMIGA_500,loadKickstartRom());
         emulator.setCallbackInvocationTicks(1000000);
-        emulator.setCallback( e ->
+
+        emulator.setStateCallback( new Emulator.IEmulatorStateCallback()
+        {
+            @Override
+            public void stopped()
+            {
+                SwingUtilities.invokeLater( () -> {
+                    windows.stream().forEach( x -> x.stopped() );
+                });
+            }
+
+            @Override
+            public void singleStepFinished()
+            {
+                SwingUtilities.invokeLater( () -> {
+                    windows.stream().forEach( x -> x.singleStepFinished() );
+                });
+            }
+
+            @Override
+            public void enteredContinousMode()
+            {
+                SwingUtilities.invokeLater( () ->
+                {
+                    windows.stream().forEach( x -> x.enteredContinousMode() );
+                });
+            }
+        } );
+        emulator.setTickCallback( e ->
         {
             for (AppWindow window : windows)
             {
@@ -116,6 +145,8 @@ public class UI extends JFrame
 
         // add internal windows
         registerWindow( new DisassemblyWindow(this) );
+        registerWindow( new CPUStateWindow("CPU", this) );
+        registerWindow( new EmulatorStateWindow("Emulator", this) );
         setContentPane( desktop );
 
         // display window
@@ -137,7 +168,7 @@ public class UI extends JFrame
 
     public void refreshAllWindows()
     {
-        doWithEmulator( e -> e.invokeCallback() );
+        doWithEmulator( e -> e.invokeTickCallback() );
     }
 
     private JMenuBar createMenuBar()

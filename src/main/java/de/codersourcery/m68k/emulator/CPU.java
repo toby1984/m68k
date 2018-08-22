@@ -1270,14 +1270,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     return;
                 }
 
-                if ( (instruction & 0b0100111011000000) == 0b0100111011000000)
-                {
-                    // JMP
-                    decodeSourceOperand(instruction,4,true);
-                    pc = ea;
-                    cycles += 4; // TODO: Timing correct?
-                    return;
-                }
                 if ( (instruction & 0b11111111_11110000) == 0b0100111001100000)
                 {
                     // MOVE Ax,USP / MOVE USP,Ax
@@ -1311,6 +1303,15 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
                     addressRegisters[dstAdrReg] = ea;
                     // TODO: Cycle timing correct ??
+                    return;
+                }
+
+                if ( (instruction & 0b0100111011000000) == 0b0100111011000000)
+                {
+                    // JMP
+                    decodeSourceOperand(instruction,4,true);
+                    pc = ea;
+                    cycles += 4; // TODO: Timing correct?
                     return;
                 }
 

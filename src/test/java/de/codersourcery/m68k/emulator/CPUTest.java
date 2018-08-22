@@ -1342,6 +1342,12 @@ public class CPUTest extends TestCase
                 .expectA0(0x12345678).carry().overflow().extended().negative().zero().notSupervisor();
     }
 
+    public void testLEA3()
+    {
+        execute("lea $40000,a7", cpu -> cpu.setFlags(ALL_USR_FLAGS))
+                .expectA7(0x40000).carry().overflow().extended().negative().zero().notSupervisor();
+    }
+
     public void testIllegal()
     {
         execute(cpu->{},"illegal").supervisor().irqActive(CPU.IRQ.ILLEGAL_INSTRUCTION);

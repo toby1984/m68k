@@ -10,11 +10,24 @@ import org.apache.commons.lang3.Validate;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 public class Emulator
 {
+    public interface IEmulatorStateCallback
+    {
+        void stopped();
+        void singleStepFinished();
+        void enteredContinousMode();
+    }
+
+    public interface ITickCallback
+    {
+        public void tick(Emulator emulator);
+    }
+
     private enum CommandType
     {
         START, STOP, RESET, SINGLE_STEP, CALLBACK, DESTROY
@@ -164,7 +177,15 @@ public class Emulator
         private final Object STOP_LOCK = new Object();
 
         private int callbackInvocationTicks = 1000;
-        private Consumer<Emulator> callback = e -> {};
+        private ITickCallback callback = e -> {};
+        private IEmulatorStateCallback stateCallback = new IEmulatorStateCallback()
+        {
+            @Override public void stopped() { }
+
+            @Override public void singleStepFinished() { }
+
+            @Override public void enteredContinousMode() { }
+        };
 
         private EmulatorMode mode = EmulatorMode.STOPPED;
 
@@ -234,6 +255,11 @@ public class Emulator
             finally
             {
                 System.err.println("Emulator thread died unexpectedly.");
+                final AtomicReference<ITickCallback> finalCallback = new AtomicReference<>(this.callback);
+                final AtomicReference<IEmulatorStateCallback> finalStateCallback =
+                        new AtomicReference<>(this.stateCallback);
+                final AtomicInteger finalTickCnt = new AtomicInteger(this.callbackInvocationTicks);
+
                 final Thread t = new Thread(() ->
                 {
                     try
@@ -251,6 +277,9 @@ public class Emulator
                         {
                             System.err.println("Restarting emulator thread");
                             emulatorThread = new EmulatorThread();
+                            emulatorThread.callback = finalCallback.get();
+                            emulatorThread.callbackInvocationTicks = finalTickCnt.get();
+                            emulatorThread.stateCallback = finalStateCallback.get();
                             emulatorThread.start();
                         }
                         else
@@ -284,19 +313,22 @@ public class Emulator
                             mode = EmulatorMode.RUNNING;
                             if (oldMode != mode)
                             {
-                                callback.accept(Emulator.this);
+                                stateCallback.enteredContinousMode();
+                                callback.tick(Emulator.this);
                             }
                             break;
                         case STOP:
                             mode = EmulatorMode.STOPPED;
                             if (oldMode != mode)
                             {
-                                callback.accept(Emulator.this);
+                                stateCallback.stopped();
+                                callback.tick(Emulator.this);
                             }
                             break;
                         case RESET:
                             doReset();
-                            callback.accept(Emulator.this);
+                            stateCallback.stopped();
+                            callback.tick(Emulator.this);
                             break;
                         case SINGLE_STEP:
                             mode = EmulatorMode.STOPPED;
@@ -304,13 +336,15 @@ public class Emulator
                             {
                                 tickCount++;
                                 cpu.executeOneInstruction();
-                            } catch (Exception e)
+                            }
+                            catch (Exception e)
                             {
                                 e.printStackTrace();
                             }
                             finally
                             {
-                                callback.accept(Emulator.this);
+                                stateCallback.singleStepFinished();
+                                callback.tick(Emulator.this);
                             }
                             break;
                         case CALLBACK:
@@ -330,7 +364,7 @@ public class Emulator
                         cpu.executeOneCycle();
                         if ((tickCount % callbackInvocationTicks) == 0)
                         {
-                            callback.accept(Emulator.this);
+                            callback.tick(Emulator.this);
                         }
                     }
                     catch (Exception e)
@@ -338,7 +372,7 @@ public class Emulator
                         e.printStackTrace();
                         mode = EmulatorMode.STOPPED;
                         System.err.println("*** emulation stopped because of error ***");
-                        callback.accept(Emulator.this);
+                        callback.tick(Emulator.this);
                     }
                 }
                 else
@@ -354,23 +388,39 @@ public class Emulator
         sendCommand(new EmulatorCallback(action),false);
     }
 
-    public void setCallback(final Consumer<Emulator> cb)
+    /**
+     * Set callback to be invoked every {@link #setCallbackInvocationTicks(int)} emulation
+     * ticks.
+     *
+     * This callback gets invoked by the emulator thread.
+     * @param cb
+     */
+    public void setTickCallback(final ITickCallback cb)
     {
         Validate.notNull(cb, "callback must not be null");
         internalAsyncSendCommand( thread ->
         {
             thread.callback = cb;
             System.out.println("Emulator callback updated,invoking it");
-            thread.callback.accept(Emulator.this );
+            thread.callback.tick(Emulator.this );
         });
     }
 
-    public void invokeCallback()
+    /**
+     * Set callback to be invoked whenever the emulator changes state.
+     *
+     * This callback gets invoked by the emulator thread.
+     * @param cb
+     */
+    public void setStateCallback(final IEmulatorStateCallback cb)
     {
-        internalAsyncSendCommand( thread ->
-        {
-            thread.callback.accept(Emulator.this );
-        });
+        Validate.notNull(cb, "callback must not be null");
+        internalAsyncSendCommand( thread -> thread.stateCallback = cb );
+    }
+
+    public void invokeTickCallback()
+    {
+        internalAsyncSendCommand( thread -> thread.callback.tick(Emulator.this ) );
     }
 
     public void setCallbackInvocationTicks(int callbackInvocationTicks)
@@ -383,7 +433,7 @@ public class Emulator
         {
             thread.callbackInvocationTicks = callbackInvocationTicks;
             System.out.println("Emulator callback will be invoked every "+callbackInvocationTicks+" ticks.");
-            thread.callback.accept(Emulator.this );
+            thread.callback.tick(Emulator.this );
         });
     }
 }
