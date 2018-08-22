@@ -1,4 +1,4 @@
-package de.codersourcery.m68k.emulator;
+package de.codersourcery.m68k.emulator.memory;
 
 public class MemoryBus
 {

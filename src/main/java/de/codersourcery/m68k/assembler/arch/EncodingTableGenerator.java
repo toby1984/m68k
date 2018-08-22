@@ -1,8 +1,9 @@
 package de.codersourcery.m68k.assembler.arch;
 
 import de.codersourcery.m68k.disassembler.Disassembler;
-import de.codersourcery.m68k.emulator.MMU;
-import de.codersourcery.m68k.emulator.Memory;
+import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.memory.MMU;
+import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
 
@@ -707,7 +708,7 @@ outer:
 
     private static void sanityCheck(Instruction insn,int opcode) {
 
-        final MMU mmu = new MMU(new MMU.PageFaultHandler());
+        final MMU mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500));
         final Memory memory = new Memory(mmu);
         final Disassembler disassembler = new Disassembler(memory);
         memory.writeWord(0,opcode);

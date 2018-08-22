@@ -1,6 +1,10 @@
-package de.codersourcery.m68k.emulator;
+package de.codersourcery.m68k.emulator.chips;
 
 import de.codersourcery.m68k.assembler.arch.CPUType;
+import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.CPU;
+import de.codersourcery.m68k.emulator.memory.MMU;
+import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.utils.BusSpy;
 import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;
@@ -13,7 +17,7 @@ public class CIA8520Test extends TestCase
     @Override
     protected void setUp()
     {
-        final MMU mmu = new MMU(new MMU.PageFaultHandler());
+        final MMU mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500));
         final Memory memory = new Memory(mmu);
         final CPU cpu = new CPU(CPUType.M68000, memory);
         final IRQController irqController = new IRQController(cpu)

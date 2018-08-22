@@ -4,7 +4,7 @@ import de.codersourcery.m68k.assembler.arch.CPUType;
 
 public enum Amiga
 {
-    AMIGA_500_PLUS
+    AMIGA_500
     {
         @Override
         public int getChipRAMSize()
@@ -15,7 +15,13 @@ public enum Amiga
         @Override
         public int getKickRomStartAddress()
         {
-            return 0xF80000;
+            return 0xFC0000;
+        }
+
+        @Override
+        public int getKickRomEndAddress()
+        {
+            return getKickRomStartAddress()+getKickRomSize();
         }
 
         @Override
@@ -33,6 +39,7 @@ public enum Amiga
 
     public abstract int getChipRAMSize();
     public abstract int getKickRomStartAddress();
+    public abstract int getKickRomEndAddress();
     public abstract int getKickRomSize();
     public abstract CPUType getCPUType();
 

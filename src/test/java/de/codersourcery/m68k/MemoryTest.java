@@ -1,7 +1,8 @@
 package de.codersourcery.m68k;
 
-import de.codersourcery.m68k.emulator.MMU;
-import de.codersourcery.m68k.emulator.Memory;
+import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.memory.MMU;
+import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.emulator.exceptions.BadAlignmentException;
 import de.codersourcery.m68k.emulator.exceptions.MemoryWriteProtectedException;
 import junit.framework.TestCase;
@@ -17,7 +18,7 @@ public class MemoryTest extends TestCase
     protected void setUp() throws Exception
     {
         super.setUp();
-        mmu = new MMU( new MMU.PageFaultHandler() );
+        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500) );
         memory = new Memory(mmu);
     }
 

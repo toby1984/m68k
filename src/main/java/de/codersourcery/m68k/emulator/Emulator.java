@@ -1,5 +1,10 @@
 package de.codersourcery.m68k.emulator;
 
+import de.codersourcery.m68k.emulator.chips.CIA8520;
+import de.codersourcery.m68k.emulator.chips.IRQController;
+import de.codersourcery.m68k.emulator.memory.MMU;
+import de.codersourcery.m68k.emulator.memory.Memory;
+import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
 
 import java.util.concurrent.ArrayBlockingQueue;
@@ -12,12 +17,12 @@ public class Emulator
 {
     private enum CommandType
     {
-        START,STOP,RESET,SINGLE_STEP,CALLBACK
+        START, STOP, RESET, SINGLE_STEP, CALLBACK, DESTROY
     }
 
     private enum EmulatorMode
     {
-        RUNNING,STOPPED;
+        RUNNING, STOPPED;
     }
 
     private static class EmulatorCommand
@@ -25,7 +30,8 @@ public class Emulator
         public final CommandType type;
         public final CountDownLatch ack = new CountDownLatch(1);
 
-        public EmulatorCommand(CommandType type) {
+        public EmulatorCommand(CommandType type)
+        {
             this.type = type;
         }
     }
@@ -41,96 +47,111 @@ public class Emulator
         }
     }
 
-    private final byte[] kickstartRom;
-
-    private final Amiga amiga;
-    private final MMU mmu;
-    private final Memory memory;
-    private final CPU cpu;
+    // after how many ticks the callback should get invoked
+    public final byte[] kickstartRom;
+    public final Amiga amiga;
+    public final MMU mmu;
+    public final Memory memory;
+    public final CPU cpu;
+    public final CIA8520 ciaa;
+    public final CIA8520 ciab;
+    public final IRQController irqController;
 
     private final Object EMULATOR_LOCK = new Object();
 
     // @GuardedBy(EMULATOR_LOCK)
     private EmulatorThread emulatorThread;
 
-    private BlockingQueue<EmulatorCommand> cmdQueue = new ArrayBlockingQueue<>(1000,true);
+    private BlockingQueue<EmulatorCommand> cmdQueue = new ArrayBlockingQueue<>(1000, true);
 
-    public Emulator(Amiga amiga,byte[] kickstartRom)
+    public Emulator(Amiga amiga, byte[] kickstartRom)
     {
         this.amiga = amiga;
 
         this.kickstartRom = kickstartRom;
-        if ( kickstartRom.length != amiga.getKickRomSize() ) {
-            throw new IllegalArgumentException("Kickstart ROM needs to have "+amiga.getKickRomSize()+" bytes");
+        if (kickstartRom.length != amiga.getKickRomSize())
+        {
+            throw new IllegalArgumentException("Kickstart ROM for "+amiga+" needs to have " + amiga.getKickRomSize() + " bytes but had "+kickstartRom.length);
         }
-
-        final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler();
-        this.mmu = new MMU( faultHandler );
+        final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler(amiga);
+        this.mmu = new MMU(faultHandler);
         this.memory = new Memory(this.mmu);
-        this.cpu = new CPU(amiga.getCPUType(),memory);
+        this.cpu = new CPU(amiga.getCPUType(), memory);
+        this.irqController = new IRQController(this.cpu);
+        this.ciaa = new CIA8520(CIA8520.Name.CIAA, irqController);
+        this.ciab = new CIA8520(CIA8520.Name.CIAB, irqController);
+        faultHandler.setCIAA(this.ciaa);
+        faultHandler.setCIAB(this.ciab);
     }
 
-    public void runOnThread(Runnable r)
+    public void destroy()
     {
-        sendCommand( new EmulatorCallback(t -> r.run() ) );
+        sendCommand(new EmulatorCommand(CommandType.DESTROY), true);
+    }
+
+    public void runOnThread(Runnable r, boolean waitForCompletion)
+    {
+        sendCommand(new EmulatorCallback(t -> r.run()), waitForCompletion);
     }
 
     public void reset()
     {
-        sendCommand( new EmulatorCommand(CommandType.RESET ) );
+        sendCommand(new EmulatorCommand(CommandType.RESET));
     }
 
     public void start()
     {
-        sendCommand( new EmulatorCommand(CommandType.START ) );
+        sendCommand(new EmulatorCommand(CommandType.START));
     }
 
     public void stop()
     {
-        sendCommand( new EmulatorCommand(CommandType.STOP ) );
+        sendCommand(new EmulatorCommand(CommandType.STOP));
     }
 
     public void singleStep()
     {
-        sendCommand( new EmulatorCommand(CommandType.SINGLE_STEP ) );
+        sendCommand(new EmulatorCommand(CommandType.SINGLE_STEP));
     }
 
     public boolean hasMode(EmulatorMode mode)
     {
-        return mode.equals( getMode() );
+        return mode.equals(getMode());
     }
 
     public EmulatorMode getMode()
     {
         final AtomicReference<EmulatorMode> result = new AtomicReference<>();
-        sendCommand( new EmulatorCallback(thread -> result.set( thread.mode ) ) , true );
+        sendCommand(new EmulatorCallback(thread -> result.set(thread.mode)), true);
         return result.get();
     }
 
 
-    private void sendCommand(EmulatorCommand cmd) {
-        sendCommand(cmd,false);
+    private void sendCommand(EmulatorCommand cmd)
+    {
+        sendCommand(cmd, false);
     }
 
-    private void sendCommand(EmulatorCommand cmd,boolean waitForCompletion)
+    private void sendCommand(EmulatorCommand cmd, boolean waitForCompletion)
     {
         Validate.notNull(cmd, "cmd must not be null");
-        cmdQueue.add( cmd );
+        cmdQueue.add(cmd);
         synchronized (EMULATOR_LOCK)
         {
-            if ( emulatorThread == null || ! emulatorThread.isAlive() ) {
+            if (emulatorThread == null || !emulatorThread.isAlive())
+            {
+                System.out.println("Starting emulator thread");
                 emulatorThread = new EmulatorThread();
                 emulatorThread.start();
             }
             emulatorThread.wakeup();
         }
-        if ( waitForCompletion )
+        if (waitForCompletion)
         {
             try
             {
                 cmd.ack.await();
-            }
-            catch (InterruptedException e)
+            } catch (InterruptedException e)
             {
                 e.printStackTrace();
                 Thread.interrupted();
@@ -142,6 +163,9 @@ public class Emulator
     {
         private final Object STOP_LOCK = new Object();
 
+        private int callbackInvocationTicks = 1000;
+        private Consumer<Emulator> callback = e -> {};
+
         private EmulatorMode mode = EmulatorMode.STOPPED;
 
         {
@@ -152,15 +176,15 @@ public class Emulator
 
         private void waitForCommand()
         {
-            while ( cmdQueue.peek() == null )
+            while (cmdQueue.peek() == null)
             {
                 System.out.println("Emulator is going to sleep");
-                synchronized(STOP_LOCK)
+                synchronized (STOP_LOCK)
                 {
                     try
                     {
                         STOP_LOCK.wait();
-                        System.out.println("Emulator woke up");
+                        System.out.println("Emulator thread woke up.");
                     }
                     catch (InterruptedException e)
                     {
@@ -171,7 +195,7 @@ public class Emulator
 
         public void wakeup()
         {
-            synchronized(STOP_LOCK)
+            synchronized (STOP_LOCK)
             {
                 STOP_LOCK.notifyAll();
             }
@@ -183,13 +207,16 @@ public class Emulator
             mmu.reset();
 
             // copy kickstart rom into RAM
-            memory.bulkWrite(amiga.getKickRomStartAddress(),kickstartRom,0,kickstartRom.length);
+            System.out.println("Writing "+kickstartRom.length+" bytes of kickstart ROM to "+ Misc.hex(amiga.getKickRomStartAddress()));
+            memory.bulkWrite(amiga.getKickRomStartAddress(), kickstartRom, 0, kickstartRom.length);
 
             // write-protect kickstart ROM
-            mmu.setWriteProtection( amiga.getKickRomStartAddress(),kickstartRom.length,true);
+            mmu.setWriteProtection(amiga.getKickRomStartAddress(), kickstartRom.length, true);
 
             // copy first 1 KB from ROM to IRQ vectors starting at 0x00
-            memory.bulkWrite(0x000000,kickstartRom,0,1024);
+            memory.bulkWrite(0x000000, kickstartRom, 0, 1024);
+
+            System.out.println( memory.hexdump(amiga.getKickRomStartAddress(),1024));
 
             cpu.reset();
 
@@ -201,26 +228,33 @@ public class Emulator
         {
             try
             {
+                System.out.println("Emulator thread start");
                 internalRun();
             }
-            finally {
+            finally
+            {
                 System.err.println("Emulator thread died unexpectedly.");
-                Thread t = new Thread( () ->
+                final Thread t = new Thread(() ->
                 {
-                    try {
-                        System.err.println("Restarting emulator thread in 10 seconds");
-                        Thread.sleep(10*1000 );
-                    } catch(Exception e) {
-                        e.printStackTrace();;
-                    }
-                    synchronized( EMULATOR_LOCK)
+                    try
                     {
-                        if ( emulatorThread == null || ! emulatorThread.isAlive() )
+                        System.err.println("Restarting emulator thread in 10 seconds");
+                        Thread.sleep(10 * 1000);
+                    } catch (Exception e)
+                    {
+                        e.printStackTrace();
+                        ;
+                    }
+                    synchronized (EMULATOR_LOCK)
+                    {
+                        if (emulatorThread == null || !emulatorThread.isAlive())
                         {
                             System.err.println("Restarting emulator thread");
                             emulatorThread = new EmulatorThread();
                             emulatorThread.start();
-                        } else {
+                        }
+                        else
+                        {
                             System.err.println("Emulator thread already running");
                         }
                     }
@@ -232,41 +266,124 @@ public class Emulator
 
         public void internalRun()
         {
-            while ( true )
+            int tickCount = 0;
+
+            while (true)
             {
                 EmulatorCommand cmd = cmdQueue.poll();
-                if ( cmd != null )
+                if (cmd != null)
                 {
-                    switch( cmd.type) {
+                    final EmulatorMode oldMode = mode;
+                    switch (cmd.type)
+                    {
 
+                        case DESTROY:
+                            cmd.ack.countDown();
+                            return; /* terminate thread */
                         case START:
                             mode = EmulatorMode.RUNNING;
+                            if (oldMode != mode)
+                            {
+                                callback.accept(Emulator.this);
+                            }
                             break;
                         case STOP:
                             mode = EmulatorMode.STOPPED;
+                            if (oldMode != mode)
+                            {
+                                callback.accept(Emulator.this);
+                            }
                             break;
                         case RESET:
                             doReset();
+                            callback.accept(Emulator.this);
                             break;
                         case SINGLE_STEP:
                             mode = EmulatorMode.STOPPED;
-                            cpu.executeOneInstruction();
+                            try
+                            {
+                                tickCount++;
+                                cpu.executeOneInstruction();
+                            } catch (Exception e)
+                            {
+                                e.printStackTrace();
+                            }
+                            finally
+                            {
+                                callback.accept(Emulator.this);
+                            }
                             break;
                         case CALLBACK:
                             ((EmulatorCallback) cmd).callback.accept(this);
                             break;
                         default:
-                            throw new RuntimeException("Unhandled command: "+cmd);
+                            throw new RuntimeException("Unhandled command: " + cmd);
                     }
                     cmd.ack.countDown();
                     continue;
                 }
-                if ( mode == EmulatorMode.RUNNING) {
-                    cpu.executeOneCycle();
-                } else {
+                if (mode == EmulatorMode.RUNNING)
+                {
+                    try
+                    {
+                        tickCount++;
+                        cpu.executeOneCycle();
+                        if ((tickCount % callbackInvocationTicks) == 0)
+                        {
+                            callback.accept(Emulator.this);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                        mode = EmulatorMode.STOPPED;
+                        System.err.println("*** emulation stopped because of error ***");
+                        callback.accept(Emulator.this);
+                    }
+                }
+                else
+                {
                     waitForCommand();
                 }
             }
         }
+    }
+
+    private void internalAsyncSendCommand(Consumer<EmulatorThread> action)
+    {
+        sendCommand(new EmulatorCallback(action),false);
+    }
+
+    public void setCallback(final Consumer<Emulator> cb)
+    {
+        Validate.notNull(cb, "callback must not be null");
+        internalAsyncSendCommand( thread ->
+        {
+            thread.callback = cb;
+            System.out.println("Emulator callback updated,invoking it");
+            thread.callback.accept(Emulator.this );
+        });
+    }
+
+    public void invokeCallback()
+    {
+        internalAsyncSendCommand( thread ->
+        {
+            thread.callback.accept(Emulator.this );
+        });
+    }
+
+    public void setCallbackInvocationTicks(int callbackInvocationTicks)
+    {
+        if (callbackInvocationTicks < 1)
+        {
+            throw new IllegalArgumentException("tick count needs to be >= 1");
+        }
+        internalAsyncSendCommand( thread ->
+        {
+            thread.callbackInvocationTicks = callbackInvocationTicks;
+            System.out.println("Emulator callback will be invoked every "+callbackInvocationTicks+" ticks.");
+            thread.callback.accept(Emulator.this );
+        });
     }
 }

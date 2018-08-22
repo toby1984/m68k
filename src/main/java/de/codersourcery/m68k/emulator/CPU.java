@@ -6,6 +6,7 @@ import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.emulator.exceptions.IllegalInstructionException;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
+import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;

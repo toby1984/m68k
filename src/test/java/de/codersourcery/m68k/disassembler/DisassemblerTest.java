@@ -1,7 +1,8 @@
 package de.codersourcery.m68k.disassembler;
 
-import de.codersourcery.m68k.emulator.MMU;
-import de.codersourcery.m68k.emulator.Memory;
+import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.memory.MMU;
+import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.assembler.Assembler;
 import de.codersourcery.m68k.assembler.CompilationMessages;
 import de.codersourcery.m68k.assembler.CompilationUnit;
@@ -604,7 +605,7 @@ public class DisassemblerTest extends TestCase
         final byte[] executable = this.asm.getBytes(false);
         System.out.println("COMPILED: "+Memory.hexdump(0,executable,0,executable.length));
 
-        final MMU mmu = new MMU( new MMU.PageFaultHandler() );
+        final MMU mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500) );
         final Memory memory = new Memory(mmu);
         memory.writeBytes( 0,executable );
 

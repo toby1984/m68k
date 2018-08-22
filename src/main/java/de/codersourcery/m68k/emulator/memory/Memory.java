@@ -1,4 +1,4 @@
-package de.codersourcery.m68k.emulator;
+package de.codersourcery.m68k.emulator.memory;
 
 import de.codersourcery.m68k.emulator.exceptions.BadAlignmentException;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
@@ -6,8 +6,16 @@ import de.codersourcery.m68k.emulator.exceptions.MemoryWriteProtectedException;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
-public class Memory {
-
+/**
+ * Fascade to the memory subsystem.
+ *
+ * Uses the {@link MMU} to locate the {@link MemoryPage} instances that
+ * are actually affected by read/write operations.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public class Memory
+{
     private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
 
     private static final HexConverter HEX_CONVERTER = new HexConverter();
@@ -87,6 +95,12 @@ public class Memory {
         return readWordNoCheck(address);
     }
 
+    public short readWordNoSideEffects(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits when assigned to int later on
+    {
+        assertReadWordAligned(address);
+        return readWordNoCheckNoSideEffects(address);
+    }
+
     public short readWordNoCheck(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits when assigned to int later on
     {
         final int p0 = mmu.getPageNo( address );
@@ -98,6 +112,21 @@ public class Memory {
             lo = page.readByte(offset+1);
         } else {
             lo = mmu.getPage( p0+1 ).readByte(0);
+        }
+        return (short) (hi<<8|(lo & 0xff));
+    }
+
+    public short readWordNoCheckNoSideEffects(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits when assigned to int later on
+    {
+        final int p0 = mmu.getPageNo( address );
+        final MemoryPage page = mmu.getPage( p0 );
+        final int offset = mmu.getOffsetInPage( address );
+        int hi = page.readByte(offset);
+        int lo;
+        if ( (offset+1) < 4096  ) {
+            lo = page.readByteNoSideEffects(offset+1);
+        } else {
+            lo = mmu.getPage( p0+1 ).readByteNoSideEffects(0);
         }
         return (short) (hi<<8|(lo & 0xff));
     }
@@ -140,6 +169,13 @@ public class Memory {
         return mmu.getPage( pageNo ).readByte( offset );
     }
 
+    public byte readByteNoSideEffects(int address) // return type NEEDS to be byte, used for implicit sign extension 8 bits -> 32 bits when assigned to int later on
+    {
+        final int pageNo = mmu.getPageNo( address );
+        final int offset = mmu.getOffsetInPage( address );
+        return mmu.getPage( pageNo ).readByteNoSideEffects( offset );
+    }
+
     public void writeByte(int address,int value)
     {
         final int offset = mmu.getOffsetInPage( address );
@@ -174,10 +210,23 @@ public class Memory {
         return (hi << 16) | (lo & 0xffff);
     }
 
+    public int readLongNoCheckNoSideEffects(int address)
+    {
+        int hi = readWordNoCheckNoSideEffects(address);
+        int lo = readWordNoCheckNoSideEffects(address+2);
+        return (hi << 16) | (lo & 0xffff);
+    }
+
     public int readLong(int address)
     {
         assertReadLongAligned(address);
         return readLongNoCheck(address);
+    }
+
+    public int readLongNoSideEffects(int address)
+    {
+        assertReadLongAligned(address);
+        return readLongNoCheckNoSideEffects(address);
     }
 
     public void writeLong(int address,int value)
@@ -191,7 +240,7 @@ public class Memory {
     {
         final byte[] tmp = new byte[count];
         for ( int i = 0 ; i < count ; i++ ) {
-            tmp[i] = (byte) readByte(startAddress+i);
+            tmp[i] = (byte) readByteNoSideEffects(startAddress+i);
         }
         return hexdump(startAddress, tmp, 0,count);
     }

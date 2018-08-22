@@ -8,6 +8,8 @@ import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
+import de.codersourcery.m68k.emulator.memory.MMU;
+import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;
@@ -41,7 +43,7 @@ public class CPUTest extends TestCase
     protected void setUp() throws Exception
     {
         super.setUp();
-        mmu = new MMU( new MMU.PageFaultHandler() );
+        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500) );
         memory = new Memory(mmu);
         cpu = new CPU(CPUType.BEST,memory);
     }

@@ -28,7 +28,8 @@ public class BusSpy
 
     private MyWindow window;
 
-    private int readPtr;
+    private final int bufferSize; // only power-of-two buffer sizes are supported
+    private final int bufferMask; // AND mask used to avoid modulo operations
     private int writePtr;
     private int[] dataArray;
     private boolean isFull;
@@ -105,9 +106,10 @@ public class BusSpy
 
                     final int xStep = drawingAreaWidth / (sampleCount+1);
 
+                    final int readPtr = isFull ? (writePtr-bufferSize) & bufferMask : 0;
                     int previousState = dataArray[readPtr];
                     int previousX = headerWidth;
-                    for ( int itemIdx = (readPtr+1)%dataArray.length, pos = 0 ; pos < sampleCount; itemIdx = (itemIdx+1) % dataArray.length , pos++)
+                    for ( int itemIdx = (readPtr+1)%bufferSize, pos = 0 ; pos < sampleCount; itemIdx = (itemIdx+1) % bufferSize , pos++)
                     {
                         int currentX = previousX + xStep;
                         final int currentState = dataArray[itemIdx];
@@ -170,13 +172,18 @@ public class BusSpy
      */
     public BusSpy(IBus bus,int bufferSize)
     {
-        Validate.notNull(bus, "bus must not be null");
-        if ( bufferSize < 1 ) {
-            throw new IllegalArgumentException("maxLen needs to be >= 1");
+        Validate.notNull(bus, "Bus must not be null");
+        if ( bufferSize < 2 ) {
+            throw new IllegalArgumentException("Buffer size needs to be >= 2");
+        }
+        if ( Integer.bitCount(bufferSize) != 1 ) {
+            throw new IllegalArgumentException("Buffer size needs to be a power of two but was "+bufferSize);
         }
         this.bus = bus;
         this.dataArray = new int[bufferSize];
         this.lineColors = genColors(bus.getPinNames().length);
+        this.bufferSize = bufferSize;
+        this.bufferMask = bufferSize-1;
     }
 
     private static Color[] genColors(int count)
@@ -232,7 +239,7 @@ public class BusSpy
 
     private int getSampleCount()
     {
-        return isFull ? dataArray.length : writePtr;
+        return isFull ? bufferSize : writePtr;
     }
 
     private boolean hasData() {
@@ -291,17 +298,10 @@ public class BusSpy
     public void sampleBus()
     {
         dataArray[writePtr] = bus.readPins();
-        if ( isFull )
+        writePtr = (writePtr+1) & bufferMask;
+        if ( !isFull && writePtr == 0 )
         {
-            readPtr = (readPtr+1) % dataArray.length;
-            writePtr = (writePtr+1) % dataArray.length;
-        } else {
-            writePtr++;
-            if ( writePtr == dataArray.length )
-            {
-                isFull = true;
-                writePtr = 0;
-            }
+            isFull = true;
         }
     }
 
@@ -335,7 +335,7 @@ public class BusSpy
                 return rnd.nextInt(16);
             }
         };
-        final BusSpy spy = new BusSpy(bus, 10);
+        final BusSpy spy = new BusSpy(bus, 16);
 
         spy.show();
         while ( true )

@@ -1,6 +1,6 @@
 package de.codersourcery.m68k.disassembler;
 
-import de.codersourcery.m68k.emulator.Memory;
+import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.assembler.arch.AddressingMode;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
@@ -15,7 +15,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 
 public class Disassembler
 {
@@ -64,7 +63,7 @@ public class Disassembler
             final String textPadded;
             if ( ascii != null || comments != null )
             {
-                textPadded = StringUtils.rightPad(text, 50, ' ');
+                textPadded = StringUtils.rightPad(text, 20, ' ');
             } else {
                 textPadded = text;
             }
@@ -1282,13 +1281,13 @@ public class Disassembler
         if ( lineConsumer.stop(pc + 4 ) ) {
             throw new EndOfMemoryAccess();
         }
-        int result = memory.readLong( pc );
+        int result = memory.readLongNoSideEffects( pc );
         if ( dumpHex )
         {
-            appendHexByte(asciiBuffer, result >> 24);
-            appendHexByte(asciiBuffer, result >> 16);
-            appendHexByte(asciiBuffer, result >> 8);
-            appendHexByte(asciiBuffer, result);
+            appendHexByte(result >> 24);
+            appendHexByte(result >> 16);
+            appendHexByte(result >> 8);
+            appendHexByte(result);
         }
         pc+=4;
         return result;
@@ -1299,11 +1298,11 @@ public class Disassembler
         if ( lineConsumer.stop((pc + 2 ) ) ) {
             throw new EndOfMemoryAccess();
         }
-        final int result = memory.readWord( pc );
+        final int result = memory.readWordNoSideEffects( pc );
         if ( dumpHex )
         {
-            appendHexByte(asciiBuffer, result >> 8);
-            appendHexByte(asciiBuffer, result);
+            appendHexByte(result >> 8);
+            appendHexByte( result);
         }
         pc+=2;
         return result;
@@ -1311,11 +1310,17 @@ public class Disassembler
 
     private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
 
-    private static void appendHexByte(StringBuilder buffer,int value) {
+    private void appendHexByte(int value) {
 
-       final char low = HEX_CHARS[ value & 0b1111 ];
-       final char hi = HEX_CHARS[ (value & 0b11110000)>>4 ];
-       buffer.append(hi).append(low);
+        final char low = HEX_CHARS[ value & 0b1111 ];
+        final char hi = HEX_CHARS[ (value & 0b11110000)>>4 ];
+        asciiBuffer.append(hi).append(low);
+        if ( value >= 32 && value < 127)
+        {
+            commentsBuffer.append(hi);
+        } else {
+            commentsBuffer.append('.');
+        }
     }
 
     private Disassembler appendln(String s)
@@ -1429,7 +1434,7 @@ public class Disassembler
                 // MEMORY_INDIRECT_POSTINDEXED
                 // MEMORY_INDIRECT_PREINDEXED
 
-                int extensionWord = memory.readWordNoCheck(pc);
+                int extensionWord = memory.readWordNoCheckNoSideEffects(pc);
                 pc += 2; // skip extension word
 
                 // bit 8 can be used to distinguish between brief extension words (bit = 0)
@@ -1564,7 +1569,7 @@ public class Disassembler
                 {
                     case 0b010:
                         // PC_INDIRECT_WITH_DISPLACEMENT(0b111,fixedValue(0b010),1),
-                        baseDisplacement = memory.readWordNoCheck(pc);
+                        baseDisplacement = memory.readWordNoCheckNoSideEffects(pc);
                         pc += 2;
                         append( Misc.hex(baseDisplacement ) ).append("(pc)");
                         return;
@@ -1578,7 +1583,7 @@ public class Disassembler
                       // 1,2 or 3 extra words
                       PC_INDIRECT_WITH_INDEX_DISPLACEMENT(0b111,fixedValue(0b011),3),
                       */
-                        extensionWord = memory.readWordNoCheck(pc);
+                        extensionWord = memory.readWordNoCheckNoSideEffects(pc);
                         pc += 2;
                         if ( (extensionWord & 1<<8) == 0 ) { // 8-bit displacement
                             baseDisplacement = ((extensionWord & 0xff) << 24) >> 24;
@@ -1628,11 +1633,11 @@ public class Disassembler
                             case 1: // instruction words always need to be word aligned,
                                 // byte values are still stored as words
                             case 2:
-                                append(Misc.hex( memory.readWord( pc ) ) );
+                                append(Misc.hex( memory.readWordNoSideEffects( pc ) ) );
                                 pc += 2;
                                 break;
                             case 4:
-                                append(Misc.hex( memory.readLong( pc ) ) );
+                                append(Misc.hex( memory.readLongNoSideEffects( pc ) ) );
                                 pc += operandSizeInBytes;
                                 break;
                             default:
@@ -1659,11 +1664,11 @@ public class Disassembler
     }
 
     private int memLoadWord(int address) {
-        return memory.readWord( address );
+        return memory.readWordNoSideEffects( address );
     }
 
     private int memLoadLong(int address ) {
-        return memory.readLong( address );
+        return memory.readLongNoSideEffects( address );
     }
 
     /**

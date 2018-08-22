@@ -1,7 +1,10 @@
-package de.codersourcery.m68k.emulator;
+package de.codersourcery.m68k.emulator.chips;
 
+import de.codersourcery.m68k.assembler.arch.Register;
 import de.codersourcery.m68k.utils.IBus;
 import de.codersourcery.m68k.utils.Misc;
+
+import java.util.function.Function;
 
 /**
  * TODO: FLAG/PC handshake not implemented
@@ -449,26 +452,61 @@ Register  Name          Function
         }
     }
 
-    public int readRegister(int regNum) {
-    /*
-Register  Name          Function
-0 0       PRA           Port A data register
-1 1       PRB           Port B data register
-2 2       DDRA          Port A data direction register
-3 3       DDRB          Port B data direction register
-4 4       TALO          Timer A lower 8 bits
-5 5       TAffl         Timer A upper 8 bits
-6 6       TBLO          Timer Blower 8 bits
-7 7       TBHI          Timer B upper 8 bits
-8 8       Event low     Counter bits 0-7
-9 9       Event med.    Counter bits 8-15
-10 A      Event high    Counter bits 16-23
-11 B      _             Unused
-12 C      SP            Serial port data register
-13 D      ICR           Interrupt control register
-14 E      CRA           Control register A
-15 F      CRB           Control register B
-        */
+    public int readRegisterNoSideEffects(int regNum) {
+        {
+            switch( regNum )
+            {
+                case REG_PORTA:
+                    return readPortA();
+                case REG_PORTB:
+                    return readPortB();
+                case REG_DDRA:
+                    return portADDR;
+                case REG_DDRB:
+                    return portBDDR;
+                case REG_TIMERA_LO:
+                    return timerA & 0xff;
+                case REG_TIMERA_HI:
+                    return (timerA & 0xff00) >> 8;
+                case REG_TIMERB_LO:
+                    return timerB & 0xff;
+                case REG_TIMERB_HI:
+                    return (timerA & 0xff00) >> 8;
+                case REG_EVENT_LO:
+                    if ((ctrlB & CTRL_ALARM) != 0 && eventCounterLatched)
+                    {
+                        return eventCounterAlarmLatch & 0xff;
+                    }
+                    return eventCounter & 0xff;
+                case REG_EVENT_MED:
+                    if ( (ctrlB & CTRL_ALARM) != 0 )
+                    {
+                        return (eventCounterAlarmLatch & 0xff00)>>8;
+                    }
+                    return (eventCounter & 0xff00) >> 8;
+                case REG_EVENT_HI:
+                    if ( (ctrlB & CTRL_ALARM) != 0 )
+                    {
+                        return (eventCounterAlarmLatch & 0xff0000)>>16;
+                    }
+                    return (eventCounter & 0xff0000) >> 16;
+                case REG_SERIAL_DATA:
+                    return serialDataReg;
+                case REG_IRQ_CTRL:
+                    return triggeredInterrupts;
+                case REG_CTRLA:
+                    return ctrlA;
+                case REG_CTRLB:
+                    return ctrlB;
+                default:
+                    System.err.println("Unhandled register read #" + regNum + " on " + this);
+                    return 0;
+            }
+        }
+    }
+
+    public int readRegister(int regNum)
+    {
         switch( regNum )
         {
             case REG_PORTA:

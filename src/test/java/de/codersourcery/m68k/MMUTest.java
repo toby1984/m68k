@@ -1,6 +1,7 @@
 package de.codersourcery.m68k;
 
-import de.codersourcery.m68k.emulator.MMU;
+import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.memory.MMU;
 import junit.framework.TestCase;
 
 public class MMUTest extends TestCase
@@ -11,7 +12,7 @@ public class MMUTest extends TestCase
     protected void setUp() throws Exception
     {
         super.setUp();
-        this.mmu = new MMU(new MMU.PageFaultHandler());
+        this.mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500));
     }
 
     public void testGetOffsetInPage() {

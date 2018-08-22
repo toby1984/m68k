@@ -1,5 +1,7 @@
 package de.codersourcery.m68k.emulator;
 
+import de.codersourcery.m68k.emulator.chips.CIA8520;
+
 /**
  * Keyboard emulation.
  * @author tobias.gierke@code-sourcery.de

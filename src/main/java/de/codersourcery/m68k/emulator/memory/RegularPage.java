@@ -1,18 +1,29 @@
-package de.codersourcery.m68k.emulator;
+package de.codersourcery.m68k.emulator.memory;
 
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 
-public class RAMPage extends MemoryPage
+/**
+ * A regular memory page (either RAM or ROM).
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public class RegularPage extends MemoryPage
 {
     private final byte[] data;
 
-    public RAMPage(int sizeInBytes)
+    public RegularPage(int sizeInBytes)
     {
         this.data = new byte[sizeInBytes];
     }
 
     @Override
     public byte readByte(int offset)
+    {
+        return data[offset];
+    }
+
+    @Override
+    public byte readByteNoSideEffects(int offset)
     {
         return data[offset];
     }

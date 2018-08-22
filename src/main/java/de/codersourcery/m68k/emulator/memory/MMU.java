@@ -1,5 +1,7 @@
-package de.codersourcery.m68k.emulator;
+package de.codersourcery.m68k.emulator.memory;
 
+import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.chips.CIA8520;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codersourcery.m68k.emulator.exceptions.PageNotMappedException;
 import de.codersourcery.m68k.utils.Misc;
@@ -7,24 +9,112 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.util.Arrays;
 
+/**
+ * Memory management unit that takes care to enforce memory protection and
+ * takes care of setting-up {@link MemoryPage memory pages} when they're
+ * being accessed for the very first time.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ *
+ * @see PageFaultHandler
+ */
 public class MMU
 {
     private static final boolean DEBUG = true;
 
     private static final int PAGE_SIZE_LEFT_SHIFT = 12;
-    public static final int PAGE_SIZE = 0x1000;
+    public  static final int PAGE_SIZE = 0x1000;
+    public  static final int PAGE_SIZE_MASK = PAGE_SIZE-1;
     private static final int PAGE_OFFSET_MASK = 0xfff;
 
     private final TIntObjectHashMap<MemoryPage> pageMap = new TIntObjectHashMap<>();
 
-    private int faultCount;
     private final PageFaultHandler faultHandler;
+    private int faultCount;
 
     public static class PageFaultHandler
     {
+        private static final int LAST_CHIPRAM_PAGENO = (0x07FFFF & PAGE_SIZE_MASK);
+        private static final int FIRST_CIA_PAGENO = (0xBF0000 & PAGE_SIZE_MASK);
+        private static final int LAST_CIA_PAGENO = (0xBFFFFF & PAGE_SIZE_MASK);
+
+        private static final int FIRST_CUSTOM_CHIP_PAGENO = (0xDF0000 & PAGE_SIZE_MASK);
+        private static final int LAST_CUSTOM_CHIP_PAGENO = (0xDFFFFF & PAGE_SIZE_MASK);
+
+        private final int firstRomPageNo;
+        private final int lastRomPageNo;
+
+        private final Amiga amiga;
+
+        private CIA8520 ciaa;
+        private CIA8520 ciab;
+
+        public PageFaultHandler(Amiga amiga)
+        {
+            this.amiga = amiga;
+            this.firstRomPageNo = amiga.getKickRomStartAddress() & PAGE_SIZE_MASK;
+            this.lastRomPageNo = (amiga.getKickRomEndAddress()-1) & PAGE_SIZE_MASK;
+        }
+
+        public void setCIAA(CIA8520 cia) {
+            this.ciaa = cia;
+        }
+
+        public void setCIAB(CIA8520 cia) {
+            this.ciab = cia;
+        }
+
         public MemoryPage getPage(int pageNo) throws MemoryAccessException
         {
-            return new RAMPage( MMU.PAGE_SIZE );
+            /*
+Amiga 500
+
+000000-03FFFF 256 KB Chip RAM
+040000-07FFFF 256 KB Chip RAM
+080000-0FFFFF 512 KB --
+100000-1FFFFF   1 MB --
+200000-5FFFFF   4 MB --
+600000-9FFFFF   4 MB --
+A00000-A7FFFF 512 KB --
+A80000-BEFFFF 1472 KB --
+BF0000-BFFFFF  64 KB CIA address space
+C00000-C7FFFF 512 KB --
+C80000-CFFFFF 512 KB --
+D00000-D7FFFF 512 KB --
+D80000-D8FFFF  64 KB --
+D90000-D9FFFF  64 KB --
+DA0000-DBFFFF 128 KB --
+DC0000-DCFFFF  64 KB Real-Time clock
+DD0000-DD0FFF   4 KB --
+DD1000-DD3FFF  12 KB --
+DD4000-DDFFFF  48 KB --
+DE0000-DEFFFF  64 KB Mainboard resources
+DF0000-DFFFFF  64 KB Custom Chip Registers
+E00000-E7FFFF 512 KB --
+E80000-E8FFFF  64 KB --
+E90000-EFFFFF 448 KB --
+F00000-F7FFFF 512 KB --
+F80000-FBFFFF 256 KB --
+FC0000-FFFFFF 256 KB -- Kickstart ROM
+             */
+
+            // Chip RAM
+            if ( pageNo <= LAST_CHIPRAM_PAGENO) {
+                return new RegularPage(PAGE_SIZE);
+            }
+            // CIA address range
+            if ( pageNo >= FIRST_CIA_PAGENO && pageNo <= LAST_CIA_PAGENO ) {
+                return new CIAPage(pageNo*PAGE_SIZE,ciaa,ciab);
+            }
+            // ROM
+            if ( pageNo >= firstRomPageNo && pageNo <= lastRomPageNo) {
+                return new RegularPage(PAGE_SIZE);
+            }
+            // custom chips
+            if ( pageNo >= FIRST_CUSTOM_CHIP_PAGENO && pageNo <= LAST_CUSTOM_CHIP_PAGENO) {
+                return new CustomChipPage(pageNo*PAGE_SIZE);
+            }
+            return AbsentPage.SINGLETON;
         }
     }
 
@@ -117,7 +207,9 @@ public class MMU
         return PAGE_SIZE;
     }
 
-    public void reset() {
+    public void reset()
+    {
+        System.out.println("MMU reset().");
         pageMap.clear();
         faultCount = 0;
     }

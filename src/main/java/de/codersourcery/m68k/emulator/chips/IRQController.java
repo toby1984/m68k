@@ -1,4 +1,6 @@
-package de.codersourcery.m68k.emulator;
+package de.codersourcery.m68k.emulator.chips;
+
+import de.codersourcery.m68k.emulator.CPU;
 
 public class IRQController
 {
