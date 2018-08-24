@@ -1253,6 +1253,10 @@ public enum Instruction
                             Instruction.destAddressingModes(cpuType,AddressingModeKind.MEMORY,AddressingModeKind.ALTERABLE) )
                             .with(Instruction.registerRange(Field.SRC_BASE_REGISTER));
                     }
+                    if ( encoding == ANDI_BYTE_ENCODING || encoding == ANDI_WORD_ENCODING || encoding == ANDI_LONG_ENCODING )
+                    {
+                        return Instruction.destAddressingModes(cpuType,AddressingModeKind.MEMORY,AddressingModeKind.ALTERABLE);
+                    }
                     throw new RuntimeException("Unreachable code reached");
                 }
 
@@ -2958,16 +2962,23 @@ D/A   |     |   |           |
     public static final String DST_BRIEF_EXTENSION_WORD = "RIIIQEE0WWWWWWWW";
 
     // src eaMode/eaRegister contained in lower 6 bits
-    public static final InstructionEncoding AND_SRC_EA_ENCODING  = InstructionEncoding.of("1100DDD0SSmmmsss");
+    public static final InstructionEncoding AND_SRC_EA_ENCODING  =
+        InstructionEncoding.of("1100DDD0SSmmmsss").withName("AND_SRC_EA_ENCODING");
     // dst eaMode/eaRegister contained in lower 6 bits
-    public static final InstructionEncoding AND_DST_EA_ENCODING  = InstructionEncoding.of("1100sss1SSMMMDDD");
+    public static final InstructionEncoding AND_DST_EA_ENCODING  =
+        InstructionEncoding.of("1100sss1SSMMMDDD").withName("AND_DST_EA_ENCODING");
 
-    public static final InstructionEncoding ANDI_TO_CCR_ENCODING = InstructionEncoding.of("0000001000111100","00000000vvvvvvvv");
+    public static final InstructionEncoding ANDI_TO_CCR_ENCODING =
+        InstructionEncoding.of("0000001000111100","00000000vvvvvvvv").withName("ANDI_TO_CCR_ENCODING");
 
-    public static final InstructionEncoding ANDI_BYTE_ENCODING   = InstructionEncoding.of("0000001000MMMDDD","00000000_vvvvvvvv");
-    public static final InstructionEncoding ANDI_WORD_ENCODING   = InstructionEncoding.of("0000001001MMMDDD","vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding ANDI_LONG_ENCODING   = InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding ANDI_TO_SR_ENCODING  = InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding ANDI_BYTE_ENCODING   =
+        InstructionEncoding.of("0000001000MMMDDD","00000000_vvvvvvvv").withName("ANDI_BYTE_ENCODING");
+    public static final InstructionEncoding ANDI_WORD_ENCODING   =
+        InstructionEncoding.of("0000001001MMMDDD","vvvvvvvv_vvvvvvvv").withName("ANDI_WORD_ENCODING");
+    public static final InstructionEncoding ANDI_LONG_ENCODING   =
+        InstructionEncoding.of("0000001010MMMDDD", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv").withName("ANDI_LONG_ENCODING");
+    public static final InstructionEncoding ANDI_TO_SR_ENCODING  =
+        InstructionEncoding.of("0000001001111100","vvvvvvvv_vvvvvvvv").withName("ANDI_TO_SR_ENCODING");
 
     // src eaMode/eaRegister contained in lower 6 bits
     public static final InstructionEncoding OR_SRC_EA_ENCODING  = InstructionEncoding.of("1000DDD0SSmmmsss");

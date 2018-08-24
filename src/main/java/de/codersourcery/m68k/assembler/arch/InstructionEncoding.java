@@ -52,6 +52,8 @@ public class InstructionEncoding
      */
     private int instructionWordMask;
 
+    private final String name;
+
     /**
      * Decorator used to change the bit encoding
      * of certain field values.
@@ -62,8 +64,10 @@ public class InstructionEncoding
         int getBits(Field field,int value);
     }
 
-    private InstructionEncoding(String[] newPatterns, Map<Field,List<IBitMapping>>[] newMappings,IValueDecorator valueDecorator)
+    private InstructionEncoding(String[] newPatterns, Map<Field,List<IBitMapping>>[] newMappings,
+                                IValueDecorator valueDecorator,String name)
     {
+        this.name = name;
         this.patterns = newPatterns;
         this.bitMappings = newMappings;
         int size = 0;
@@ -82,7 +86,12 @@ public class InstructionEncoding
             throw new IllegalArgumentException("Decorator must not be NULL");
         }
         final IValueDecorator newDecorator = (field, value) -> decorator.getBits( field, this.valueDecorator.getBits( field,value ) );
-        return new InstructionEncoding(this.patterns, this.bitMappings, newDecorator );
+        return new InstructionEncoding(this.patterns, this.bitMappings, newDecorator,this.name );
+    }
+
+    public InstructionEncoding withName(String name)
+    {
+        return new InstructionEncoding(this.patterns, this.bitMappings, this.valueDecorator,name );
     }
 
     private void populateInstructionMask(String pattern)
@@ -128,7 +137,7 @@ public class InstructionEncoding
                 buffer.append(" , ");
             }
         }
-        return buffer.toString();
+        return name+" { "+buffer.toString()+" }";
     }
 
     public int getSizeInBytes()
@@ -328,6 +337,7 @@ public class InstructionEncoding
         pattern1 = stripUnderscores(pattern1);
         Validate.notBlank( pattern1, "pattern1 must not be null or blank");
         final int len = 1 + ( additional != null ? additional.length : 0 );
+        this.name = null;
         this.bitMappings = new Map[len];
         this.patterns = new String[len];
         this.patterns[0] = pattern1;
@@ -576,7 +586,7 @@ public class InstructionEncoding
         System.arraycopy(patterns,0,newPatterns,0,patterns.length);
         newPatterns[newPatterns.length-1] = pattern;
 
-        return new InstructionEncoding(newPatterns,newMappings,this.valueDecorator );
+        return new InstructionEncoding(newPatterns,newMappings,this.valueDecorator,this.name);
     }
 
     public InstructionEncoding append(String pattern1,String... morePatterns)
@@ -601,7 +611,7 @@ public class InstructionEncoding
             newMappings[newIdx] = getMappings(pattern);
             newPatterns[newIdx] = pattern;
         }
-        return new InstructionEncoding(newPatterns,newMappings,this.valueDecorator );
+        return new InstructionEncoding(newPatterns,newMappings,this.valueDecorator,this.name);
     }
 
     /**
@@ -631,6 +641,7 @@ public class InstructionEncoding
             newMappings[newIdx] = getMappings(pattern);
             newPatterns[newIdx] = pattern;
         }
-        return new InstructionEncoding(newPatterns,newMappings,this.valueDecorator );
+        return new InstructionEncoding(newPatterns,newMappings,this.valueDecorator,this.name);
     }
+
 }

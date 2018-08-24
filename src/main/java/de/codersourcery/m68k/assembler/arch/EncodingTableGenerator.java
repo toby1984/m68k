@@ -7,8 +7,10 @@ import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
 
-import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -16,6 +18,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.IntSupplier;
 import java.util.regex.Matcher;
@@ -419,7 +422,7 @@ outer:
         }
     }
 
-    public void addMappings(InstructionEncoding encoding,Instruction instruction,CPUType cpuType,Map<Integer, Instruction> result)
+    public void addMappings(InstructionEncoding encoding,Instruction instruction,CPUType cpuType,Map<Integer, EncodingEntry> result)
     {
         final Map<Field, List<InstructionEncoding.IBitMapping>> mappings =
                 InstructionEncoding.getMappings(encoding.getPatterns()[0]);// consider only the first 16 bit
@@ -492,7 +495,7 @@ outer:
                 throw new RuntimeException("Internal error,duplicate mapping "+
                     Misc.binary16Bit(value)+" for "+instruction+" already used by "+result.get(value));
             }
-            result.put(value,instruction);
+            result.put(value,new EncodingEntry(instruction,encoding));
 
             if ( iterator.hasNext() )
             {
@@ -503,6 +506,17 @@ outer:
         }
     }
 
+    protected static final class EncodingEntry
+    {
+        public final Instruction instruction;
+        public final InstructionEncoding encoding;
+
+        public EncodingEntry(Instruction insn, InstructionEncoding encoding)
+        {
+            this.instruction = insn;
+            this.encoding = encoding;
+        }
+    }
     public static void main(String[] args) throws IOException
     {
         final CPUType cpuType = CPUType.M68000;
@@ -551,6 +565,7 @@ outer:
         allEncodings.put(Instruction.TRAPV,Arrays.asList(Instruction.TRAPV_ENCODING));
         allEncodings.put(Instruction.TST,Arrays.asList(Instruction.TST_ENCODING));
         allEncodings.put(Instruction.CLR,Arrays.asList(Instruction.CLR_ENCODING));
+        allEncodings.put(Instruction.ILLEGAL,Arrays.asList(Instruction.ILLEGAL_ENCODING));
         allEncodings.put(Instruction.BCHG, Arrays.asList(Instruction.BCHG_DYNAMIC_ENCODING, Instruction.BCHG_STATIC_ENCODING));
         allEncodings.put(Instruction.BSET, Arrays.asList(Instruction.BSET_DYNAMIC_ENCODING, Instruction.BSET_STATIC_ENCODING));
         allEncodings.put(Instruction.BCLR, Arrays.asList(Instruction.BCLR_DYNAMIC_ENCODING, Instruction.BCLR_STATIC_ENCODING));
@@ -600,8 +615,16 @@ outer:
         allEncodings.put(Instruction.SWAP,Arrays.asList(Instruction.SWAP_ENCODING));
         allEncodings.put(Instruction.JMP,Arrays.asList(Instruction.JMP_INDIRECT_ENCODING) ); // only one encoding needed (differ only in bits 16+)
         allEncodings.put(Instruction.EOR,Arrays.asList(Instruction.EOR_DST_EA_ENCODING));
-        allEncodings.put(Instruction.OR,Arrays.asList(Instruction.OR_DST_EA_ENCODING,Instruction.OR_SRC_EA_ENCODING));
-        allEncodings.put(Instruction.AND,Arrays.asList(Instruction.AND_DST_EA_ENCODING,Instruction.AND_SRC_EA_ENCODING));
+        allEncodings.put(Instruction.OR,Arrays.asList(Instruction.OR_DST_EA_ENCODING,
+                Instruction.OR_SRC_EA_ENCODING));
+        allEncodings.put(Instruction.AND,Arrays.asList(Instruction.AND_DST_EA_ENCODING,
+                Instruction.AND_SRC_EA_ENCODING,
+                Instruction.ANDI_TO_CCR_ENCODING,
+                Instruction.ANDI_TO_SR_ENCODING,
+                Instruction.ANDI_BYTE_ENCODING,
+                Instruction.ANDI_WORD_ENCODING,
+                Instruction.ANDI_LONG_ENCODING
+                ));
         allEncodings.put(Instruction.SCC,Arrays.asList(Instruction.SCC_ENCODING));
         allEncodings.put(Instruction.DBCC,Arrays.asList(Instruction.DBCC_ENCODING));
 
@@ -621,7 +644,9 @@ outer:
         allEncodings.put(Instruction.MOVEQ,Arrays.asList(Instruction.MOVEQ_ENCODING));
 
         allEncodings.put(Instruction.MOVE,Arrays.asList(
+            Instruction.MOVE_BYTE_ENCODING     ,
             Instruction.MOVE_WORD_ENCODING     ,
+            Instruction.MOVE_LONG_ENCODING     ,
             Instruction.MOVE_TO_CCR_ENCODING   ,
             Instruction.MOVE_FROM_SR_ENCODING  ,
             Instruction.MOVE_TO_SR_ENCODING    ,
@@ -630,7 +655,7 @@ outer:
             
         allEncodings.put(Instruction.LEA,Arrays.asList(Instruction.LEA_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
 
-        final Map<Integer, Instruction> mappings = new HashMap<>();
+        final Map<Integer, EncodingEntry> mappings = new HashMap<>();
 
         for ( var entry : allEncodings.entrySet() )
         {
@@ -639,68 +664,241 @@ outer:
             {
                 if ( cpuType.supports(enc) )
                 {
-                    System.out.println("Processing encoding: " + enc);
-                    new EncodingTableGenerator().addMappings(enc, instruction, cpuType, mappings);
+                    System.out.println("Processing encoding: " + getName(enc));
+                    final Map<Integer, EncodingEntry> tmpMap = new HashMap<>();
+                    new EncodingTableGenerator().addMappings(enc, instruction, cpuType, tmpMap);
+                    for ( var e : tmpMap.entrySet() )
+                    {
+                        final EncodingEntry existing = mappings.put(e.getKey(), e.getValue());
+                        if ( existing != null )
+                        {
+                            throw new RuntimeException("Duplicate encoding "+
+                                Misc.binary16Bit(e.getKey())+" for instruction "+instruction+", encoding "+
+                                getName(enc));
+                        }
+                    }
                 }
             }
         }
 
-        final StringBuilder classBuffer = new StringBuilder();
-        classBuffer.append("public static final InstructionImpl[] opcodes = new InstructionImpl[65536];\n");
-
-        int initMethodNumber=0;
-        final StringBuilder initMethodBuffer = new StringBuilder();
-        initMethodBuffer.append("static {\n");
-        initMethodBuffer.append("    java.util.Arrays.fill(opcodes,INVALID_OPCODE);");
-
-        final StringBuilder dataMethodsBuffer = new StringBuilder();
-
-        final StringBuilder currentMethodBuffer = new StringBuilder();
-
-        int maxMethodSize = 5000;
-        int currentMethodSize = 0;
-        int insnCount = 0;
-        for ( int index = 0 ; index < 65536 ; index++)
+        try ( Writer out = new FileWriter("/tmp/68000_instructions.properties") )
         {
-            final Instruction insn = mappings.get( index );
-            if ( insn != null )
+            for (Map.Entry<Integer, EncodingEntry> entry : mappings.entrySet())
             {
-                final String insName = insn.name().toUpperCase();
-                currentMethodBuffer.append("\n    opcodes[").append(index).append("] = ").append(insName).append("; // ").append(Misc.binary16Bit(index));
+                final int opcode = entry.getKey();
+                final EncodingEntry value = entry.getValue();
+                out.write( Integer.toString(opcode) );
+                out.write("=");
+                out.write(getName(value.encoding) );
+                out.write("    # ");
+                out.write( Misc.binary16Bit(opcode) );
+                out.write("\n");
+            }
+        }
 
-                sanityCheck(insn,index);
+        final Map<String,String> insnImplementation = new HashMap<>();
 
-                currentMethodSize++;
-                insnCount++;
+        insnImplementation.put("ADDA_LONG_ENCODING",null);
+        insnImplementation.put("ADDA_WORD_ENCODING",null);
+        insnImplementation.put("ADDI_WORD_ENCODING","addi");
+        insnImplementation.put("ADDQ_ENCODING",null);
+        insnImplementation.put("ADDX_ADDRREG_ENCODING",null);
+        insnImplementation.put("ADDX_DATAREG_ENCODING",null);
+        insnImplementation.put("ADD_DST_DATA_ENCODING",null);
+        insnImplementation.put("ADD_DST_EA_ENCODING",null);
+        insnImplementation.put("ANDI_BYTE_ENCODING",null);
+        insnImplementation.put("ANDI_LONG_ENCODING",null);
+        insnImplementation.put("ANDI_TO_CCR_ENCODING","andiToCCR");
+        insnImplementation.put("ANDI_TO_SR_ENCODING","andiToSR");
+        insnImplementation.put("ANDI_WORD_ENCODING","andi");
+        insnImplementation.put("AND_DST_EA_ENCODING",null);
+        insnImplementation.put("AND_SRC_EA_ENCODING",null);
+        insnImplementation.put("ASL_IMMEDIATE_ENCODING",null);
+        insnImplementation.put("ASL_MEMORY_ENCODING",null);
+        insnImplementation.put("ASL_REGISTER_ENCODING",null);
+        insnImplementation.put("ASR_IMMEDIATE_ENCODING",null);
+        insnImplementation.put("ASR_MEMORY_ENCODING",null);
+        insnImplementation.put("ASR_REGISTER_ENCODING",null);
+        insnImplementation.put("BCC_16BIT_ENCODING",null);
+        insnImplementation.put("BCC_32BIT_ENCODING",null);
+        insnImplementation.put("BCC_8BIT_ENCODING",null);
+        insnImplementation.put("BCHG_DYNAMIC_ENCODING","bchgDn");
+        insnImplementation.put("BCHG_STATIC_ENCODING","bchgImmediate"); // static == immediate
+        insnImplementation.put("BCLR_DYNAMIC_ENCODING","bclrDn");
+        insnImplementation.put("BCLR_STATIC_ENCODING","bclrImmediate");
+        insnImplementation.put("BSET_DYNAMIC_ENCODING","bsetDn");
+        insnImplementation.put("BSET_STATIC_ENCODING","bsetImmediate");
+        insnImplementation.put("BTST_DYNAMIC_ENCODING","btstDn");
+        insnImplementation.put("BTST_STATIC_ENCODING","btstImmediate");
+        insnImplementation.put("CHK_WORD_ENCODING",null);
+        insnImplementation.put("CLR_ENCODING","clr");
+        insnImplementation.put("CMPA_LONG_ENCODING",null);
+        insnImplementation.put("CMPA_WORD_ENCODING",null);
+        insnImplementation.put("CMPI_WORD_ENCODING","cmpi");
+        insnImplementation.put("CMPM_ENCODING",null);
+        insnImplementation.put("CMP_ENCODING",null);
+        insnImplementation.put("DBCC_ENCODING",null);
+        insnImplementation.put("DIVS_ENCODING",null);
+        insnImplementation.put("DIVU_ENCODING",null);
+        insnImplementation.put("EORI_TO_CCR_ENCODING","eoriCCR");
+        insnImplementation.put("EORI_TO_SR_ENCODING","eoriSR");
+        insnImplementation.put("EORI_WORD_ENCODING","eori");
+        insnImplementation.put("EOR_DST_EA_ENCODING",null);
+        insnImplementation.put("EXG_ADR_ADR_ENCODING",null);
+        insnImplementation.put("EXG_DATA_ADR_ENCODING",null);
+        insnImplementation.put("EXG_DATA_DATA_ENCODING",null);
+        insnImplementation.put("EXTL_ENCODING","extLong");
+        insnImplementation.put("EXTW_ENCODING","extWord");
+        insnImplementation.put("ILLEGAL","illegal");
+        insnImplementation.put("JMP_INDIRECT_ENCODING",null);
+        insnImplementation.put("JSR_ENCODING",null);
+        insnImplementation.put("LEA_WORD_ENCODING",null);
+        insnImplementation.put("LINK_ENCODING",null);
+        insnImplementation.put("LSL_IMMEDIATE_ENCODING",null);
+        insnImplementation.put("LSL_MEMORY_ENCODING",null);
+        insnImplementation.put("LSL_REGISTER_ENCODING",null);
+        insnImplementation.put("LSR_IMMEDIATE_ENCODING",null);
+        insnImplementation.put("LSR_MEMORY_ENCODING",null);
+        insnImplementation.put("LSR_REGISTER_ENCODING",null);
+        insnImplementation.put("MOVE_BYTE_ENCODING","moveb");
+        insnImplementation.put("MOVE_WORD_ENCODING","movew");
+        insnImplementation.put("MOVE_LONG_ENCODING","movel");
+        insnImplementation.put("MOVEA_LONG_ENCODING","moveal");
+        insnImplementation.put("MOVEA_WORD_ENCODING","moveaw");
+        insnImplementation.put("MOVEM_FROM_REGISTERS_ENCODING",null);
+        insnImplementation.put("MOVEM_TO_REGISTERS_ENCODING",null);
+        insnImplementation.put("MOVEP_LONG_FROM_MEMORY_ENCODING","movepLongFromMemoryToRegister");
+        insnImplementation.put("MOVEP_LONG_TO_MEMORY_ENCODING",  "movepLongFromRegisterToMemory");
+        insnImplementation.put("MOVEP_WORD_FROM_MEMORY_ENCODING","movepWordFromMemoryToRegister");
+        insnImplementation.put("MOVEP_WORD_TO_MEMORY_ENCODING",  "movepWordFromRegisterToMemory");
+        insnImplementation.put("MOVE_FROM_SR_ENCODING",  "moveFromSR");
+        insnImplementation.put("MOVE_TO_SR_ENCODING",  "moveToSR");
+        insnImplementation.put("MOVEQ_ENCODING",null);
+        insnImplementation.put("MOVE_AX_TO_USP_ENCODING",null);
+        insnImplementation.put("MOVE_TO_CCR_ENCODING",null);
+        insnImplementation.put("MOVE_TO_SR_ENCODING",null);
+        insnImplementation.put("MOVE_USP_TO_AX_ENCODING",null);
+        insnImplementation.put("MOVE_WORD_ENCODING",null);
+        insnImplementation.put("MULS_ENCODING",null);
+        insnImplementation.put("MULU_ENCODING",null);
+        insnImplementation.put("NEGX_ENCODING",null);
+        insnImplementation.put("NEG_ENCODING",null);
+        insnImplementation.put("NOP_ENCODING","nop");
+        insnImplementation.put("NOT_ENCODING","not");
+        insnImplementation.put("ORI_TO_CCR_ENCODING","oriToCCR");
+        insnImplementation.put("ORI_TO_SR_ENCODING","oriToSR");
+        insnImplementation.put("ORI_WORD_ENCODING","ori");
+        insnImplementation.put("OR_DST_EA_ENCODING",null);
+        insnImplementation.put("OR_SRC_EA_ENCODING",null);
+        insnImplementation.put("PEA_ENCODING",null);
+        insnImplementation.put("RESET_ENCODING","reset");
+        insnImplementation.put("ROL_IMMEDIATE_ENCODING",null);
+        insnImplementation.put("ROL_MEMORY_ENCODING",null);
+        insnImplementation.put("ROL_REGISTER_ENCODING",null);
+        insnImplementation.put("ROR_IMMEDIATE_ENCODING",null);
+        insnImplementation.put("ROR_MEMORY_ENCODING",null);
+        insnImplementation.put("ROR_REGISTER_ENCODING",null);
+        insnImplementation.put("ROXL_IMMEDIATE_ENCODING",null);
+        insnImplementation.put("ROXL_MEMORY_ENCODING",null);
+        insnImplementation.put("ROXL_REGISTER_ENCODING",null);
+        insnImplementation.put("ROXR_IMMEDIATE_ENCODING",null);
+        insnImplementation.put("ROXR_MEMORY_ENCODING",null);
+        insnImplementation.put("ROXR_REGISTER_ENCODING",null);
+        insnImplementation.put("RTR_ENCODING","rtr");
+        insnImplementation.put("RTS_ENCODING","rts");
+        insnImplementation.put("SCC_ENCODING",null);
+        insnImplementation.put("STOP_ENCODING","stop");
+        insnImplementation.put("SUBA_LONG_ENCODING",null);
+        insnImplementation.put("SUBA_WORD_ENCODING",null);
+        insnImplementation.put("SUBI_WORD_ENCODING","subi");
+        insnImplementation.put("SUBQ_ENCODING",null);
+        insnImplementation.put("SUBX_ADDR_REG_ENCODING",null);
+        insnImplementation.put("SUBX_DATA_REG_ENCODING",null);
+        insnImplementation.put("SUB_DST_DATA_ENCODING",null);
+        insnImplementation.put("SUB_DST_EA_ENCODING",null);
+        insnImplementation.put("SWAP_ENCODING",null);
+        insnImplementation.put("TAS_ENCODING","tas");
+        insnImplementation.put("TRAPV_ENCODING","trapv");
+        insnImplementation.put("TST_ENCODING","tst");
+        insnImplementation.put("UNLK_ENCODING",null);
 
-                if ( currentMethodSize >= maxMethodSize )
+        mappings.values().stream().map( x -> getName(x.encoding) )
+            .distinct()
+            .sorted()
+            .forEach(name ->
+            {
+                String methodName = insnImplementation.get( name );
+                final String impl;
+                if ( methodName == null ) {
+                    impl = "instruction -> throw new RuntimeException(\"not implemented: "+name+"\")";
+                } else {
+                    impl = "this::"+methodName;
+                }
+                System.out.println("private final InstructionImpl "+name+" = "+impl+";\n");
+            });
+
+//        mappings.values().stream().map( x -> new Pair(getName(x.encoding),x.encoding) )
+//            .distinct()
+//            .sorted()
+//            .forEach(pair ->
+//                System.out.println("insnImplementation.put(\""+pair.a+"\",null);")
+//            );
+    }
+
+    public static final class Pair implements Comparable<Pair>
+    {
+        public final String a;
+        public final InstructionEncoding b;
+
+        public Pair(String a, InstructionEncoding b)
+        {
+            this.a = a;
+            this.b = b;
+        }
+
+        public boolean equals(Object x)
+        {
+            if ( x instanceof Pair) {
+                return Objects.equals(this.a,((Pair) x).a);
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return a.hashCode();
+        }
+
+        @Override
+        public int compareTo(Pair o)
+        {
+            return a.compareTo(o.a);
+        }
+    }
+
+    private static String getName(InstructionEncoding encoding) {
+
+        for ( java.lang.reflect.Field f : Instruction.class.getDeclaredFields() ) {
+            final int mods = f.getModifiers();
+            if (Modifier.isStatic(mods) && Modifier.isFinal(mods) && f.getType() == InstructionEncoding.class )
+            {
+                f.setAccessible(true);
+                InstructionEncoding actual = null;
+                try
                 {
-                    dataMethodsBuffer.append("public static void initMethod"+initMethodNumber+"() {");
-                    dataMethodsBuffer.append( currentMethodBuffer );
-                    dataMethodsBuffer.append("\n}\n\n");
-                    initMethodBuffer.append("\n    initMethod"+initMethodNumber+"();");
-
-                    initMethodNumber++;
-                    currentMethodSize=0;
-                    currentMethodBuffer.setLength(0);
+                    actual = (InstructionEncoding) f.get(null);
+                }
+                catch (IllegalAccessException e)
+                {
+                    throw new RuntimeException(e);
+                }
+                if ( actual == encoding ) {
+                    return f.getName();
                 }
             }
         }
-        if ( currentMethodBuffer.length() > 0 ) {
-            dataMethodsBuffer.append("public static void initMethod"+initMethodNumber+"() {");
-            dataMethodsBuffer.append( currentMethodBuffer );
-            dataMethodsBuffer.append("\n}\n\n");
-            initMethodBuffer.append("\n    initMethod"+initMethodNumber+"();");
-        }
-        initMethodBuffer.append("\n}\n");
-        classBuffer.append("\n").append( initMethodBuffer ).append( "\n").append( dataMethodsBuffer );
-
-        System.out.println( classBuffer );
-
-        System.out.println("Instructions: "+insnCount);
-        FileOutputStream out = new FileOutputStream("/tmp/Test.java");
-        out.write(classBuffer.toString().getBytes());
-        out.close();
+        return null;
     }
 
     private static final Pattern DISASM_PATTERN =
