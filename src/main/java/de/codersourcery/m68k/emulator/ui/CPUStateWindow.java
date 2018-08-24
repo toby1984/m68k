@@ -9,7 +9,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CPUStateWindow extends AppWindow
+public class CPUStateWindow extends AppWindow implements ITickListener
 {
     private final Object DATA_LOCK = new  Object();
 
@@ -104,11 +104,16 @@ public class CPUStateWindow extends AppWindow
         cnstrs.weighty = 0.5;
         cnstrs.fill= GridBagConstraints.BOTH;
         getContentPane().add( registerPanel, cnstrs );
-
     }
 
     @Override
-    protected void internalTick(Emulator emulator)
+    public String getWindowKey()
+    {
+        return "cpustate";
+    }
+
+    @Override
+    public void tick(Emulator emulator)
     {
         synchronized(DATA_LOCK)
         {

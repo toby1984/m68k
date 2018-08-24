@@ -4,6 +4,7 @@ import de.codersourcery.m68k.emulator.chips.CIA8520;
 import de.codersourcery.m68k.emulator.chips.IRQController;
 import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
+import de.codersourcery.m68k.emulator.ui.ITickListener;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
 
@@ -16,16 +17,29 @@ import java.util.function.Consumer;
 
 public class Emulator
 {
+    /**
+     * Called whenever the emulation changes state.
+     *
+     * @author tobias.gierke@code-sourcery.de
+     */
     public interface IEmulatorStateCallback
     {
-        void stopped();
-        void singleStepFinished();
-        void enteredContinousMode();
-    }
+        /**
+         * Called right after the emulation stopped
+         * after having run in continous (non single-step) mode.
+         */
+        void stopped(Emulator emulator);
 
-    public interface ITickCallback
-    {
-        public void tick(Emulator emulator);
+        /**
+         * Called right after single-stepping an instruction has finished.
+         */
+        void singleStepFinished(Emulator emulator);
+
+        /**
+         * Called right before the emulation starts to run
+         * on continous mode.
+         */
+        void enteredContinousMode(Emulator emulator);
     }
 
     private enum CommandType
@@ -177,14 +191,14 @@ public class Emulator
         private final Object STOP_LOCK = new Object();
 
         private int callbackInvocationTicks = 1000;
-        private ITickCallback callback = e -> {};
+        private ITickListener callback = e -> {};
         private IEmulatorStateCallback stateCallback = new IEmulatorStateCallback()
         {
-            @Override public void stopped() { }
+            @Override public void stopped(Emulator emulator) { }
 
-            @Override public void singleStepFinished() { }
+            @Override public void singleStepFinished(Emulator emulator) { }
 
-            @Override public void enteredContinousMode() { }
+            @Override public void enteredContinousMode(Emulator emulator) { }
         };
 
         private EmulatorMode mode = EmulatorMode.STOPPED;
@@ -255,7 +269,7 @@ public class Emulator
             finally
             {
                 System.err.println("Emulator thread died unexpectedly.");
-                final AtomicReference<ITickCallback> finalCallback = new AtomicReference<>(this.callback);
+                final AtomicReference<ITickListener> finalCallback = new AtomicReference<>(this.callback);
                 final AtomicReference<IEmulatorStateCallback> finalStateCallback =
                         new AtomicReference<>(this.stateCallback);
                 final AtomicInteger finalTickCnt = new AtomicInteger(this.callbackInvocationTicks);
@@ -293,6 +307,7 @@ public class Emulator
             }
         }
 
+        @SuppressWarnings( "deprecation" )
         public void internalRun()
         {
             int tickCount = 0;
@@ -313,22 +328,19 @@ public class Emulator
                             mode = EmulatorMode.RUNNING;
                             if (oldMode != mode)
                             {
-                                stateCallback.enteredContinousMode();
-                                callback.tick(Emulator.this);
+                                stateCallback.enteredContinousMode(Emulator.this);
                             }
                             break;
                         case STOP:
                             mode = EmulatorMode.STOPPED;
                             if (oldMode != mode)
                             {
-                                stateCallback.stopped();
-                                callback.tick(Emulator.this);
+                                stateCallback.stopped(Emulator.this);
                             }
                             break;
                         case RESET:
                             doReset();
-                            stateCallback.stopped();
-                            callback.tick(Emulator.this);
+                            stateCallback.stopped(Emulator.this);
                             break;
                         case SINGLE_STEP:
                             mode = EmulatorMode.STOPPED;
@@ -343,8 +355,7 @@ public class Emulator
                             }
                             finally
                             {
-                                stateCallback.singleStepFinished();
-                                callback.tick(Emulator.this);
+                                stateCallback.singleStepFinished(Emulator.this);
                             }
                             break;
                         case CALLBACK:
@@ -372,7 +383,7 @@ public class Emulator
                         e.printStackTrace();
                         mode = EmulatorMode.STOPPED;
                         System.err.println("*** emulation stopped because of error ***");
-                        callback.tick(Emulator.this);
+                        stateCallback.stopped(Emulator.this);
                     }
                 }
                 else
@@ -395,7 +406,7 @@ public class Emulator
      * This callback gets invoked by the emulator thread.
      * @param cb
      */
-    public void setTickCallback(final ITickCallback cb)
+    public void setTickCallback(final ITickListener cb)
     {
         Validate.notNull(cb, "callback must not be null");
         internalAsyncSendCommand( thread ->

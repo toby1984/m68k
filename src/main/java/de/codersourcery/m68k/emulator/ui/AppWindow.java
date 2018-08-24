@@ -1,11 +1,21 @@
 package de.codersourcery.m68k.emulator.ui;
 
-import de.codersourcery.m68k.emulator.Emulator;
-
 import javax.swing.*;
 import java.awt.*;
 
-public abstract class AppWindow extends JInternalFrame implements Emulator.IEmulatorStateCallback
+/**
+ * Abstract base class for application windows.
+ *
+ * Windows that need access to emulator state or
+ * want to be notified about emulator state changes
+ * can implement {@link ITickListener} and/or
+ * {@link de.codersourcery.m68k.emulator.Emulator.IEmulatorStateCallback}
+ * and the {@link UI} will take care of forwarding those calls
+ * to the interested windows.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public abstract class AppWindow extends JInternalFrame
 {
     protected final UI ui;
 
@@ -17,17 +27,6 @@ public abstract class AppWindow extends JInternalFrame implements Emulator.IEmul
         setResizable(true);
         setMaximizable(true);
         setFocusable(true);
-    }
-
-    public final void tick(Emulator emulator)
-    {
-        try
-        {
-            internalTick(emulator);
-        }
-        finally {
-            repaint();
-        }
     }
 
     protected final GridBagConstraints cnstrs(int x,int y)
@@ -48,32 +47,37 @@ public abstract class AppWindow extends JInternalFrame implements Emulator.IEmul
         return result;
     }
 
-    protected abstract void internalTick(Emulator emulator);
-
     protected final void error(Throwable cause) {
         ui.error(cause);
     }
 
-    protected final void refresh()
-    {
-        ui.doWithEmulator(this::tick);
+    protected final void runOnEDT(Runnable r) {
+        if ( SwingUtilities.isEventDispatchThread() ) {
+            r.run();
+        } else {
+            SwingUtilities.invokeLater( r );
+        }
     }
 
-    @Override
-    public void stopped()
-    {
+    public abstract String getWindowKey();
 
+    public void applyWindowState(WindowState state)
+    {
+        if ( ! getWindowKey().equals(state.getWindowKey()) ) {
+            throw new IllegalArgumentException("Window state belongs to "+state.getWindowKey()+" but this is "+getWindowKey());
+        }
+        // TODO: setEnabled() not honored here
+        setVisible(state.isVisible());
+        setBounds( state.getLocationAndSize() );
     }
 
-    @Override
-    public void singleStepFinished()
+    public WindowState getWindowState()
     {
-
-    }
-
-    @Override
-    public void enteredContinousMode()
-    {
-
+        final WindowState state = new WindowState();
+        state.setLocationAndSize( getBounds() );
+        state.setEnabled( true );
+        state.setVisible( isVisible() );
+        state.setWindowKey( getWindowKey() );
+        return state;
     }
 }

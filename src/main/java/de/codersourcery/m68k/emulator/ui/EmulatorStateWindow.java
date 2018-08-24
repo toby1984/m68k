@@ -5,7 +5,7 @@ import de.codersourcery.m68k.emulator.Emulator;
 import javax.swing.*;
 import java.awt.*;
 
-public class EmulatorStateWindow extends AppWindow
+public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulatorStateCallback
 {
     private JButton runButton;
     private JButton stopButton;
@@ -31,6 +31,12 @@ public class EmulatorStateWindow extends AppWindow
         });
     }
 
+    @Override
+    public String getWindowKey()
+    {
+        return "emulatorcontrol";
+    }
+
     private JButton addButton(String label,Runnable action) {
         final JButton button = new JButton(label);
         button.addActionListener( ev -> action.run() );
@@ -39,24 +45,29 @@ public class EmulatorStateWindow extends AppWindow
     }
 
     @Override
-    protected void internalTick(Emulator emulator)
+    public void stopped(Emulator emulator)
     {
-
+        runOnEDT( () ->
+        {
+            runButton.setEnabled( true );
+            stepButton.setEnabled( true );
+            stopButton.setEnabled( false );
+        });
     }
 
     @Override
-    public void stopped()
+    public void singleStepFinished(Emulator emulator)
     {
-        runButton.setEnabled( true );
-        stepButton.setEnabled( true );
-        stopButton.setEnabled( false );
     }
 
     @Override
-    public void enteredContinousMode()
+    public void enteredContinousMode(Emulator emulator)
     {
-        runButton.setEnabled( false );
-        stepButton.setEnabled( false );
-        stopButton.setEnabled( true );
+        runOnEDT( () ->
+        {
+            runButton.setEnabled( false );
+            stepButton.setEnabled( false );
+            stopButton.setEnabled( true );
+        });
     }
 }

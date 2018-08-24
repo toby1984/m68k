@@ -6,8 +6,12 @@ import de.codersourcery.m68k.emulator.Emulator;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
@@ -22,11 +26,13 @@ public class UI extends JFrame
 {
     final JDesktopPane desktop = new JDesktopPane();
 
-//    private File kickstartRom = new File("/home/tgierke/Downloads/kickstart_1.2.rom");
+    //    private File kickstartRom = new File("/home/tgierke/Downloads/kickstart_1.2.rom");
     private File kickstartRom = new File("/home/tobi/Downloads/kickstart_1.3.rom");
     private Emulator emulator;
 
     private final List<AppWindow> windows = new ArrayList<>();
+
+    private UIConfig uiConfig;
 
     public static void main(String[] args) throws Exception {
 
@@ -38,7 +44,15 @@ public class UI extends JFrame
     public UI()
     {
         super("m68k");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        addWindowListener( new WindowAdapter()
+        {
+            @Override
+            public void windowClosing(WindowEvent e)
+            {
+                saveConfig();
+            }
+        } );
         setPreferredSize(new Dimension(640,480));
     }
 
@@ -66,36 +80,38 @@ public class UI extends JFrame
         emulator.setStateCallback( new Emulator.IEmulatorStateCallback()
         {
             @Override
-            public void stopped()
+            public void stopped(Emulator emulator)
             {
-                SwingUtilities.invokeLater( () -> {
-                    windows.stream().forEach( x -> x.stopped() );
-                });
-            }
-
-            @Override
-            public void singleStepFinished()
-            {
-                SwingUtilities.invokeLater( () -> {
-                    windows.stream().forEach( x -> x.singleStepFinished() );
-                });
-            }
-
-            @Override
-            public void enteredContinousMode()
-            {
-                SwingUtilities.invokeLater( () ->
+                for (Emulator.IEmulatorStateCallback listener : stateChangeListeners)
                 {
-                    windows.stream().forEach( x -> x.enteredContinousMode() );
-                });
+                    listener.stopped( emulator );
+                }
+            }
+
+            @Override
+            public void singleStepFinished(Emulator emulator)
+            {
+                for (Emulator.IEmulatorStateCallback listener : stateChangeListeners)
+                {
+                    listener.singleStepFinished( emulator );
+                }
+            }
+
+            @Override
+            public void enteredContinousMode(Emulator emulator)
+            {
+                for (Emulator.IEmulatorStateCallback listener : stateChangeListeners)
+                {
+                    listener.enteredContinousMode( emulator );
+                }
             }
         } );
         emulator.setTickCallback( e ->
         {
-            for (AppWindow window : windows)
+            for (ITickListener l : tickListeners)
             {
-                System.out.println("Refreshing "+window);
-                window.tick(e);
+                System.out.println("Refreshing "+l);
+                l.tick(e);
             }
         });
     }
@@ -130,12 +146,32 @@ public class UI extends JFrame
         return Optional.ofNullable( result == JFileChooser.APPROVE_OPTION ? fileChooser.getSelectedFile() : null );
     }
 
+    private final List<ITickListener> tickListeners = new ArrayList<>();
+    private final List<Emulator.IEmulatorStateCallback> stateChangeListeners
+            = new ArrayList<>();
+
     private void registerWindow(AppWindow window)
     {
-        window.pack();
-        window.setVisible(true);
         windows.add(window);
         desktop.add(window);
+
+        final Optional<WindowState> state =
+                loadConfig().getWindowState( window.getWindowKey() );
+
+        if ( state.isPresent() ) {
+            System.out.println("Applying window state "+state.get());
+            window.applyWindowState( state.get() );
+        } else {
+            window.pack();
+            window.setVisible( true );
+        }
+
+        if ( window instanceof ITickListener) {
+            tickListeners.add( (ITickListener) window );
+        }
+        if ( window instanceof Emulator.IEmulatorStateCallback) {
+            stateChangeListeners.add( (Emulator.IEmulatorStateCallback) window);
+        }
     }
 
     public void run()
@@ -164,11 +200,6 @@ public class UI extends JFrame
                 error(e);
             }
         }
-    }
-
-    public void refreshAllWindows()
-    {
-        doWithEmulator( e -> e.invokeTickCallback() );
     }
 
     private JMenuBar createMenuBar()
@@ -201,7 +232,11 @@ public class UI extends JFrame
                 setupEmulator();
             }
         }));
-        menu1.add( menuItem("Quit", () -> System.exit(0) ) );
+        menu1.add( menuItem("Quit", () ->
+        {
+            saveConfig();
+            System.exit( 0 );
+        } ) );
 
         return menuBar;
     }
@@ -280,5 +315,52 @@ public class UI extends JFrame
             return result.get();
         }
         return defaultValue;
+    }
+
+    private File getConfigPath()
+    {
+        final String dir = System.getProperty( "user.dir" );
+        return new File(dir+File.separator+".m68kconfig");
+    }
+
+    private UIConfig loadConfig()
+    {
+        if ( uiConfig == null )
+        {
+            final File file = getConfigPath();
+            if ( file.exists() )
+            {
+                try (FileInputStream in = new FileInputStream( file ))
+                {
+                    uiConfig = UIConfig.read( in );
+                }
+                catch(Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            if ( uiConfig == null )
+            {
+                uiConfig = new UIConfig();
+            }
+        }
+        return uiConfig;
+    }
+
+    private void saveConfig()
+    {
+        final UIConfig config = loadConfig();
+        windows.stream().map( x->x.getWindowState() )
+                .forEach(  config::setWindowState );
+
+        final File file = getConfigPath();
+        System.out.println("*** Saving configuration to "+file);
+        try (FileOutputStream out = new FileOutputStream( file ) )
+        {
+            uiConfig.write( out );
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
     }
 }

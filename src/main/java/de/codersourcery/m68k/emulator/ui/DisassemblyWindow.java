@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DisassemblyWindow extends AppWindow
+        implements ITickListener, Emulator.IEmulatorStateCallback
 {
     private final Object LOCK = new Object();
 
@@ -89,7 +90,7 @@ public class DisassemblyWindow extends AppWindow
                     followProgramCounter = false;
                     addressToDisplay = toDisplay;
                 }
-                refresh();
+                repaint();
             }
             catch(Exception e)
             {
@@ -109,7 +110,7 @@ public class DisassemblyWindow extends AppWindow
                     addressToDisplay = lines.get(0).pc;
                 }
             }
-            refresh();
+            repaint();
         }));
 
         // Page down
@@ -123,7 +124,7 @@ public class DisassemblyWindow extends AppWindow
                     addressToDisplay = lines.get( lines.size()-1 ).pc;
                 }
             }
-            refresh();
+            repaint();
         }));
 
         addressTextfield.setColumns( 8 );
@@ -140,7 +141,7 @@ public class DisassemblyWindow extends AppWindow
     }
 
     @Override
-    protected void internalTick(Emulator emulator)
+    public void tick(Emulator emulator)
     {
         final Disassembler disasm = new Disassembler(emulator.memory);
         disasm.setDumpHex(true);
@@ -199,5 +200,32 @@ public class DisassemblyWindow extends AppWindow
                 addressTextfield.setText( Integer.toHexString(address) );
             }
         });
+    }
+
+    @Override
+    public void stopped(Emulator emulator)
+    {
+        tick(emulator);
+        repaint();
+    }
+
+    @Override
+    public void singleStepFinished(Emulator emulator)
+    {
+        tick(emulator);
+        repaint();
+    }
+
+    @Override
+    public void enteredContinousMode(Emulator emulator)
+    {
+        tick(emulator);
+        repaint();
+    }
+
+    @Override
+    public String getWindowKey()
+    {
+        return "disassembly";
     }
 }
