@@ -3144,6 +3144,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         insToExecute += ( runInSuperVisorMode ? 3 : 4 ); // + number of instructions in reset handler
 
         final int mask = ~CPU.FLAG_SUPERVISOR_MODE;
+        System.out.println("USERMODE_STACK_PTR = "+Misc.hex(USERMODE_STACK_PTR));
         String resetHandler = "MOVE.L #"+Misc.hex(USERMODE_STACK_PTR)+",A0\n" +
                 "MOVE.L A0,USP\n";
         if ( ! runInSuperVisorMode )

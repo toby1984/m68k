@@ -5,6 +5,7 @@ import de.codersourcery.m68k.assembler.arch.AddressingModeKind;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
+import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.emulator.exceptions.IllegalInstructionException;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codersourcery.m68k.emulator.memory.Memory;
@@ -19,6 +20,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,6 +32,14 @@ import java.util.Map;
 public class CPU
 {
     private final CPUType cpuType;
+
+    private final InstructionImpl[] opcodeMap = new InstructionImpl[65536];
+    private final String[] opcodeDebugMap = new String[65536];
+
+    protected interface InstructionImpl
+    {
+        public void execute(int instruction);
+    }
 
     private enum BinaryLogicalOp
     {
@@ -299,6 +309,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         Validate.notNull(memory, "memory must not be null");
         this.memory = memory;
         this.cpuType = type;
+        try
+        {
+            initializeOpcodeMap();
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     /*
@@ -739,7 +757,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
     {
         addressRegisterDirectAllowed = true;
 
-
         if ( ( pc & 1 ) != 0 )
         {
             System.out.println(">>>> Executing instruction "+memory.readWordNoCheck(pc)+" at 0x"+Integer.toHexString(pc));
@@ -749,693 +766,12 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
         pcAtStartOfLastInstruction = pc;
 
-        int instruction= memory.readWordNoCheck(pc);
-        System.out.println(">>>> Executing instruction "+Misc.hex(instruction)+" ("+Misc.binary16Bit(instruction)+") at 0x"+Integer.toHexString(pc));
+        final int instruction= memory.readWordNoCheck(pc);
         pc += 2;
 
-        switch(instruction)
-        {
-            /* ================================
-             * Bit Manipulation/MOVEP/Immediate
-             * ================================
-             */
-            case 0b0000001000111100: // ANDI to CCR
-                andiToCCR(instruction);
-                return;
-            case 0b0000001001111100: // ANDI to SR
-                andiToSR(instruction);
-                return;
-            /* ================================
-             * Miscellaneous instructions
-             * ================================
-             */
-            case 0b0100111001110110: // TRAPV
-                trapv(instruction);
-                return;
-            case 0b0100111001110111: // RTR
-                rtr(instruction);
-                return;
-            case 0b0100111001110011: // RTE
-                returnFromException();
-                cycles = 20;
-                return;
-            case 0b0100111001110001:  // NOP
-                nop(instruction);
-                return;
-            case 0b0100111001110101:  // RTS
-                rts(instruction);
-                return;
-            case 0b0100101011111100: // ILLEGAL
-                illegal(instruction);
-                return;
-            case 0b0100111001110000: // RESET
-                reset(instruction);
-                return;
-
-            case 0b0100111001110010: // STOP
-                stop(instruction);
-                return;
-        }
-        final int insBits = (instruction & 0b1111_0000_0000_0000);
-        switch( insBits  )
-        {
-            /* ================================
-             * Bit Manipulation/MOVEP/Immediate
-             * ================================
-             */
-            case 0b0000_0000_0000_0000:
-
-                switch(instruction & 0b1111000111111000)
-                {
-                    case 0b0000000100001000:
-                        // MOVEP_WORD_FROM_MEMORY_ENCODING
-                        movepWordFromMemoryToRegister(instruction);
-                        return;
-                    case 0b0000000101001000:
-                        // MOVEP_LONG_FROM_MEMORY_ENCODING
-                        movepLongFromMemoryToRegister(instruction);
-                        return;
-                    case 0b0000000110001000:
-                        // MOVEP_WORD_TO_MEMORY_ENCODING
-                        movepWordFromRegisterToMemory(instruction);
-                        return;
-                    case 0b0000000111001000:
-                        // MOVEP_LONG_TO_MEMORY_ENCODING
-                        movepLongFromRegisterToMemory(instruction);
-                        return;
-                }
-
-                if ( instruction == 0b0000000000111100 ) {
-                    // ORI to CCR
-                    oriToCCR(instruction);
-                    return;
-                }
-
-                if ( instruction == 0b0000000001111100 ) {
-                    // ORI to SR
-                    oriToSR(instruction);
-                    return;
-                }
-
-                if ( instruction == 0b0000101000111100 )
-                {
-                    // EORI #xx,CCR
-                    eoriCCR(instruction);
-                    return;
-                }
-
-                if ( instruction == 0b0000101001111100)
-                {
-                    // EORI #xx,SR
-                    eoriSR(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111100000000 ) == 0b0000101000000000 ) {
-                    // EORI #xx,<ea>
-                    eori(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111100000000 ) == 0b0000000000000000 )
-                {
-                    // ORI #xx,<ea>
-                    ori(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111100000000 ) == 0b0000110000000000 ) {
-                    // CMPI
-                    cmpi(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111100000000) == 0b0000010000000000 )
-                {
-                    // SUBI
-                    subi(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111111100000000) == 0b0000011000000000 )
-                {
-                    // ADDI
-                    addi(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111100000000) == 0b0000001000000000 ) {
-                    // ANDI #xx,<ea>
-                    andi(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111000111000000) == 0b0000000101000000) {
-                    // BCHG Dn,<ea>
-                    bchgDn(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111111000000) == 0b0000100001000000) {
-                    // BCHG #xx,<ea>
-                    bchgImmediate(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111000111000000) == 0b0000000111000000) {
-                    // BSET Dn,<ea>
-                    bsetDn(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111111000000) == 0b0000100011000000) {
-                    // BSET #xx,<ea>
-                    bsetImmediate(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111000111000000) == 0b0000000110000000) {
-                    // BCLR Dn,<ea>
-                    bclrDn(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111111000000) == 0b0000100010000000) {
-                    // BCLR #xx,<ea>
-                    bclrImmediate(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111000111000000) == 0b0000000100000000) {
-                    // BTST Dn,<ea>
-                    btstDn(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111111000000) == 0b0000100000000000) {
-                    // BTST #xx,<ea>
-                    btstImmediate(instruction);
-                    return;
-                }
-                break;
-            /* ================================
-             * Move Byte
-             * ================================
-             */
-            case 0b0001_0000_0000_0000:
-                moveb(instruction);
-                return;
-            /* ================================
-             * Move Long
-             * ================================
-             */
-            case 0b0010_0000_0000_0000:
-                if ( (instruction & 0b0010000111000000) == 0b0010000001000000 ) {
-                    // MOVEA
-                    moveal(instruction);
-                    return;
-                }
-                movel(instruction);
-                return;
-            /* ================================
-             * Move Word
-             * ================================
-             */
-            case 0b0011_0000_0000_0000:
-                if ( (instruction & 0b0011000111000000) == 0b0011000001000000 ) {
-                    // MOVEA
-                    moveaw(instruction);
-                    return;
-                }
-                movew(instruction);
-                return;
-            /* ================================
-             * Miscellaneous instructions
-             * ================================
-             */
-            case 0b0100_0000_0000_0000:
-
-                if ( ( instruction & 0b1111111111000000 ) == 0b0100000011000000 )
-                {
-                    // MOVE_FROM_SR_ENCODING
-                    moveFromSR(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111111000000 ) == 0b0100011011000000 ) {
-                    // MOVE_TO_SR_ENCODING
-                    moveToSR(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111100000000) == 0b0100011000000000) {
-                    // NOT
-                    not(instruction);
-                    return;
-                }
-                if ( ( instruction & 0b1111111111000000 ) == 0b0100101011000000 )
-                {
-                    // TAS
-                    tas(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111100000000) == 0b0100101000000000) {
-                    // TST
-                    tst(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111100000000) == 0b0100001000000000)
-                {
-                    // CLR
-                    clr(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111111111111000) == 0b0100100010000000)
-                {
-                    // EXT Byte -> Word
-                    extWord(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111111111000) == 0b0100100011000000) {
-                    // EXT Word -> Long
-                    extLong(instruction);
-                    return;
-                }
-                if ( ( instruction & 0b1111111111000000 ) == 0b0100010011000000 )
-                {
-                    // MOVE_TO_CCR_ENCODING
-                    moveToCCR(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111110000000 ) == 0b0100100010000000 )
-                {
-                    // MOVEM_FROM_REGISTERS_ENCODING
-                    movemFromRegisters(instruction);
-                    return;
-                }
-                if ( ( instruction & 0b1111111110000000 ) == 0b0100110010000000 )
-                {
-                    // MOVEM_TO_REGISTERS_ENCODING
-                    movemToRegisters(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111111111000) == 0b0100111001011000) {
-                    // UNLK
-                    unlink(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111111111111000) == 0b0100111001010000) {
-                    // LINK
-                    link(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111111111000000) == 0b0100111010000000)
-                {
-                    // JSR
-                    jsr(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111111100000000) == 0b0100010000000000)
-                {
-                    // NEG
-                    neg(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111111111111000) == 0b0100100001000000) {
-                    // SWAP
-                    swap(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b11111111_11110000) == 0b0100111001100000)
-                {
-                    // MOVE Ax,USP / MOVE USP,Ax
-                    moveUSP(instruction);
-                    return;
-                }
-                if ( (instruction & 0b1111111111110000) == 0b0100111001000000 ) {
-                    // TRAP #xx
-                    trap(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111000111000000) == 0b0100000111000000 )
-                {
-                    // LEA
-                    lea(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b0100111011000000) == 0b0100111011000000)
-                {
-                    // JMP
-                    jmp(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111111111000000) == 0b0100100001000000) {
-                    // PEA
-                    pea(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111100000000 ) == 0b0100000000000000 )
-                {
-                    // NEGX
-                    negx(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000001000000 ) == 0b0100000000000000 )
-                {
-                    // CHK_ENCODING
-                    chk(instruction);
-                    return;
-                }
-
-                break;
-            /* ================================
-             * ADDQ/SUBQ/Scc/DBcc/TRAPc c
-             * ================================
-             */
-            case 0b0101_0000_0000_0000:
-
-                if ( (instruction & 0b1111000011111000 ) == 0b0101000011001000 )
-                {
-                    // DBcc
-                    dbcc(instruction);
-                    return;
-                }
-                if ( ( instruction & 0b1111000011000000 ) == 0b0101000011000000 )
-                {
-                    // SCC
-                    scc(instruction);
-                    return;
-                }
-                if ( ( instruction & 0b1111000100000000 ) == 0b0101000000000000 )
-                {
-                    // ADDQ_ENCODING
-                    addq(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000100000000 ) == 0b0101000100000000 ) {
-                    // SUBQ_ENCODING
-                    subq(instruction);
-                    return;
-                }
-                break;
-            /* ================================
-             * Bcc/BSR/BRA
-             * ================================
-             */
-            case 0b0110_0000_0000_0000:
-
-                // BRA/Bcc/BSR
-                bcc(instruction);
-                return;
-            /* ================================
-             * MOVEQ
-             * ================================
-             */
-            case 0b0111_0000_0000_0000:
-                moveq(instruction);
-                return;
-            /* ================================
-             * OR/DIV/SBCD
-             * ================================
-             */
-            case 0b1000_0000_0000_0000:
-
-                if ( ( instruction & 0b1111000111000000 ) == 0b1000000011000000 )
-                {
-                    // DIVU_ENCODING
-                    divu(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000111000000 ) == 0b1000000111000000 ) {
-                    // DIVS_ENCODING
-                    divs(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000100000000 ) == 0b1000000100000000 ) {
-                    // OR Dn,<ea>
-                    orDnEa(instruction);
-                    return;
-                }
-
-                if ( ( instruction& 0b1111000100000000 ) == 0b1000000000000000 ) {
-                    // OR <ea>,Dn
-                    orEaDn(instruction);
-                    return;
-                }
-                break;
-            /* ================================
-             * SUB/SUBX
-             * ================================
-             */
-            case 0b1001_0000_0000_0000:
-
-                if ( ( instruction & 0b1111000111000000 ) == 0b1001000111000000 ) {
-                    // SUBA.L <ea>,An
-                    subal(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000111000000 ) == 0b1001000011000000 ) {
-                    // SUBA.W <ea>,An
-                    subaw(instruction);
-                    return;
-                }
-
-                if ((instruction & 0b1111000100111000) == 0b1001000100001000 ||
-                    (instruction & 0b1111000100111000) == 0b1001000100000000)
-                {
-                    // SUBX
-                    subx(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111000100000000) == 0b1001000000000000 ||
-                     (instruction & 0b1111000100000000) == 0b1001000100000000)
-                {
-                    // SUB
-                    sub(instruction);
-                    return;
-                }
-                break;
-            /* ================================
-             * (Unassigned, Reserved)
-             * ================================
-             */
-            case 0b1010_0000_0000_0000:
-                break;
-            /* ================================
-             * CMP/EOR
-             * ================================
-             */
-            case 0b1011_0000_0000_0000:
-
-                if ( ( instruction & 0b1111000100111000 ) == 0b1011000100001000 ) {
-                    // CMPM
-                    cmpm(instruction);
-                    return;
-                }
-
-                if ( (instruction & 0b1111000111000000) == 0b1011000111000000 ||
-                     (instruction & 0b1111000111000000) == 0b1011000011000000)
-                {
-                    // CMPA_WORD_ENCODING / CMPA_LONG_ENCODING
-                    cmpa(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000100000000 ) == 0b1011000000000000 )
-                {
-                    // CMP
-                    cmp(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000100000000 ) == 0b1011000100000000 ) {
-                    // EOR_DST_EA_ENCODING
-                    eorDstEa(instruction);
-                    return;
-                }
-                break;
-            /* ================================
-             * AND/MUL/ABCD/EXG
-             * ================================
-             */
-            case 0b1100_0000_0000_0000:
-
-                if ( ( instruction & 0b1111000111000000 ) == 0b1100000111000000 ) {
-                    // MULS_ENCODING
-                    muls(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000111000000 ) == 0b1100000011000000 )
-                {
-                    // MULU_ENCODING
-                    mulu(instruction);
-                    return;
-                }
-
-                // EXG and AND look almost the same so just applying the instruction encoding's AND
-                // mask is not enough
-                int masked = instruction & 0b1111000111111000;
-                if ( masked ==  0b1100000101000000 || masked == 0b1100000101001000 || masked == 0b1100000110001000 ) // EXG
-                {
-                    exg(instruction);
-                    return;
-                }
-
-                masked = (instruction & 0b11110001_00000000);
-                if ( masked == 0b1100000000000000 || masked == 0b1100000100000000) {
-                    // AND <ea>,Dn
-                    // AND Dn,<ea>
-                    and(instruction);
-                    return;
-                }
-                break;
-            /* ================================
-             * ADD/ADDX
-             * ================================
-             */
-            case 0b1101_0000_0000_0000:
-
-                if ( ( instruction & 0b1111000100111000 ) == 0b1101000100001000 ) {
-                    // ADDX -(Ax),-(Ay)
-                    addxPredecrement(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000100111000 ) == 0b1101000100000000 ) {
-                    // ADDX Dx,Dy
-                    addxDataReg(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000111000000 ) == 0b1101000111000000 ) {
-                    // ADDA_LONG_ENCODING
-                    addal(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000111000000 ) == 0b1101000011000000 )
-                {
-                    // ADDA_WORD_ENCODING
-                    addaw(instruction);
-                    return;
-                }
-
-                if ( ( ( instruction & 0b1111000100000000 ) == 0b1101000000000000 ) ||
-                    ( instruction & 0b1111000100000000 ) == 0b1101000100000000 )
-                {
-                    // ADD <ea>,Dx
-                    // ADD Dx,<ea>
-                    add(instruction);
-                    return;
-                }
-
-                break;
-            /* ================================
-             * Shift/Rotate/Bit Field
-             * ================================
-             */
-            case 0b1110_0000_0000_0000:
-
-                /* ---------
-                 * ROL/ ROR / LSL / LSR / ASL / ASR
-                 * ---------
-                 */
-                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000010000 )
-                {
-                    // ROXL/ROXR IMMEDIATE
-                    roxImmediate(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000000000 )
-                {
-                    // ASL/ASR IMMEDIATE
-                    asImmediate(instruction);
-                    return;
-                }
-                if ( ( instruction & 0b1111000000111000) ==  0b1110000000001000 ) // LSL/LSR
-                {
-                    // LSL/LSR IMMEDIATE
-                    lsImmediate(instruction);
-                    return;
-                }
-                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000011000 )
-                {
-                    // ROL/ROR IMMEDIATE
-                    roImmediate(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111011000000 ) == 0b1110010011000000 )
-                {
-                    // ROXL/ROXR MEMORY
-                    roxMemory(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111011000000 ) == 0b1110000011000000 ) {
-                    // ASL/ASR MEMORY
-                    asMemory(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111111011000000) == 0b1110001011000000 ) { // LSL/LSR
-                    // LSL/LSR MEMORY
-                    lsMemory(instruction);
-                    return;
-                }
-                if ( ( instruction & 0b1111111001000000) == 0b1110011001000000 ) {
-                    // ROL/ROR MEMORY
-                    roMemory(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000110000 )
-                {
-                    // ROXL/ROXR REGISTER
-                    roxRegister(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000000111000 ) == 0b1110000000100000 )
-                {
-                    // ASL/ASR REGISTER
-                    asRegister(instruction);
-                    return;
-                }
-                if ( ( instruction & 0b1111000000111000) == 0b1110000000101000) { // LSL/LSR
-                    // LSL/LSR REGISTER
-                    lsRegister(instruction);
-                    return;
-                }
-
-                if ( ( instruction & 0b1111000000111000) == 0b1110000000111000)
-                {
-                    // ROL/ROR REGISTER
-                    roRegister(instruction);
-                    return;
-                }
-                break;
-            /* ================================
-             * Coprocessor Interface/MC68040 and CPU32 Extensions
-             * ================================
-             */
-            case 0b1111_0000_0000_0000:
-                break;
-            default:
-                throw new RuntimeException("Unreachable code reached");
-        }
-        throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
+        final String encoding = opcodeDebugMap[instruction & 0xffff];
+        System.out.println(">>>> Executing instruction "+Misc.hex(instruction)+" ( "+encoding+" , "+Misc.binary16Bit(instruction)+") at 0x"+Integer.toHexString(pc));
+        opcodeMap[instruction & 0xffff].execute(instruction);
     }
 
     private void illegalInstruction() {
@@ -3112,16 +2448,13 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         }
     }
 
-    protected interface InstructionImpl
-    {
-        public void execute(int instruction);
-    }
-
-    private final InstructionImpl[] opcodeMap = new InstructionImpl[65536];
-
     private void initializeOpcodeMap() throws IOException, IllegalAccessException
     {
-        final Map<Instruction,InstructionImpl> implCache = new HashMap<>(Instruction.values().length);
+        for ( int i = 0 ; i < opcodeMap.length ; i++ ) {
+            opcodeMap[i] = ILLEGAL_ENCODING;
+        }
+
+        final Map<String,InstructionImpl> implCache = new HashMap<>(Instruction.ALL_ENCODINGS.size());
 
         final InputStream input = getClass().getResourceAsStream("/68000_instructions.properties");
         final BufferedReader in = new BufferedReader(new InputStreamReader(input));
@@ -3135,58 +2468,91 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
 
             int i = 0;
 
-            final char c =line.charAt(i);
-
-            while( i < len && Character.isDigit(c ) ) {
+            // parse opcode (integer) value
+            while( i < len && Character.isDigit(line.charAt(i)) ) {
                 i++;
             }
             if ( i == len ) {
                 throw new EOFException("Premature EOF at line "+lineNo);
             }
             final int opCode = Integer.parseInt( line.substring(0,i) );
-            while( i < len && ! Character.isLetter(c) ) {
+            // skip non-letters
+            while( i < len && ! Character.isLetter(line.charAt(i)) ) {
                 i++;
             }
+            // parse instruction encoding name
             if ( i == len ) {
                 throw new EOFException("Premature EOF at line "+lineNo);
             }
             final int start = i;
-            while( i < len && ( Character.isLetter(c) || c == '_' ) ) {
-                i++;
+            while( i < len )
+            {
+                final char c = line.charAt(i);
+                if ( Character.isLetter(c) || c == '_' || Character.isDigit(c) )
+                {
+                    i++;
+                } else {
+                    break;
+                }
             }
             if ( i == len ) {
                 throw new EOFException("Premature EOF at line "+lineNo);
             }
-            final String insName = line.substring(start,i);
-            final Instruction insn = Instruction.valueOf( insName );
-            opcodeMap[ opCode ] = lookupInstructionImpl(insn, implCache);
+            final String insEncodingName = line.substring(start,i);
+            opcodeMap[ opCode ] = lookupInstructionImpl(insEncodingName, implCache);
+            opcodeDebugMap[ opCode ] = insEncodingName;
         }
     }
 
-    private InstructionImpl lookupInstructionImpl(Instruction instruction, Map<Instruction,InstructionImpl> cache) throws IllegalAccessException
+    private InstructionImpl lookupInstructionImpl(String encodingName, Map<String,InstructionImpl> cache) throws IllegalAccessException
     {
-        InstructionImpl result = cache.get( instruction.name() );
+        InstructionImpl result = cache.get( encodingName );
         if ( result != null )
         {
             return result;
         }
-        final String expectedFieldName = instruction.name().toUpperCase();
         for (Field m : getClass().getDeclaredFields() )
 
         {
             final int mods = m.getModifiers();
-            if ( m.getType() == InstructionImpl.class && Modifier.isFinal(mods) && m.getName().equals(expectedFieldName) )
+            if ( m.getType() == InstructionImpl.class && Modifier.isFinal(mods) && m.getName().equals(encodingName) )
             {
                 m.setAccessible(true);
                 result = (InstructionImpl) m.get(this);
                 if (result == null ) {
                     throw new RuntimeException("Internal error, class field returned NULL "+InstructionImpl.class.getSimpleName());
                 }
-                cache.put(instruction,result);
+                cache.put(encodingName,result);
                 return result;
             }
         }
-        throw new RuntimeException("Internal error, found no final field named '"+expectedFieldName+"' for instruction "+instruction);
+        throw new RuntimeException("Internal error, found no final field named '"+encodingName+"' with type InstructionImpl on CPU class'");
+    }
+
+    private InstructionEncoding lookupInstructionEncoding(String encodingName, Map<String,InstructionEncoding> cache) throws IllegalAccessException
+    {
+        InstructionEncoding result = cache.get( encodingName );
+        if ( result != null )
+        {
+            return result;
+        }
+        for (Field m : Instruction.class.getDeclaredFields() )
+
+        {
+            final int mods = m.getModifiers();
+            if ( m.getType() == InstructionEncoding.class && Modifier.isFinal(mods) &&
+                m.getName().equals(encodingName) )
+            {
+                m.setAccessible(true);
+                result = (InstructionEncoding) m.get(this);
+                if (result == null ) {
+                    throw new RuntimeException("Internal error, class field returned NULL "+InstructionImpl.class.getSimpleName());
+                }
+                cache.put(encodingName,result);
+                return result;
+            }
+        }
+        throw new RuntimeException("Internal error, found no final field named '"+encodingName+"'");
     }
 
     private void andiToCCR(int instruction) {
@@ -4553,5 +3919,246 @@ C — Set if a borrow occurs; cleared otherwise.
         final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
         rotateRegister(instruction,RotateMode.ROTATE,rotateLeft);
     }
-}
 
+    private final InstructionImpl ADDA_LONG_ENCODING = this::addal;
+
+    private final InstructionImpl ADDA_WORD_ENCODING = this::addaw;
+
+    private final InstructionImpl ADDI_WORD_ENCODING = this::addi;
+
+    private final InstructionImpl ADDQ_ENCODING = this::addq;
+
+    private final InstructionImpl ADDX_ADDRREG_ENCODING = this::addxPredecrement;
+
+    private final InstructionImpl ADDX_DATAREG_ENCODING = this::addxDataReg;
+
+    private final InstructionImpl ADD_DST_DATA_ENCODING = this::add;
+
+    private final InstructionImpl ADD_DST_EA_ENCODING = this::add;
+
+    private final InstructionImpl ANDI_BYTE_ENCODING = this::andi;
+
+    private final InstructionImpl ANDI_LONG_ENCODING = this::andi;
+
+    private final InstructionImpl ANDI_TO_CCR_ENCODING = this::andiToCCR;
+
+    private final InstructionImpl ANDI_TO_SR_ENCODING = this::andiToSR;
+
+    private final InstructionImpl ANDI_WORD_ENCODING = this::andi;
+
+    private final InstructionImpl AND_DST_EA_ENCODING = this::and;
+
+    private final InstructionImpl AND_SRC_EA_ENCODING = this::and;
+
+    private final InstructionImpl ASL_IMMEDIATE_ENCODING = this::asImmediate;
+
+    private final InstructionImpl ASL_MEMORY_ENCODING = this::asMemory;
+
+    private final InstructionImpl ASL_REGISTER_ENCODING = this::asRegister;
+
+    private final InstructionImpl ASR_IMMEDIATE_ENCODING = this::asImmediate;
+
+    private final InstructionImpl ASR_MEMORY_ENCODING = this::asMemory;
+
+    private final InstructionImpl ASR_REGISTER_ENCODING = this::asRegister;
+
+    private final InstructionImpl BCC_16BIT_ENCODING = this::bcc;
+
+    private final InstructionImpl BCC_32BIT_ENCODING = this::bcc;
+
+    private final InstructionImpl BCC_8BIT_ENCODING = this::bcc;
+
+    private final InstructionImpl BCHG_DYNAMIC_ENCODING = this::bchgDn;
+
+    private final InstructionImpl BCHG_STATIC_ENCODING = this::bchgImmediate;
+
+    private final InstructionImpl BCLR_DYNAMIC_ENCODING = this::bclrDn;
+
+    private final InstructionImpl BCLR_STATIC_ENCODING = this::bclrImmediate;
+
+    private final InstructionImpl BSET_DYNAMIC_ENCODING = this::bsetDn;
+
+    private final InstructionImpl BSET_STATIC_ENCODING = this::bsetImmediate;
+
+    private final InstructionImpl BTST_DYNAMIC_ENCODING = this::btstDn;
+
+    private final InstructionImpl BTST_STATIC_ENCODING = this::btstImmediate;
+
+    private final InstructionImpl CHK_WORD_ENCODING = this::chk;
+
+    private final InstructionImpl CLR_ENCODING = this::clr;
+
+    private final InstructionImpl CMPA_LONG_ENCODING = this::cmpa;
+
+    private final InstructionImpl CMPA_WORD_ENCODING = this::cmpa;
+
+    private final InstructionImpl CMPI_WORD_ENCODING = this::cmpi;
+
+    private final InstructionImpl CMPM_ENCODING = this::cmpm;
+
+    private final InstructionImpl CMP_ENCODING = this::cmp;
+
+    private final InstructionImpl DBCC_ENCODING = this::dbcc;
+
+    private final InstructionImpl DIVS_ENCODING = this::divs;
+
+    private final InstructionImpl DIVU_ENCODING = this::divu;
+
+    private final InstructionImpl EORI_TO_CCR_ENCODING = this::eoriCCR;
+
+    private final InstructionImpl EORI_TO_SR_ENCODING = this::eoriSR;
+
+    private final InstructionImpl EORI_WORD_ENCODING = this::eori;
+
+    private final InstructionImpl EOR_DST_EA_ENCODING = this::eorDstEa;
+
+    private final InstructionImpl EXG_ADR_ADR_ENCODING = this::exg;
+
+    private final InstructionImpl EXG_DATA_ADR_ENCODING = this::exg;
+
+    private final InstructionImpl EXG_DATA_DATA_ENCODING = this::exg;
+
+    private final InstructionImpl EXTL_ENCODING = this::extLong;
+
+    private final InstructionImpl EXTW_ENCODING = this::extWord;
+
+    private final InstructionImpl ILLEGAL_ENCODING = this::illegal;
+
+    private final InstructionImpl JMP_INDIRECT_ENCODING = this::jmp;
+
+    private final InstructionImpl JSR_ENCODING = this::jsr;
+
+    private final InstructionImpl LEA_WORD_ENCODING = this::lea;
+
+    private final InstructionImpl LINK_ENCODING = this::link;
+
+    private final InstructionImpl LSL_IMMEDIATE_ENCODING = this::lsImmediate;
+
+    private final InstructionImpl LSL_MEMORY_ENCODING = this::lsMemory;
+
+    private final InstructionImpl LSL_REGISTER_ENCODING = this::lsRegister;
+
+    private final InstructionImpl LSR_IMMEDIATE_ENCODING = this::lsImmediate;
+
+    private final InstructionImpl LSR_MEMORY_ENCODING = this::lsMemory;
+
+    private final InstructionImpl LSR_REGISTER_ENCODING = this::lsRegister;
+
+    private final InstructionImpl MOVEA_LONG_ENCODING = this::moveal;
+
+    private final InstructionImpl MOVEA_WORD_ENCODING = this::moveaw;
+
+    private final InstructionImpl MOVEM_FROM_REGISTERS_ENCODING = this::movemFromRegisters;
+
+    private final InstructionImpl MOVEM_TO_REGISTERS_ENCODING = this::movemToRegisters;
+
+    private final InstructionImpl MOVEP_LONG_FROM_MEMORY_ENCODING = this::movepLongFromMemoryToRegister;
+
+    private final InstructionImpl MOVEP_LONG_TO_MEMORY_ENCODING = this::movepLongFromRegisterToMemory;
+
+    private final InstructionImpl MOVEP_WORD_FROM_MEMORY_ENCODING = this::movepWordFromMemoryToRegister;
+
+    private final InstructionImpl MOVEP_WORD_TO_MEMORY_ENCODING = this::movepWordFromRegisterToMemory;
+
+    private final InstructionImpl MOVEQ_ENCODING = this::moveq;
+
+    private final InstructionImpl MOVE_AX_TO_USP_ENCODING = this::moveUSP;
+
+    private final InstructionImpl MOVE_BYTE_ENCODING = this::moveb;
+
+    private final InstructionImpl MOVE_LONG_ENCODING = this::movel;
+
+    private final InstructionImpl MOVE_TO_CCR_ENCODING = this::moveToCCR;
+
+    private final InstructionImpl MOVE_TO_SR_ENCODING = this::moveToSR;
+
+    private final InstructionImpl MOVE_USP_TO_AX_ENCODING = this::moveUSP;
+
+    private final InstructionImpl MOVE_WORD_ENCODING = this::movew;
+
+    private final InstructionImpl MULS_ENCODING = this::muls;
+
+    private final InstructionImpl MULU_ENCODING = this::mulu;
+
+    private final InstructionImpl NEGX_ENCODING = this::negx;
+
+    private final InstructionImpl NEG_ENCODING = this::neg;
+
+    private final InstructionImpl NOP_ENCODING = this::nop;
+
+    private final InstructionImpl NOT_ENCODING = this::not;
+
+    private final InstructionImpl ORI_TO_CCR_ENCODING = this::oriToCCR;
+
+    private final InstructionImpl ORI_TO_SR_ENCODING = this::oriToSR;
+
+    private final InstructionImpl ORI_WORD_ENCODING = this::ori;
+
+    private final InstructionImpl OR_DST_EA_ENCODING = this::orDnEa;
+
+    private final InstructionImpl OR_SRC_EA_ENCODING = this::orEaDn;
+
+    private final InstructionImpl PEA_ENCODING = this::pea;
+
+    private final InstructionImpl RESET_ENCODING = this::reset;
+
+    private final InstructionImpl ROL_IMMEDIATE_ENCODING = this::roImmediate;
+
+    private final InstructionImpl ROL_MEMORY_ENCODING = this::roMemory;
+
+    private final InstructionImpl ROL_REGISTER_ENCODING = this::roRegister;
+
+    private final InstructionImpl ROR_IMMEDIATE_ENCODING = this::roImmediate;
+
+    private final InstructionImpl ROR_MEMORY_ENCODING = this::roMemory;
+
+    private final InstructionImpl ROR_REGISTER_ENCODING = this::roRegister;
+
+    private final InstructionImpl ROXL_IMMEDIATE_ENCODING = this::roxImmediate;
+
+    private final InstructionImpl ROXL_MEMORY_ENCODING = this::roxMemory;
+
+    private final InstructionImpl ROXL_REGISTER_ENCODING = this::roxRegister;
+
+    private final InstructionImpl ROXR_IMMEDIATE_ENCODING = this::roxImmediate;
+
+    private final InstructionImpl ROXR_MEMORY_ENCODING = this::roxMemory;
+
+    private final InstructionImpl ROXR_REGISTER_ENCODING = this::roxRegister;
+
+    private final InstructionImpl RTR_ENCODING = this::rtr;
+
+    private final InstructionImpl RTS_ENCODING = this::rts;
+
+    private final InstructionImpl SCC_ENCODING = this::scc;
+
+    private final InstructionImpl STOP_ENCODING = this::stop;
+
+    private final InstructionImpl SUBA_LONG_ENCODING = this::subal;
+
+    private final InstructionImpl SUBA_WORD_ENCODING = this::subaw;
+
+    private final InstructionImpl SUBI_WORD_ENCODING = this::subi;
+
+    private final InstructionImpl SUBQ_ENCODING = this::subq;
+
+    private final InstructionImpl SUBX_ADDR_REG_ENCODING = this::subx;
+
+    private final InstructionImpl SUBX_DATA_REG_ENCODING = this::subx;
+
+    private final InstructionImpl SUB_DST_DATA_ENCODING = this::sub;
+
+    private final InstructionImpl SUB_DST_EA_ENCODING = this::sub;
+
+    private final InstructionImpl SWAP_ENCODING = this::swap;
+
+    private final InstructionImpl TAS_ENCODING = this::tas;
+
+    private final InstructionImpl TRAPV_ENCODING = this::trapv;
+
+    private final InstructionImpl TRAP_ENCODING = this::trap;
+
+    private final InstructionImpl TST_ENCODING = this::tst;
+
+    private final InstructionImpl UNLK_ENCODING = this::unlink;
+}

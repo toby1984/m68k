@@ -218,6 +218,7 @@ public class AssemblerTest extends TestCase
     }
 
     public void testMovea() {
+        assertArrayEquals(compile("movea.l #$2700,a0")    ,0x20,0x7c,0x00,0x00,0x27,0x00 );
         assertArrayEquals(compile("movea #$1234,a3")    ,0x36,0x7c,0x12,0x34 );
         assertArrayEquals(compile("movea.l #$123456,a3")    ,0x26,0x7c,0x00,0x12,0x34,0x56 );
     }

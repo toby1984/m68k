@@ -1543,7 +1543,8 @@ public enum Instruction
             @Override
             public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
             {
-                return Instruction.sourceAddressingModes();
+                return Instruction.sourceAddressingModes()
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
             }
 
             @Override
@@ -1594,9 +1595,13 @@ public enum Instruction
                 @Override
                 public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
                 {
-                    if ( encoding == MOVE_BYTE_ENCODING || encoding == MOVE_WORD_ENCODING || encoding == MOVE_LONG_ENCODING) {
+                    if ( encoding == MOVE_BYTE_ENCODING ||
+                        encoding  == MOVE_WORD_ENCODING ||
+                        encoding  == MOVE_LONG_ENCODING)
+                    {
                         return Instruction.sourceAddressingModes()
-                            .with( Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE));
+                            .with( Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,
+                                AddressingModeKind.ALTERABLE));
                     }
                     if ( encoding == MOVE_TO_CCR_ENCODING )
                     {
@@ -2343,6 +2348,23 @@ destination Dn mode, not the destination < ea > mode.
 
                 insn.setImplicitOperandSize( OperandSize.WORD );
 
+                if ( insn.destination().hasAddressingMode(AddressingMode.ADDRESS_REGISTER_DIRECT ) )
+                {
+                    if ( insn.hasOperandSize(OperandSize.WORD) )
+                    {
+                        // MOVEA WORD
+                        extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn, context);
+                        return MOVEA_WORD_ENCODING.append(extraInsnWords);
+                    }
+                    if ( insn.hasOperandSize(OperandSize.LONG) )
+                    {
+                        // MOVEA LONG
+                        extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn, context);
+                        return MOVEA_LONG_ENCODING.append(extraInsnWords);
+                    }
+                    throw new RuntimeException("Invalid operation size for MOVEA: "+insn.getOperandSize());
+                }
+
                 if ( insn.destination().getValue().isRegister(Register.CCR ) ) {
                     // MOVE to CCR
                     assertOperandSize(insn,OperandSize.WORD);
@@ -3048,6 +3070,7 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding MOVE_BYTE_ENCODING = InstructionEncoding.of("0001DDDMMMmmmsss");
     public static final InstructionEncoding MOVE_WORD_ENCODING = InstructionEncoding.of("0011DDDMMMmmmsss");
+                                                                                      // 0010000001111100
     public static final InstructionEncoding MOVE_LONG_ENCODING = InstructionEncoding.of("0010DDDMMMmmmsss");
     public static final InstructionEncoding MOVE_TO_CCR_ENCODING = InstructionEncoding.of("0100010011mmmsss");
     public static final InstructionEncoding MOVE_AX_TO_USP_ENCODING = InstructionEncoding.of("0100111001100sss");
@@ -3495,13 +3518,16 @@ D/A   |     |   |           |
     private static EncodingTableGenerator.IValueIterator sourceAddressingModes()
     {
         final AddressingMode m1 = AddressingMode.values()[0];
-        final AddressingMode[] additional = Stream.of(AddressingMode.values()).skip(1).toArray(size->new AddressingMode[size]);
+        final AddressingMode[] additional = Stream.of(AddressingMode.values()).skip(1)
+            .toArray(size->new AddressingMode[size]);
         return sourceAddressingModes(m1,additional);
     }
 
     private static EncodingTableGenerator.IValueIterator sourceAddressingModes(AddressingMode m1,AddressingMode...modes)
     {
-        return new EncodingTableGenerator.AddressingModeIterator(Field.SRC_MODE,Field.SRC_BASE_REGISTER,toSet(m1,modes));
+        return new EncodingTableGenerator.AddressingModeIterator(
+            Field.SRC_MODE,
+            Field.SRC_BASE_REGISTER,toSet(m1,modes));
     }
 
     private static <T> Set<T> toSet(T m1,T...modes) {

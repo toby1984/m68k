@@ -129,9 +129,6 @@ public class EncodingTableGenerator
 
         private final IValueIterator[] iterators;
 
-        private int maxPtr = 0;
-
-
         public CompoundValueIterator(IValueIterator it1,IValueIterator it2)
         {
             super( Stream.concat(it1.getFields().stream(),it2.getFields().stream()).collect(Collectors.toSet()));
@@ -184,7 +181,7 @@ public class EncodingTableGenerator
         public void reset()
         {
             for ( IValueIterator it : iterators ) {
-                it.reset();;
+                it.reset();
             }
         }
     }
@@ -196,7 +193,8 @@ public class EncodingTableGenerator
 
         private int currentValue;
 
-        public RangedValueIterator(Field field,int startValueInclusive,int endValueExclusive) {
+        public RangedValueIterator(Field field,int startValueInclusive,int endValueExclusive)
+        {
             super(field);
             if ( startValueInclusive >= endValueExclusive ) {
                 throw new IllegalArgumentException("start >= end ??");
@@ -315,6 +313,8 @@ public class EncodingTableGenerator
             this.modes.addAll(modes);
             this.modes.removeIf(x -> x == AddressingMode.IMPLIED ); // internal use only
             removeModesWithSameBitPattern();
+            System.out.println("AddressingModeIterator(): Modes to iterate over: "+this.modes.stream()
+                .map(m->m.name()).collect(Collectors.joining(",")));
             System.out.println("AddressingModeIterator(): eaMode is now "+currentMode());
             reset();
         }
@@ -519,6 +519,26 @@ outer:
     }
     public static void main(String[] args) throws IOException
     {
+        final Set<AddressingMode> addressingModes =
+            Stream.of(AddressingMode.values())
+                .filter( x -> x.hasKinds(AddressingModeKind.DATA,AddressingModeKind.ALTERABLE))
+            .collect(Collectors.toSet());
+
+        AddressingModeIterator it1 = new AddressingModeIterator(Field.SRC_MODE,Field.SRC_BASE_REGISTER,
+            addressingModes);
+
+        while( it1.hasNext() )
+        {
+            final int v1 = it1.getValue(Field.SRC_MODE);
+            final int v2 = it1.getValue(Field.SRC_BASE_REGISTER);
+//            System.out.println("v1: "+v1);
+//            System.out.println("v2: "+v2);
+            final int value = (v1<<3)|v2;
+            System.out.println( Misc.binary8Bit(value) );
+            it1.doIncrement();
+        }
+        System.exit(1);
+
         final CPUType cpuType = CPUType.M68000;
 
         final Map<Instruction,List<InstructionEncoding>> allEncodings =
@@ -655,6 +675,13 @@ outer:
             Instruction.MOVE_USP_TO_AX_ENCODING));
             
         allEncodings.put(Instruction.LEA,Arrays.asList(Instruction.LEA_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
+
+        // TODO: REMOVE DEBUG CODE
+        allEncodings.clear();
+        // TODO: REMOVE DEBUG CODE ^^^^^^^^^^^^^
+
+        System.out.println("Reset map");
+        allEncodings.put(Instruction.MOVEA,Arrays.asList(Instruction.MOVEA_LONG_ENCODING));
 
         final Map<Integer, EncodingEntry> mappings = new HashMap<>();
 
