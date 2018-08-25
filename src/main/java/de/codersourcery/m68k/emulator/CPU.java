@@ -1017,218 +1017,97 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( ( instruction & 0b1111111111000000 ) == 0b0100010011000000 )
                 {
                     // MOVE_TO_CCR_ENCODING
-                    decodeSourceOperand(instruction,2,false);
-                    System.out.println("Move To CCR: "+value);
-                    statusRegister = (statusRegister & ~0b11111) | (value & 0b11111);
+                    moveToCCR(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111111110000000 ) == 0b0100100010000000 )
                 {
                     // MOVEM_FROM_REGISTERS_ENCODING
-                    moveMultipleRegisters(instruction,true);
+                    movemFromRegisters(instruction);
                     return;
                 }
                 if ( ( instruction & 0b1111111110000000 ) == 0b0100110010000000 )
                 {
                     // MOVEM_TO_REGISTERS_ENCODING
-                    moveMultipleRegisters(instruction,false);
+                    movemToRegisters(instruction);
                     return;
                 }
                 if ( (instruction & 0b1111111111111000) == 0b0100111001011000) {
                     // UNLK
-                    final int regNum = (instruction & 0b111);
-                    addressRegisters[ 7 ] = addressRegisters[regNum];
-                    addressRegisters[regNum] = popLong();
-                    cycles = 12;
+                    unlink(instruction);
                     return;
                 }
 
                 if ( (instruction & 0b1111111111111000) == 0b0100111001010000) {
                     // LINK
-                    final int regNum = (instruction & 0b111);
-                    final int displacement = memLoadWord(pc);
-                    pc += 2;
-                    pushLong( addressRegisters[ regNum ] );
-                    addressRegisters[ regNum ] = addressRegisters[ 7 ];
-                    addressRegisters[7] += displacement; // TODO: Is the displacement in bytes or words ??? Stack pointer always needs to point to an even address....
-                    cycles = 16;
+                    link(instruction);
                     return;
                 }
 
                 if ( (instruction & 0b1111111111000000) == 0b0100111010000000)
                 {
                     // JSR
-                    decodeSourceOperand(instruction,4,true);
-                    pushLong(pc);
-                    cycles += 4; // TODO: Timing correct ?
-                    pc = ea;
+                    jsr(instruction);
                     return;
                 }
 
                 if ( (instruction & 0b1111111100000000) == 0b0100010000000000)
                 {
                     // NEG
-                    final int sizeBits = (instruction & 0b11000000) >>> 6;
-                    final int operandSize = 1<<sizeBits;
-                    if ( decodeSourceOperand(instruction,operandSize,false) )
-                    {
-                        // operand is register
-                        cycles += (operandSize <= 2) ? 4 : 6;
-                    } else {
-                        // operand is memory
-                        cycles += (operandSize <= 2) ? 8 : 12;
-                    }
-                    final int b = value;
-                    value = 0 - value;
-                    int eaMode     = (instruction & 0b111000) >> 3;
-                    int eaRegister = (instruction & 0b000111);
-                    storeValue(eaMode,eaRegister,operandSize);
-                    int setMask=0;
-                    switch(operandSize) {
-                        case 1: setMask = isOverflow8Bit( 0,b,value ) ? FLAG_OVERFLOW : 0; break;
-                        case 2: setMask = isOverflow16Bit( 0,b,value ) ? FLAG_OVERFLOW : 0; break;
-                        case 4: setMask = isOverflow32Bit( 0,b,value ) ? FLAG_OVERFLOW : 0; break;
-                    }
-                    if ( value < 0 ) {
-                        setMask |= FLAG_NEGATIVE | FLAG_CARRY | FLAG_EXTENDED;
-                    } else if ( value == 0 ) {
-                        setMask |= FLAG_ZERO;
-                    } else {
-                        setMask |= FLAG_CARRY | FLAG_EXTENDED;
-                    }
-                    statusRegister = (statusRegister & 0xff00) | setMask;
+                    neg(instruction);
                     return;
                 }
 
                 if ( (instruction & 0b1111111111111000) == 0b0100100001000000) {
                     // SWAP
-                    final int regNum = (instruction & 0b111);
-                    int result = (dataRegisters[regNum] << 16) | (dataRegisters[regNum] >>> 16);
-                    dataRegisters[regNum] = result;
-                    /* N — Set if the most significant bit of the 32-bit result is set; cleared otherwise.
-                     * Z — Set if the 32-bit result is zero; cleared otherwise.
-                     * V — Always cleared.
-                     * C — Always cleared. */
-                    int flagsToSet = 0;
-                    if ( result == 0 ) {
-                        flagsToSet |= FLAG_ZERO;
-                    }
-                    if ( (result & 1<<31) != 0 ) {
-                        flagsToSet |= FLAG_NEGATIVE;
-                    }
-                    this.statusRegister = (statusRegister & ~(FLAG_OVERFLOW | FLAG_CARRY | FLAG_ZERO | FLAG_NEGATIVE) ) | flagsToSet;
+                    swap(instruction);
                     return;
                 }
 
                 if ( (instruction & 0b11111111_11110000) == 0b0100111001100000)
                 {
                     // MOVE Ax,USP / MOVE USP,Ax
-                    if ( assertSupervisorMode() )
-                    {
-                        final int regNum = instruction & 0b111;
-                        if ((instruction & 1 << 3) == 0) // check transfer direction
-                        {
-                            userModeStackPtr = addressRegisters[ regNum ]; // address register -> USP
-                        }
-                        else
-                        {
-                            addressRegisters[ regNum ] = userModeStackPtr; // USP -> address register
-                        }
-                    }
-                    cycles = 4;
+                    moveUSP(instruction);
                     return;
                 }
                 if ( (instruction & 0b1111111111110000) == 0b0100111001000000 ) {
                     // TRAP #xx
-                    triggerIRQ(IRQ.userTrapToIRQ( instruction & 0b1111 ),0);
-                    cycles = 38;
+                    trap(instruction);
                     return;
                 }
 
                 if ( (instruction & 0b1111000111000000) == 0b0100000111000000 )
                 {
                     // LEA
-                    decodeSourceOperand(instruction,4,true);
-                    final int dstAdrReg = (instruction & 0b1110_0000_0000) >> 9;
-
-                    addressRegisters[dstAdrReg] = ea;
-                    // TODO: Cycle timing correct ??
+                    lea(instruction);
                     return;
                 }
 
                 if ( (instruction & 0b0100111011000000) == 0b0100111011000000)
                 {
                     // JMP
-                    decodeSourceOperand(instruction,4,true);
-                    pc = ea;
-                    cycles += 4; // TODO: Timing correct?
+                    jmp(instruction);
                     return;
                 }
 
                 if ( (instruction & 0b1111111111000000) == 0b0100100001000000) {
                     // PEA
-                    decodeSourceOperand( instruction,4,true );
-                    pushLong( value );
+                    pea(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111111100000000 ) == 0b0100000000000000 )
                 {
                     // NEGX
-                    final int sizeBits = (instruction &0b11000000) >> 6;
-                    final int eaMode = (instruction&0b111000) >> 3;
-                    final int eaRegister = (instruction&0b111);
-                    final int operandSize = 1 << sizeBits;
-                    decodeSourceOperand(instruction,operandSize,false,false);
-                    final int srcValue = value;
-                    final int dstValue = 0;
-                    final int result = dstValue - srcValue - (isExtended() ? 1 : 0);
-                    value = result;
-                    updateFlags(srcValue,dstValue,result,operandSize,CCOperation.SUBTRACTION,FLAG_EXTENDED|FLAG_NEGATIVE|FLAG_OVERFLOW|FLAG_CARRY);
-                    if ( result != 0 ) {
-                        statusRegister &= ~CPU.FLAG_ZERO;
-                    }
-                    storeValue(eaMode,eaRegister,operandSize);
+                    negx(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000001000000 ) == 0b0100000000000000 )
                 {
                     // CHK_ENCODING
-                    int sizeBits = (instruction & 0b110000000) >>> 7;
-                    final int operandSize; // non-standard operand size encoding...
-                    int regNum = (instruction & 0b111000000000) >>> 9;
-                    int regValue = dataRegisters[regNum];
-                    switch( sizeBits )
-                    {
-                        case 0b11:
-                            operandSize = 2;
-                            break;
-                        case 0b10:
-                            if ( cpuType.isCompatibleWith(CPUType.M68020) )
-                            {
-                                operandSize = 4;
-                                break;
-                            }
-                            // $$FALL-THROUGH$$
-                        default:
-                            throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
-                    }
-                    decodeSourceOperand( instruction,operandSize,false );
-
-                    // compare
-                    final boolean lowerBoundViolated = regValue < 0;
-                    final boolean upperBoundViolated = regValue > value;
-                    final boolean outOfBounds = lowerBoundViolated | upperBoundViolated;
-                    if ( outOfBounds ) {
-                        if ( lowerBoundViolated ) {
-                            statusRegister |= FLAG_NEGATIVE;
-                        } else {
-                            statusRegister &= ~FLAG_NEGATIVE;
-                        }
-                        triggerIRQ(IRQ.CHK_CHK2,0);
-                    }
+                    chk(instruction);
                     return;
                 }
 
@@ -1242,114 +1121,25 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( (instruction & 0b1111000011111000 ) == 0b0101000011001000 )
                 {
                     // DBcc
-                    final int cc = (instruction & 0b0000111100000000) >> 8;
-                    if ( ! Condition.isTrue(this,cc ) )
-                    {
-                        // condition is false, decrement data register lower 16 bits
-                        final int regNum = instruction & 0b111;
-                        final int regVal = dataRegisters[regNum];
-                        int newValue = ( (regVal & 0xffff) - 1 ) & 0xffff;
-                        dataRegisters[ regNum ] = (regVal & 0xffff0000) | newValue;
-                        if ( newValue != 0xffff ) {
-                            /*
-                             * - If the result is – 1, execution continues with the next instruction.
-                             * - If the result is not equal to – 1, execution continues at the location indicated RAy the current value of the program
-                             *   counter plus the sign-extended 16-bit displacement. The value in the program counter is
-                             *   the address of the instruction word of the DBcc instruction plus two. The
-                             */
-                            pc = pc + memory.readWordNoCheck(pc);
-                            cycles = 10;
-                            return;
-                        } else {
-                            cycles = 14;
-                        }
-                    } else {
-                        cycles = 12;
-                    }
-                    pc += 2; // skip branch offset
+                    dbcc(instruction);
                     return;
                 }
                 if ( ( instruction & 0b1111000011000000 ) == 0b0101000011000000 )
                 {
                     // SCC
-                    final int cc = (instruction & 0b0000111100000000) >> 8;
-                    final int eaMode = (instruction & 0b111000) >> 3;
-                    final int eaRegister = (instruction & 0b111);
-                    value = Condition.isTrue(this,cc ) ? 0xff : 0x00;
-                    storeValue(eaMode,eaRegister,1);
+                    scc(instruction);
                     return;
                 }
                 if ( ( instruction & 0b1111000100000000 ) == 0b0101000000000000 )
                 {
                     // ADDQ_ENCODING
-                    final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
-                    switch(operandSizeInBytes) {
-                        case 1:
-                        case 2:
-                            cycles += 4;
-                            break;
-                        case 4:
-                            cycles += 6;
-                            break;
-                        default:
-                            throw new RuntimeException("Unreachable code reached");
-                    }
-                    final int eaMode = (instruction & 0b111000) >> 3;
-                    final int eaRegister = instruction & 0b111;
-                    final boolean dstIsAddressRegister = eaMode == AddressingMode.ADDRESS_REGISTER_DIRECT.eaModeField;
-
-                    int srcValue = (instruction& 0b111000000000) >> 9;
-                    if ( srcValue == 0 ) {
-                        srcValue = 8;
-                    }
-
-                    decodeSourceOperand(instruction,operandSizeInBytes,false,false);
-                    final int dstValue = value;
-
-                    value += srcValue;
-
-                    storeValue(eaMode, eaRegister, operandSizeInBytes);
-
-                    if ( ! dstIsAddressRegister )
-                    {
-                        updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.ADDITION, CPU.ALL_USERMODE_FLAGS);
-                    }
+                    addq(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000100000000 ) == 0b0101000100000000 ) {
                     // SUBQ_ENCODING
-                    final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
-                    switch(operandSizeInBytes) {
-                        case 1:
-                        case 2:
-                            cycles += 4;
-                            break;
-                        case 4:
-                            cycles += 6;
-                            break;
-                        default:
-                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
-                    }
-                    final int eaMode = (instruction & 0b111000) >> 3;
-                    final int eaRegister = instruction & 0b111;
-                    final boolean dstIsAddressRegister = eaMode == AddressingMode.ADDRESS_REGISTER_DIRECT.eaModeField;
-
-                    int srcValue = (instruction& 0b111000000000) >> 9;
-                    if ( srcValue == 0 ) {
-                        srcValue = 8;
-                    }
-                    decodeSourceOperand(instruction,operandSizeInBytes,false,false);
-                    final int dstValue = value;
-
-                    value -= srcValue;
-
-                    storeValue(eaMode, eaRegister, operandSizeInBytes);
-
-                    if ( ! dstIsAddressRegister )
-                    {
-                        updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
-                    }
+                    subq(instruction);
                     return;
                 }
                 break;
@@ -1360,81 +1150,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b0110_0000_0000_0000:
 
                 // BRA/Bcc/BSR
-                final int cc = (instruction & 0b0000111100000000) >> 8;
-                if ( cc == Condition.BSR.bits )
-                {
-                    switch (instruction & 0xff)
-                    {
-                        case 0x00: // 16 bit offset
-                            pushLong( pc+2 );
-                            pc += memLoadWord(pc)-2; // -2 because we already advanced the PC after reading the instruction word
-                            cycles = 18;
-                            return;
-                        case 0xff: // 32 bit offset
-                            if ( cpuType.isNotCompatibleWith( CPUType.M68020 ) )
-                            {
-                                break;
-                            }
-                            pushLong( pc+4 );
-                            pc += memLoadLong( pc )-2; // -2because we already advanced the PC after reading the instruction word
-                            cycles = 24; // TODO: Wrong timing, find out 68020+ timings...
-                            return;
-                        default:
-                            // 8-bit branch offset encoded in instruction itself
-                            pushLong( pc );
-                            final int offset = ((instruction & 0xff) << 24) >> 24;
-                            pc += offset - 2; // -2 because we already advanced the PC after reading the instruction word
-                            cycles = 18;
-                            return;
-                    }
-                    throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
-                }
-                final boolean takeBranch = Condition.isTrue(this, cc);
-                switch (instruction & 0xff)
-                {
-                    case 0x00: // 16 bit offset
-                        if (takeBranch)
-                        {
-                            pc += memLoadWord(pc) - 2; // -2 because we already advanced the PC after reading the instruction word
-                            cycles = 10;
-                        } else {
-                            cycles = 12;
-                        }
-                        pc += 2; // skip offset
-                        break;
-                    case 0xff: // 32 bit offset (NOT an M68000 addressing mode...)
-                        if (takeBranch)
-                        {
-                            pc += memLoadLong(pc) - 2; // -2because we already advanced the PC after reading the instruction word
-                            cycles = 12; // TODO: Wrong timing, find out 68020+ timings...
-                        } else {
-                            cycles = 10; // TODO: Wrong timing, find out 68020+ timings...
-                        }
-                        pc += 4;
-                        break;
-                    default:
-                        // 8-bit branch offset encoded in instruction itself
-                        if (takeBranch)
-                        {
-                            final int offset = ((instruction & 0xff) << 24) >> 24;
-                            pc += offset - 2; // -2 because we already advanced the PC after reading the instruction word
-                            cycles = 10;
-                        } else {
-                            cycles = 8;
-                        }
-                }
+                bcc(instruction);
                 return;
             /* ================================
              * MOVEQ
              * ================================
              */
             case 0b0111_0000_0000_0000:
-                value = instruction & 0xff;
-                value = (value<<24)>>24; // sign-extend
-                int register = (instruction & 0b0111_0000_0000) >> 8;
-                dataRegisters[register] = value;
-                updateFlagsAfterMove(1);
-                cycles = 4;
+                moveq(instruction);
                 return;
             /* ================================
              * OR/DIV/SBCD
@@ -1445,78 +1168,25 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 if ( ( instruction & 0b1111000111000000 ) == 0b1000000011000000 )
                 {
                     // DIVU_ENCODING
-                    final int dataReg = (instruction&0b111000000000)>>9;
-                    decodeSourceOperand(instruction,4,false);
-                    long a = dataRegisters[dataReg];
-                    a &= 0xffffffff;
-                    long b = value;
-                    b &= 0xffff;
-                    if ( b == 0 )
-                    {
-                        triggerIRQ(IRQ.INTEGER_DIVIDE_BY_ZERO,0);
-                        return;
-                    }
-                    long result = a/b;
-                    long remainder = a - (result*b);
-                    dataRegisters[dataReg] = (int) ( ((remainder & 0xffff)<<16) | (result & 0xffff) );
-                    final int clearMask = ~(CPU.FLAG_NEGATIVE|CPU.FLAG_ZERO|CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW);
-                    int setMask = 0;
-                    if ( result == 0 ) {
-                        setMask |= CPU.FLAG_ZERO;
-                    }
-                    if ( result < 0 || result > 0xffffffffL ) {
-                        setMask |= CPU.FLAG_OVERFLOW;
-                    }
-                    if ( (result & 1<<15)!=0) {
-                        setMask |= CPU.FLAG_NEGATIVE;
-                    }
-                    cycles += 140;
-                    statusRegister = (statusRegister & clearMask) | setMask;
+                    divu(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000111000000 ) == 0b1000000111000000 ) {
                     // DIVS_ENCODING
-                    final int dataReg = (instruction&0b111000000000)>>9;
-                    decodeSourceOperand(instruction,4,false);
-                    long a = dataRegisters[dataReg];
-                    long b = value;
-                    if ( b == 0 )
-                    {
-                        triggerIRQ(IRQ.INTEGER_DIVIDE_BY_ZERO,0);
-                        return;
-                    }
-                    long result = a/b;
-                    long remainder = a - (result*b);
-                    dataRegisters[dataReg] = (int) ( ((remainder & 0xffff)<<16) | (result & 0xffff) );
-                    final int clearMask = ~(CPU.FLAG_NEGATIVE|CPU.FLAG_ZERO|CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW);
-                    int setMask = 0;
-                    if ( result == 0 ) {
-                        setMask |= CPU.FLAG_ZERO;
-                    }
-                    if ( (result & 1<<15)!=0) {
-                        setMask |= CPU.FLAG_NEGATIVE;
-                    }
-                    final long masked = result & 0xffffffff_00000000L;
-                    if ( masked != 0 && masked != 0xffffffff_00000000L) {
-                        setMask |= CPU.FLAG_OVERFLOW;
-                    }
-                    cycles += 170;
-                    statusRegister = (statusRegister & clearMask) | setMask;
+                    divs(instruction);
                     return;
                 }
 
-
-
                 if ( ( instruction & 0b1111000100000000 ) == 0b1000000100000000 ) {
                     // OR Dn,<ea>
-                    binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.REGULAR);
+                    orDnEa(instruction);
                     return;
                 }
 
                 if ( ( instruction& 0b1111000100000000 ) == 0b1000000000000000 ) {
                     // OR <ea>,Dn
-                    binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.REGULAR);
+                    orEaDn(instruction);
                     return;
                 }
                 break;
@@ -1528,19 +1198,13 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
                 if ( ( instruction & 0b1111000111000000 ) == 0b1001000111000000 ) {
                     // SUBA.L <ea>,An
-                    decodeSourceOperand(instruction,4,false);
-                    final int dstReg = (instruction & 0b111000000000) >> 9;
-                    addressRegisters[dstReg] -= value;
-                    cycles += 8;
+                    subal(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000111000000 ) == 0b1001000011000000 ) {
                     // SUBA.W <ea>,An
-                    decodeSourceOperand(instruction,2,false);
-                    final int dstReg = (instruction & 0b111000000000) >> 9;
-                    addressRegisters[dstReg] -= value;
-                    cycles += 8;
+                    subaw(instruction);
                     return;
                 }
 
@@ -1548,99 +1212,14 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                     (instruction & 0b1111000100111000) == 0b1001000100000000)
                 {
                     // SUBX
-                    final int sizeBits = (instruction & 0b11000000) >> 6;
-                    final int operandSizeInBytes = 1<<sizeBits;
-                    final int srcReg = instruction & 0b111;
-                    final int dstReg = (instruction & 0b111000000000) >> 9;
-                    final boolean isDataRegister = (instruction & 1<<3) == 0;
-
-                    // load
-                    int srcValue;
-                    int dstValue;
-                    switch(operandSizeInBytes)
-                    {
-                        case 1:
-                            if ( isDataRegister ) {
-                                srcValue = (dataRegisters[ srcReg ] << 24) >> 24;
-                                dstValue = (dataRegisters[ dstReg ] << 24) >> 24;
-                            } else {
-                                addressRegisters[srcReg] -= 1;
-                                addressRegisters[dstReg] -= 1;
-                                srcValue = memory.readByte(addressRegisters[srcReg]);
-                                dstValue = memory.readByte(addressRegisters[dstReg]);
-                            }
-                            break;
-                        case 2:
-                            if ( isDataRegister ) {
-                                srcValue = (dataRegisters[ srcReg ] << 16) >> 16;
-                                dstValue = (dataRegisters[ dstReg ] << 16) >> 16;
-                            } else {
-                                addressRegisters[srcReg] -= 2;
-                                addressRegisters[dstReg] -= 2;
-                                srcValue = memory.readWord(addressRegisters[srcReg]);
-                                dstValue = memory.readWord(addressRegisters[dstReg]);
-                            }
-                            break;
-                        case 4:
-                            if ( isDataRegister ) {
-                                srcValue = dataRegisters[ srcReg ];
-                                dstValue = dataRegisters[ dstReg ];
-                            } else {
-                                addressRegisters[srcReg] -= 4;
-                                addressRegisters[dstReg] -= 4;
-                                srcValue = memory.readLong(addressRegisters[srcReg]);
-                                dstValue = memory.readLong(addressRegisters[dstReg]);
-                            }
-                            break;
-                        default:
-                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction );
-                    }
-                    final int carry = isExtended() ? 1 : 0;
-                    final int result = dstValue - srcValue - carry;
-                    // store
-                    switch(operandSizeInBytes)
-                    {
-                        case 1:
-                            if ( isDataRegister ) {
-                                dataRegisters[dstReg] = (dataRegisters[dstReg] & 0xffffff00) | (result & 0xff);
-                            } else {
-                                memory.writeByte(addressRegisters[dstReg],result);
-                            }
-                            break;
-                        case 2:
-                            if ( isDataRegister ) {
-                                dataRegisters[dstReg] = (dataRegisters[dstReg] & 0xffff0000) | (result & 0xffff);
-                            } else {
-                                memory.writeWord(addressRegisters[dstReg],result);
-                            }
-                            break;
-                        case 4:
-                            if ( isDataRegister ) {
-                                dataRegisters[dstReg] = result;
-                            } else {
-                                memory.writeLong(addressRegisters[dstReg],result);
-                            }
-                            break;
-                        default:
-                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction );
-                    }
-                    /*
-X — Set to the value of the carry bit.
-N — Set if the result is negative; cleared otherwise.
-Z — Cleared if the result is nonzero; unchanged otherwise.
-V — Set if an overflow occurs; cleared otherwise.
-C — Set if a borrow occurs; cleared otherwise.
-                     */
-                    updateFlags(srcValue,dstValue,result,operandSizeInBytes,CCOperation.SUBTRACTION,FLAG_EXTENDED|FLAG_NEGATIVE|FLAG_OVERFLOW|FLAG_CARRY);
-                    if ( result != 0 ) {
-                        statusRegister &= ~FLAG_ZERO;
-                    }
+                    subx(instruction);
                     return;
                 }
 
                 if ( (instruction & 0b1111000100000000) == 0b1001000000000000 ||
                      (instruction & 0b1111000100000000) == 0b1001000100000000)
                 {
+                    // SUB
                     sub(instruction);
                     return;
                 }
@@ -1659,32 +1238,7 @@ C — Set if a borrow occurs; cleared otherwise.
 
                 if ( ( instruction & 0b1111000100111000 ) == 0b1011000100001000 ) {
                     // CMPM
-                    final int srcRegNum = (instruction & 0b000000000111);
-                    final int dstRegNum = (instruction & 0b111000000000)>>9;
-                    final int sizeBits = (instruction&0b11000000)>>6;
-                    final int sizeInBytes = 1<<sizeBits;
-                    final int srcValue;
-                    final int dstValue;
-                    switch( sizeInBytes ) {
-                        case 1:
-                            srcValue = memory.readByte(addressRegisters[srcRegNum]);
-                            dstValue = memory.readByte(addressRegisters[dstRegNum]);
-                            break;
-                        case 2:
-                            srcValue = memory.readWord(addressRegisters[srcRegNum]);
-                            dstValue = memory.readWord(addressRegisters[dstRegNum]);
-                            break;
-                        case 4:
-                            srcValue = memory.readWord(addressRegisters[srcRegNum]);
-                            dstValue = memory.readWord(addressRegisters[dstRegNum]);
-                            break;
-                        default:
-                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction );
-                    }
-                    addressRegisters[srcRegNum] += sizeInBytes;
-                    addressRegisters[dstRegNum] += sizeInBytes;
-                    int result = dstValue - srcValue;
-                    updateFlags( srcValue, dstValue,result,sizeInBytes,CCOperation.SUBTRACTION,CPU.USERMODE_FLAGS_NO_X );
+                    cmpm(instruction);
                     return;
                 }
 
@@ -1692,53 +1246,20 @@ C — Set if a borrow occurs; cleared otherwise.
                      (instruction & 0b1111000111000000) == 0b1011000011000000)
                 {
                     // CMPA_WORD_ENCODING / CMPA_LONG_ENCODING
-                    final int dstReg = (instruction & 0b111000000000) >> 9;
-                    final boolean isWordOp = (instruction & 0b100000000) == 0;
-                    final int sizeInBytes = isWordOp ? 2 : 4;
-                    decodeSourceOperand(instruction,sizeInBytes,false);
-                    final int src = value;
-                    final int dst = addressRegisters[dstReg];
-                    final int result = dst - src;
-                    updateFlags(src,dst,result,4,CCOperation.SUBTRACTION,USERMODE_FLAGS_NO_X);
-                    cycles += 6;
+                    cmpa(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000100000000 ) == 0b1011000000000000 )
                 {
                     // CMP
-                    final int dstRegNum = (instruction & 0b111000000000)>>9;
-                    final int sizeBits = (instruction&0b11000000)>>6;
-                    final int sizeInBytes = 1<<sizeBits;
-                    decodeSourceOperand(instruction,sizeInBytes,false);
-                    final int srcValue = value;
-                    final int dstValue;
-                    switch(sizeInBytes) {
-                        case 1:
-                            dstValue = (dataRegisters[dstRegNum] << 24 )>>24;
-                            break;
-                        case 2:
-                            dstValue = (dataRegisters[dstRegNum] << 16 )>>16;
-                            break;
-                        case 4:
-                            dstValue = dataRegisters[dstRegNum];
-                            break;
-                        default:
-                            throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
-                    }
-                    final int result = dstValue - srcValue;
-                    updateFlags( srcValue, dstValue,result,sizeInBytes,CCOperation.SUBTRACTION,CPU.USERMODE_FLAGS_NO_X );
+                    cmp(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000100000000 ) == 0b1011000100000000 ) {
                     // EOR_DST_EA_ENCODING
-                    final int dataRegNum = (instruction&0b111000000000) >> 9;
-                    final int sizeInBytes= 1 << ( (instruction&0b11000000) >> 6);
-                    decodeSourceOperand(instruction, sizeInBytes,false,false);
-                    value = dataRegisters[dataRegNum] ^ value;
-                    storeValue((instruction&0b111000)>>3, instruction&0b111, sizeInBytes);
-                    updateFlagsAfterMove(sizeInBytes);
+                    eorDstEa(instruction);
                     return;
                 }
                 break;
@@ -1750,66 +1271,14 @@ C — Set if a borrow occurs; cleared otherwise.
 
                 if ( ( instruction & 0b1111000111000000 ) == 0b1100000111000000 ) {
                     // MULS_ENCODING
-                    final int dataReg = (instruction & 0b111_000000000) >> 9;
-                    decodeSourceOperand(instruction,2,false);
-
-                    int pattern = value & 0xffff;
-                    pattern <<= 1;
-
-                    int grpCount = 0;
-                    grpCount += (((pattern & 0b110000000000000000) == 0b100000000000000000) ||
-                            ((pattern & 0b110000000000000000) == 0b010000000000000000)) ? 1 : 0;
-                    grpCount += (((pattern & 0b001100000000000000) == 0b001000000000000000) ||
-                            ((pattern & 0b001100000000000000) == 0b000100000000000000)) ? 1 : 0;
-                    grpCount += (((pattern & 0b000011000000000000) == 0b000010000000000000) ||
-                            ((pattern & 0b000011000000000000) == 0b000001000000000000)) ? 1 : 0;
-                    grpCount += (((pattern & 0b000000110000000000) == 0b000000100000000000) ||
-                            ((pattern & 0b000000110000000000) == 0b000000010000000000)) ? 1 : 0;
-                    grpCount += (((pattern & 0b000000001100000000) == 0b000000001000000000) ||
-                            ((pattern & 0b000000001100000000) == 0b000000000100000000)) ? 1 : 0;
-                    grpCount += (((pattern & 0b000000000011000000) == 0b000000000010000000) ||
-                            ((pattern & 0b000000000011000000) == 0b000000000001000000)) ? 1 : 0;
-                    grpCount += (((pattern & 0b000000000000110000) == 0b000000000000100000) ||
-                            ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
-                    grpCount += (((pattern & 0b000000000000110000) == 0b000000000000100000) ||
-                            ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
-                    grpCount += (((pattern & 0b000000000000001100) == 0b000000000000001000) ||
-                            ((pattern & 0b000000000000001100) == 0b000000000000000100)) ? 1 : 0;
-                    grpCount += (((pattern & 0b000000000000000011) == 0b000000000000000010) ||
-                            ((pattern & 0b000000000000000011) == 0b000000000000000001)) ? 1 : 0;
-
-                    value *= ((dataRegisters[dataReg] << 16 ) >> 16); // sign-extend data register
-                    dataRegisters[dataReg] = value;
-                    int setMask = 0;
-                    if ( value == 0 ) {
-                        setMask |= FLAG_ZERO;
-                    } else if ( (value & 1<<31) != 0 ) {
-                        setMask |= FLAG_NEGATIVE;
-                    }
-                    final int clearMask = ~(FLAG_OVERFLOW | FLAG_NEGATIVE | FLAG_ZERO | FLAG_CARRY);
-                    statusRegister = (statusRegister & clearMask) | setMask;
-                    cycles+=(38+2*grpCount);
+                    muls(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000111000000 ) == 0b1100000011000000 )
                 {
                     // MULU_ENCODING
-                    final int dataReg = (instruction & 0b111_000000000) >> 9;
-                    decodeSourceOperand(instruction,2,false);
-                    value &= 0xffff; // decodeSourceOperand() always does sign extension but we're doing unsigned multiplication here...
-                    final int oneBitCnt = Integer.bitCount(value);
-                    value *= (dataRegisters[dataReg] & 0xffff);
-                    dataRegisters[dataReg] = value;
-                    int setMask = 0;
-                    if ( value == 0 ) {
-                        setMask |= FLAG_ZERO;
-                    } else if ( (value & 1<<31) != 0 ) {
-                        setMask |= FLAG_NEGATIVE;
-                    }
-                    final int clearMask = ~(FLAG_OVERFLOW | FLAG_NEGATIVE | FLAG_ZERO | FLAG_CARRY);
-                    statusRegister = (statusRegister & clearMask) | setMask;
-                    cycles+=(38+2*oneBitCnt);
+                    mulu(instruction);
                     return;
                 }
 
@@ -1818,31 +1287,7 @@ C — Set if a borrow occurs; cleared otherwise.
                 int masked = instruction & 0b1111000111111000;
                 if ( masked ==  0b1100000101000000 || masked == 0b1100000101001000 || masked == 0b1100000110001000 ) // EXG
                 {
-                    // hint: variable names are a bit misleading, only apply if EXG between different register types
-                    final int dataReg = (instruction & 0b111_000000000) >> 9;
-                    final int addressReg = instruction & 0b111;
-                    switch( instruction & 0b1111_1000 )
-                    {
-                        case 0b01000000: // swap Data registers
-                            int tmp = dataRegisters[ addressReg ];
-                            dataRegisters[ addressReg ] = dataRegisters[ dataReg ];
-                            dataRegisters[ dataReg ] = tmp;
-                            cycles = 6;
-                            return;
-                        case 0b01001000: // swap Address registers
-                            tmp = addressRegisters[ addressReg ];
-                            addressRegisters[ addressReg ] = addressRegisters[ dataReg ];
-                            addressRegisters[ dataReg ] = tmp;
-                            cycles = 6;
-                            return;
-                        case 0b10001000: // swap Data register and address register
-                            tmp = addressRegisters[ addressReg ];
-                            addressRegisters[ addressReg ] = dataRegisters[ dataReg ];
-                            dataRegisters[ dataReg ] = tmp;
-                            cycles = 6;
-                            return;
-                    }
-                    triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
+                    exg(instruction);
                     return;
                 }
 
@@ -1850,7 +1295,7 @@ C — Set if a borrow occurs; cleared otherwise.
                 if ( masked == 0b1100000000000000 || masked == 0b1100000100000000) {
                     // AND <ea>,Dn
                     // AND Dn,<ea>
-                    binaryLogicalOp(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.REGULAR);
+                    and(instruction);
                     return;
                 }
                 break;
@@ -1862,120 +1307,26 @@ C — Set if a borrow occurs; cleared otherwise.
 
                 if ( ( instruction & 0b1111000100111000 ) == 0b1101000100001000 ) {
                     // ADDX -(Ax),-(Ay)
-                    final int sizeBits = (instruction & 0b11000000) >> 6;
-                    int srcReg = instruction&0b111;
-                    int dstReg = (instruction&0b111000000000)>>9;
-                    final int srcValue;
-                    final int dstValue;
-                    switch( sizeBits )
-                    {
-                        case 0b00:
-                            addressRegisters[srcReg] -= 1;
-                            srcValue = memory.readByte( addressRegisters[srcReg] );
-                            addressRegisters[dstReg] -= 1;
-                            dstValue = memory.readByte( addressRegisters[dstReg] );
-                            cycles += 18;
-                            break;
-                        case 0b01:
-                            addressRegisters[srcReg] -= 2;
-                            srcValue = memory.readWord( addressRegisters[srcReg] );
-                            addressRegisters[dstReg] -= 2;
-                            dstValue = memory.readWord( addressRegisters[dstReg] );
-                            cycles += 18;
-                            break;
-                        case 0b10:
-                            addressRegisters[srcReg] -= 4;
-                            srcValue = memory.readLong( addressRegisters[srcReg] );
-                            addressRegisters[dstReg] -= 4;
-                            dstValue = memory.readLong( addressRegisters[dstReg] );
-                            cycles += 30;
-                            break;
-                        default:
-                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
-                    }
-                    int result = srcValue + dstValue + (isExtended() ? 1 : 0);
-
-                    updateFlags(srcValue,dstValue,result,1<<sizeBits,CCOperation.ADDITION,CPU.ALL_USERMODE_FLAGS);
-
-                    switch( sizeBits )
-                    {
-                        case 0b00:
-                            memory.writeByte( addressRegisters[dstReg], result );
-                            break;
-                        case 0b01:
-                            memory.writeWord( addressRegisters[dstReg], result );
-                            break;
-                        case 0b10:
-                            memory.writeLong( addressRegisters[dstReg], result );
-                            break;
-                        default:
-                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
-                    }
+                    addxPredecrement(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000100111000 ) == 0b1101000100000000 ) {
                     // ADDX Dx,Dy
-                    final int sizeBits = (instruction & 0b11000000) >> 6;
-                    int srcReg = instruction&0b111;
-                    int dstReg = (instruction&0b111000000000)>>9;
-                    final int srcValue;
-                    final int dstValue;
-                    switch( sizeBits )
-                    {
-                        case 0b00:
-                            srcValue = (dataRegisters[srcReg]<<24)>>24;
-                            dstValue = (dataRegisters[dstReg]<<24)>>24;
-                            cycles += 4;
-                            break;
-                        case 0b01:
-                            srcValue = (dataRegisters[srcReg]<<16)>>16;
-                            dstValue = (dataRegisters[dstReg]<<16)>>16;
-                            cycles += 4;
-                            break;
-                        case 0b10:
-                            srcValue = dataRegisters[srcReg];
-                            dstValue = dataRegisters[dstReg];
-                            cycles += 8;
-                            break;
-                        default:
-                            throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
-                    }
-                    int result = srcValue + dstValue + (isExtended() ? 1 : 0);
-
-                    updateFlags(srcValue,dstValue,result,1<<sizeBits,CCOperation.ADDITION,CPU.ALL_USERMODE_FLAGS);
-
-                    switch( sizeBits )
-                    {
-                        case 0b00:
-                            dataRegisters[dstReg] = (dataRegisters[dstReg] & ~0xff) | (result & 0xff);
-                            break;
-                        case 0b01:
-                            dataRegisters[dstReg] = (dataRegisters[dstReg] & ~0xffff) | (result & 0xffff);
-                            break;
-                        case 0b10:
-                            dataRegisters[dstReg] = result;
-                            break;
-                    }
+                    addxDataReg(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000111000000 ) == 0b1101000111000000 ) {
                     // ADDA_LONG_ENCODING
-                    decodeSourceOperand(instruction,4,false);
-                    final int dstReg = (instruction & 0b111000000000) >> 9;
-                    addressRegisters[dstReg] += value;
-                    cycles += 8;
+                    addal(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000111000000 ) == 0b1101000011000000 )
                 {
                     // ADDA_WORD_ENCODING
-                    decodeSourceOperand(instruction,2,false);
-                    final int dstReg = (instruction & 0b111000000000) >> 9;
-                    addressRegisters[dstReg] += value;
-                    cycles += 8;
+                    addaw(instruction);
                     return;
                 }
 
@@ -1984,68 +1335,7 @@ C — Set if a borrow occurs; cleared otherwise.
                 {
                     // ADD <ea>,Dx
                     // ADD Dx,<ea>
-                    int sizeBits = (instruction & 0b11000000) >> 6;
-                    int regNum = (instruction&0b111000000000)>>9;
-
-                    final int srcValue;
-                    final int dstValue;
-                    final boolean dstIsEa = (instruction & 1<<8) != 0;
-                    if (dstIsEa)
-                    {
-                        // Dn + <ea> -> <ea>
-                        switch(sizeBits)
-                        {
-                            case 0b00:
-                                srcValue = (dataRegisters[regNum]<<24)>>24;
-                                cycles += 8;
-                                break;
-                            case 0b01:
-                                srcValue = (dataRegisters[regNum]<<16)>>16;
-                                cycles += 8;
-                                break;
-                            case 0b10:
-                                srcValue = dataRegisters[regNum];
-                                cycles += 12;
-                                break;
-                            default:
-                                throw new RuntimeException("Unreachable code reached");
-                        }
-                        decodeSourceOperand(instruction,1<<sizeBits,false,false);
-                        dstValue = value;
-                    }
-                    else
-                    {
-                        // <ea> + Dn -> Dn
-                        decodeSourceOperand(instruction,1<<sizeBits,false);
-                        srcValue = value;
-                        switch(sizeBits)
-                        {
-                            case 0b00:
-                                dstValue = (dataRegisters[regNum]<<24)>>24;
-                                cycles += 4;
-                                break;
-                            case 0b01:
-                                dstValue = (dataRegisters[regNum]<<16)>>16;
-                                cycles += 4;
-                                break;
-                            case 0b10:
-                                dstValue = dataRegisters[regNum];
-                                cycles += 6;
-                                break;
-                            default:
-                                throw new RuntimeException("Unreachable code reached");
-                        }
-                    }
-                    final int result = srcValue + dstValue;
-                    value = result;
-
-                    updateFlags(srcValue,dstValue,result,1<<sizeBits,CCOperation.ADDITION,CPU.ALL_USERMODE_FLAGS);
-
-                    if ( dstIsEa ) {
-                        storeValue((instruction&0b111000)>>3,instruction&0b111,1<<sizeBits);
-                    } else {
-                        dataRegisters[regNum] = mergeValue(dataRegisters[regNum], result,1<<sizeBits);
-                    }
+                    add(instruction);
                     return;
                 }
 
@@ -2063,112 +1353,76 @@ C — Set if a borrow occurs; cleared otherwise.
                 if ( ( instruction & 0b1111000000111000 ) == 0b1110000000010000 )
                 {
                     // ROXL/ROXR IMMEDIATE
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    rotateImmediate(instruction,RotateMode.ROTATE_WITH_EXTEND,rotateLeft);
+                    roxImmediate(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000000111000 ) == 0b1110000000000000 )
                 {
                     // ASL/ASR IMMEDIATE
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    rotateImmediate(instruction,RotateMode.ARITHMETIC_SHIFT,rotateLeft);
+                    asImmediate(instruction);
                     return;
                 }
                 if ( ( instruction & 0b1111000000111000) ==  0b1110000000001000 ) // LSL/LSR
                 {
                     // LSL/LSR IMMEDIATE
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    rotateImmediate(instruction,RotateMode.LOGICAL_SHIFT,rotateLeft);
+                    lsImmediate(instruction);
                     return;
                 }
                 if ( ( instruction & 0b1111000000111000 ) == 0b1110000000011000 )
                 {
                     // ROL/ROR IMMEDIATE
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    rotateImmediate(instruction,RotateMode.ROTATE,rotateLeft);
+                    roImmediate(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111111011000000 ) == 0b1110010011000000 )
                 {
                     // ROXL/ROXR MEMORY
-                    int sizeBits = (instruction & 0b11000000) >> 6;
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    int eaMode     = (instruction & 0b111000) >> 3;
-                    int eaRegister = (instruction & 0b000111);
-                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
-                    int value = memLoadWord( ea );
-                    value = rotate( value,2,RotateMode.ROTATE_WITH_EXTEND,rotateLeft,1 );
-                    memory.writeWord(ea,value);
+                    roxMemory(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111111011000000 ) == 0b1110000011000000 ) {
                     // ASL/ASR MEMORY
-                    int sizeBits = (instruction & 0b11000000) >> 6;
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    int eaMode     = (instruction & 0b111000) >> 3;
-                    int eaRegister = (instruction & 0b000111);
-                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
-                    int value = memLoadWord( ea );
-                    value = rotate( value,2,RotateMode.ARITHMETIC_SHIFT,rotateLeft,1 );
-                    memory.writeWord(ea,value);
+                    asMemory(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111111011000000) == 0b1110001011000000 ) { // LSL/LSR
                     // LSL/LSR MEMORY
-                    int sizeBits = (instruction & 0b11000000) >> 6;
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    int eaMode     = (instruction & 0b111000) >> 3;
-                    int eaRegister = (instruction & 0b000111);
-                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
-                    int value = memLoadWord( ea );
-                    value = rotate( value,2,RotateMode.LOGICAL_SHIFT,rotateLeft,1 );
-                    memory.writeWord(ea,value);
+                    lsMemory(instruction);
                     return;
                 }
                 if ( ( instruction & 0b1111111001000000) == 0b1110011001000000 ) {
                     // ROL/ROR MEMORY
-                    int sizeBits = (instruction & 0b11000000) >> 6;
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    int eaMode     = (instruction & 0b111000) >> 3;
-                    int eaRegister = (instruction & 0b000111);
-                    calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
-                    int value = memLoadWord( ea );
-                    value = rotate( value,2,RotateMode.ROTATE,rotateLeft,1 );
-                    memory.writeWord(ea,value);
+                    roMemory(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000000111000 ) == 0b1110000000110000 )
                 {
                     // ROXL/ROXR REGISTER
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    rotateRegister(instruction,RotateMode.ROTATE_WITH_EXTEND,rotateLeft);
+                    roxRegister(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000000111000 ) == 0b1110000000100000 )
                 {
                     // ASL/ASR REGISTER
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    rotateRegister(instruction,RotateMode.ARITHMETIC_SHIFT,rotateLeft);
+                    asRegister(instruction);
                     return;
                 }
                 if ( ( instruction & 0b1111000000111000) == 0b1110000000101000) { // LSL/LSR
                     // LSL/LSR REGISTER
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    rotateRegister(instruction,RotateMode.LOGICAL_SHIFT,rotateLeft);
+                    lsRegister(instruction);
                     return;
                 }
 
                 if ( ( instruction & 0b1111000000111000) == 0b1110000000111000)
                 {
                     // ROL/ROR REGISTER
-                    final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
-                    rotateRegister(instruction,RotateMode.ROTATE,rotateLeft);
+                    roRegister(instruction);
                     return;
                 }
                 break;
@@ -3714,11 +2968,8 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void sub(int instruction) {
+        // SUB
         sub(instruction,false);
-    }
-
-    private void cmp(int instruction) {
-        sub(instruction,true);
     }
 
     private void sub(int instruction,boolean isCompareInsn)
@@ -4168,6 +3419,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void moveFromSR(int instruction) {
+        // MOVE_FROM_SR_ENCODING
         if ( assertSupervisorMode() )
         {
             value = statusRegister;
@@ -4177,6 +3429,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void moveToSR(int instruction) {
+        // MOVE_TO_SR_ENCODING
         if ( assertSupervisorMode() )
         {
             decodeSourceOperand( instruction,2,false );
@@ -4186,6 +3439,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void not(int instruction) {
+        // NOT
         final int sizeBits = (instruction &0b11000000) >> 6;
         final int eaMode = (instruction&0b111000) >> 3;
         final int eaRegister = (instruction&0b111);
@@ -4201,6 +3455,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         updateFlagsAfterTST( operandSize );
     }
     private void tas(int instruction) {
+        // TAS
         if ( decodeSourceOperand( instruction,1,false,false ) ) {
             cycles += 4; // register operation
         } else {
@@ -4221,6 +3476,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void tst(int instruction) {
+        // TST
         final int operandSize = 1 << ((instruction & 0b11000000) >>> 6);
         decodeSourceOperand( instruction,operandSize,false);
 
@@ -4228,6 +3484,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         cycles += 4;
     }
     private void clr(int instruction) {
+        // CLR
         int eaMode = (instruction & 0b111000)>>>3;
         int eaRegister  = (instruction & 0b111);
         final int operandSize =  1 << ((instruction & 0b11000000) >>> 6);
@@ -4247,6 +3504,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void extLong(int instruction) {
+        // EXT Word -> Long
         final int regNum = instruction & 0b111;
         final int value = ( dataRegisters[regNum]  << 16) >> 16;
         dataRegisters[regNum] = value;
@@ -4261,6 +3519,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void extWord(int instruction) {
+        // EXT Byte -> Word
         final int regNum = instruction & 0b111;
         final int input = ( dataRegisters[regNum]  << 24) >> 24;
         int setMask = 0;
@@ -4273,4 +3532,1026 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         dataRegisters[regNum] = (dataRegisters[regNum] & 0xffff0000) | (input & 0xffff);
         cycles += 4;
     }
+
+    private void moveToCCR(int instruction) {
+        // MOVE_TO_CCR_ENCODING
+        decodeSourceOperand(instruction,2,false);
+        System.out.println("Move To CCR: "+value);
+        statusRegister = (statusRegister & ~0b11111) | (value & 0b11111);
+        // TODO: cycle count??
+    }
+
+    private void movemFromRegisters(int instruction) {
+        // MOVEM_FROM_REGISTERS_ENCODING
+        moveMultipleRegisters(instruction,true);
+    }
+
+    private void movemToRegisters(int instruction) {
+        // MOVEM_TO_REGISTERS_ENCODING
+        moveMultipleRegisters(instruction,false);
+    }
+
+    private void unlink(int instruction) {
+        // UNLK
+        final int regNum = (instruction & 0b111);
+        addressRegisters[ 7 ] = addressRegisters[regNum];
+        addressRegisters[regNum] = popLong();
+        cycles = 12;
+    }
+
+    private void link(int instruction) {
+        // LINK
+        final int regNum = (instruction & 0b111);
+        final int displacement = memLoadWord(pc);
+        pc += 2;
+        pushLong( addressRegisters[ regNum ] );
+        addressRegisters[ regNum ] = addressRegisters[ 7 ];
+        addressRegisters[7] += displacement; // TODO: Is the displacement in bytes or words ??? Stack pointer always needs to point to an even address....
+        cycles = 16;
+    }
+
+    private void jsr(int instruction) {
+        // JSR
+        decodeSourceOperand(instruction,4,true);
+        pushLong(pc);
+        cycles += 4; // TODO: Timing correct ?
+        pc = ea;
+    }
+
+    private void swap(int instruction) {
+        // SWAP
+        final int regNum = (instruction & 0b111);
+        int result = (dataRegisters[regNum] << 16) | (dataRegisters[regNum] >>> 16);
+        dataRegisters[regNum] = result;
+        /* N — Set if the most significant bit of the 32-bit result is set; cleared otherwise.
+         * Z — Set if the 32-bit result is zero; cleared otherwise.
+         * V — Always cleared.
+         * C — Always cleared. */
+        int flagsToSet = 0;
+        if ( result == 0 ) {
+            flagsToSet |= FLAG_ZERO;
+        }
+        if ( (result & 1<<31) != 0 ) {
+            flagsToSet |= FLAG_NEGATIVE;
+        }
+        this.statusRegister = (statusRegister & ~(FLAG_OVERFLOW | FLAG_CARRY | FLAG_ZERO | FLAG_NEGATIVE) ) | flagsToSet;
+    }
+
+    private void neg(int instruction)
+    {
+        // NEG
+        final int sizeBits = (instruction & 0b11000000) >>> 6;
+        final int operandSize = 1<<sizeBits;
+        if ( decodeSourceOperand(instruction,operandSize,false) )
+        {
+            // operand is register
+            cycles += (operandSize <= 2) ? 4 : 6;
+        } else {
+            // operand is memory
+            cycles += (operandSize <= 2) ? 8 : 12;
+        }
+        final int b = value;
+        value = 0 - value;
+        int eaMode     = (instruction & 0b111000) >> 3;
+        int eaRegister = (instruction & 0b000111);
+        storeValue(eaMode,eaRegister,operandSize);
+        int setMask=0;
+        switch(operandSize) {
+            case 1: setMask = isOverflow8Bit( 0,b,value ) ? FLAG_OVERFLOW : 0; break;
+            case 2: setMask = isOverflow16Bit( 0,b,value ) ? FLAG_OVERFLOW : 0; break;
+            case 4: setMask = isOverflow32Bit( 0,b,value ) ? FLAG_OVERFLOW : 0; break;
+        }
+        if ( value < 0 ) {
+            setMask |= FLAG_NEGATIVE | FLAG_CARRY | FLAG_EXTENDED;
+        } else if ( value == 0 ) {
+            setMask |= FLAG_ZERO;
+        } else {
+            setMask |= FLAG_CARRY | FLAG_EXTENDED;
+        }
+        statusRegister = (statusRegister & 0xff00) | setMask;
+    }
+
+    private void moveUSP(int instruction) {
+        // MOVE Ax,USP / MOVE USP,Ax
+        if ( assertSupervisorMode() )
+        {
+            final int regNum = instruction & 0b111;
+            if ((instruction & 1 << 3) == 0) // check transfer direction
+            {
+                userModeStackPtr = addressRegisters[ regNum ]; // address register -> USP
+            }
+            else
+            {
+                addressRegisters[ regNum ] = userModeStackPtr; // USP -> address register
+            }
+        }
+        cycles = 4;
+    }
+
+    private void trap(int instruction) {
+        // TRAP #xx
+        triggerIRQ(IRQ.userTrapToIRQ( instruction & 0b1111 ),0);
+        cycles = 38;
+    }
+
+    private void lea(int instruction) {
+        // LEA
+        decodeSourceOperand(instruction,4,true);
+        final int dstAdrReg = (instruction & 0b1110_0000_0000) >> 9;
+
+        addressRegisters[dstAdrReg] = ea;
+        // TODO: Cycle timing correct ??
+    }
+
+    private void jmp(int instruction)
+    {
+        // JMP
+        decodeSourceOperand(instruction,4,true);
+        pc = ea;
+        cycles += 4; // TODO: Timing correct?
+    }
+
+    private void pea(int instruction) {
+        // PEA
+        decodeSourceOperand( instruction,4,true );
+        pushLong( value );
+    }
+
+    private void negx(int instruction) {
+        // NEGX
+        final int sizeBits = (instruction &0b11000000) >> 6;
+        final int eaMode = (instruction&0b111000) >> 3;
+        final int eaRegister = (instruction&0b111);
+        final int operandSize = 1 << sizeBits;
+        decodeSourceOperand(instruction,operandSize,false,false);
+        final int srcValue = value;
+        final int dstValue = 0;
+        final int result = dstValue - srcValue - (isExtended() ? 1 : 0);
+        value = result;
+        updateFlags(srcValue,dstValue,result,operandSize,CCOperation.SUBTRACTION,FLAG_EXTENDED|FLAG_NEGATIVE|FLAG_OVERFLOW|FLAG_CARRY);
+        if ( result != 0 ) {
+            statusRegister &= ~CPU.FLAG_ZERO;
+        }
+        storeValue(eaMode,eaRegister,operandSize);
+    }
+
+    private void chk(int instruction)
+    {
+        // CHK_ENCODING
+        int sizeBits = (instruction & 0b110000000) >>> 7;
+        final int operandSize; // non-standard operand size encoding...
+        int regNum = (instruction & 0b111000000000) >>> 9;
+        int regValue = dataRegisters[regNum];
+        switch( sizeBits )
+        {
+            case 0b11:
+                operandSize = 2;
+                break;
+            case 0b10:
+                if ( cpuType.isCompatibleWith(CPUType.M68020) )
+                {
+                    operandSize = 4;
+                    break;
+                }
+                // $$FALL-THROUGH$$
+            default:
+                throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
+        }
+        decodeSourceOperand( instruction,operandSize,false );
+
+        // compare
+        final boolean lowerBoundViolated = regValue < 0;
+        final boolean upperBoundViolated = regValue > value;
+        final boolean outOfBounds = lowerBoundViolated | upperBoundViolated;
+        if ( outOfBounds ) {
+            if ( lowerBoundViolated ) {
+                statusRegister |= FLAG_NEGATIVE;
+            } else {
+                statusRegister &= ~FLAG_NEGATIVE;
+            }
+            triggerIRQ(IRQ.CHK_CHK2,0);
+        }
+    }
+
+    private void dbcc(int instruction) {
+        // DBcc
+        final int cc = (instruction & 0b0000111100000000) >> 8;
+        if ( ! Condition.isTrue(this,cc ) )
+        {
+            // condition is false, decrement data register lower 16 bits
+            final int regNum = instruction & 0b111;
+            final int regVal = dataRegisters[regNum];
+            int newValue = ( (regVal & 0xffff) - 1 ) & 0xffff;
+            dataRegisters[ regNum ] = (regVal & 0xffff0000) | newValue;
+            if ( newValue != 0xffff ) {
+                /*
+                 * - If the result is – 1, execution continues with the next instruction.
+                 * - If the result is not equal to – 1, execution continues at the location indicated RAy the current value of the program
+                 *   counter plus the sign-extended 16-bit displacement. The value in the program counter is
+                 *   the address of the instruction word of the DBcc instruction plus two. The
+                 */
+                pc = pc + memory.readWordNoCheck(pc);
+                cycles = 10;
+                return;
+            } else {
+                cycles = 14;
+            }
+        } else {
+            cycles = 12;
+        }
+        pc += 2; // skip branch offset
+    }
+
+    private void scc(int instruction) {
+        // SCC
+        final int cc = (instruction & 0b0000111100000000) >> 8;
+        final int eaMode = (instruction & 0b111000) >> 3;
+        final int eaRegister = (instruction & 0b111);
+        value = Condition.isTrue(this,cc ) ? 0xff : 0x00;
+        storeValue(eaMode,eaRegister,1);
+   }
+
+   private void addq(int instruction) {
+       // ADDQ_ENCODING
+       final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
+       switch(operandSizeInBytes) {
+           case 1:
+           case 2:
+               cycles += 4;
+               break;
+           case 4:
+               cycles += 6;
+               break;
+           default:
+               throw new RuntimeException("Unreachable code reached");
+       }
+       final int eaMode = (instruction & 0b111000) >> 3;
+       final int eaRegister = instruction & 0b111;
+       final boolean dstIsAddressRegister = eaMode == AddressingMode.ADDRESS_REGISTER_DIRECT.eaModeField;
+
+       int srcValue = (instruction& 0b111000000000) >> 9;
+       if ( srcValue == 0 ) {
+           srcValue = 8;
+       }
+
+       decodeSourceOperand(instruction,operandSizeInBytes,false,false);
+       final int dstValue = value;
+
+       value += srcValue;
+
+       storeValue(eaMode, eaRegister, operandSizeInBytes);
+
+       if ( ! dstIsAddressRegister )
+       {
+           updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.ADDITION, CPU.ALL_USERMODE_FLAGS);
+       }
+   }
+
+   private void subq(int instruction) {
+       // SUBQ_ENCODING
+       final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
+       switch(operandSizeInBytes) {
+           case 1:
+           case 2:
+               cycles += 4;
+               break;
+           case 4:
+               cycles += 6;
+               break;
+           default:
+               throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
+       }
+       final int eaMode = (instruction & 0b111000) >> 3;
+       final int eaRegister = instruction & 0b111;
+       final boolean dstIsAddressRegister = eaMode == AddressingMode.ADDRESS_REGISTER_DIRECT.eaModeField;
+
+       int srcValue = (instruction& 0b111000000000) >> 9;
+       if ( srcValue == 0 ) {
+           srcValue = 8;
+       }
+       decodeSourceOperand(instruction,operandSizeInBytes,false,false);
+       final int dstValue = value;
+
+       value -= srcValue;
+
+       storeValue(eaMode, eaRegister, operandSizeInBytes);
+
+       if ( ! dstIsAddressRegister )
+       {
+           updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
+       }
+   }
+
+   private void bcc(int instruction) {
+       // BRA/Bcc/BSR
+       final int cc = (instruction & 0b0000111100000000) >> 8;
+       if ( cc == Condition.BSR.bits )
+       {
+           switch (instruction & 0xff)
+           {
+               case 0x00: // 16 bit offset
+                   pushLong( pc+2 );
+                   pc += memLoadWord(pc)-2; // -2 because we already advanced the PC after reading the instruction word
+                   cycles = 18;
+                   return;
+               case 0xff: // 32 bit offset
+                   if ( cpuType.isNotCompatibleWith( CPUType.M68020 ) )
+                   {
+                       break;
+                   }
+                   pushLong( pc+4 );
+                   pc += memLoadLong( pc )-2; // -2because we already advanced the PC after reading the instruction word
+                   cycles = 24; // TODO: Wrong timing, find out 68020+ timings...
+                   return;
+               default:
+                   // 8-bit branch offset encoded in instruction itself
+                   pushLong( pc );
+                   final int offset = ((instruction & 0xff) << 24) >> 24;
+                   pc += offset - 2; // -2 because we already advanced the PC after reading the instruction word
+                   cycles = 18;
+                   return;
+           }
+           throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
+       }
+       final boolean takeBranch = Condition.isTrue(this, cc);
+       switch (instruction & 0xff)
+       {
+           case 0x00: // 16 bit offset
+               if (takeBranch)
+               {
+                   pc += memLoadWord(pc) - 2; // -2 because we already advanced the PC after reading the instruction word
+                   cycles = 10;
+               } else {
+                   cycles = 12;
+               }
+               pc += 2; // skip offset
+               break;
+           case 0xff: // 32 bit offset (NOT an M68000 addressing mode...)
+               if (takeBranch)
+               {
+                   pc += memLoadLong(pc) - 2; // -2because we already advanced the PC after reading the instruction word
+                   cycles = 12; // TODO: Wrong timing, find out 68020+ timings...
+               } else {
+                   cycles = 10; // TODO: Wrong timing, find out 68020+ timings...
+               }
+               pc += 4;
+               break;
+           default:
+               // 8-bit branch offset encoded in instruction itself
+               if (takeBranch)
+               {
+                   final int offset = ((instruction & 0xff) << 24) >> 24;
+                   pc += offset - 2; // -2 because we already advanced the PC after reading the instruction word
+                   cycles = 10;
+               } else {
+                   cycles = 8;
+               }
+       }
+   }
+
+   private void moveq(int instruction) {
+        // MOVEQ
+       value = instruction & 0xff;
+       value = (value<<24)>>24; // sign-extend
+       int register = (instruction & 0b0111_0000_0000) >> 8;
+       dataRegisters[register] = value;
+       updateFlagsAfterMove(1);
+       cycles = 4;
+   }
+
+   private void divu(int instruction) {
+       // DIVU_ENCODING
+       final int dataReg = (instruction&0b111000000000)>>9;
+       decodeSourceOperand(instruction,4,false);
+       long a = dataRegisters[dataReg];
+       a &= 0xffffffff;
+       long b = value;
+       b &= 0xffff;
+       if ( b == 0 )
+       {
+           triggerIRQ(IRQ.INTEGER_DIVIDE_BY_ZERO,0);
+           return;
+       }
+       long result = a/b;
+       long remainder = a - (result*b);
+       dataRegisters[dataReg] = (int) ( ((remainder & 0xffff)<<16) | (result & 0xffff) );
+       final int clearMask = ~(CPU.FLAG_NEGATIVE|CPU.FLAG_ZERO|CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW);
+       int setMask = 0;
+       if ( result == 0 ) {
+           setMask |= CPU.FLAG_ZERO;
+       }
+       if ( result < 0 || result > 0xffffffffL ) {
+           setMask |= CPU.FLAG_OVERFLOW;
+       }
+       if ( (result & 1<<15)!=0) {
+           setMask |= CPU.FLAG_NEGATIVE;
+       }
+       cycles += 140;
+       statusRegister = (statusRegister & clearMask) | setMask;
+   }
+
+   private void divs(int instruction) {
+       // DIVS_ENCODING
+       final int dataReg = (instruction&0b111000000000)>>9;
+       decodeSourceOperand(instruction,4,false);
+       long a = dataRegisters[dataReg];
+       long b = value;
+       if ( b == 0 )
+       {
+           triggerIRQ(IRQ.INTEGER_DIVIDE_BY_ZERO,0);
+           return;
+       }
+       long result = a/b;
+       long remainder = a - (result*b);
+       dataRegisters[dataReg] = (int) ( ((remainder & 0xffff)<<16) | (result & 0xffff) );
+       final int clearMask = ~(CPU.FLAG_NEGATIVE|CPU.FLAG_ZERO|CPU.FLAG_CARRY|CPU.FLAG_OVERFLOW);
+       int setMask = 0;
+       if ( result == 0 ) {
+           setMask |= CPU.FLAG_ZERO;
+       }
+       if ( (result & 1<<15)!=0) {
+           setMask |= CPU.FLAG_NEGATIVE;
+       }
+       final long masked = result & 0xffffffff_00000000L;
+       if ( masked != 0 && masked != 0xffffffff_00000000L) {
+           setMask |= CPU.FLAG_OVERFLOW;
+       }
+       cycles += 170;
+       statusRegister = (statusRegister & clearMask) | setMask;
+   }
+
+   private void orDnEa(int instruction) {
+       // OR Dn,<ea>
+       binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.REGULAR);
+   }
+
+    private void orEaDn(int instruction) {
+        // OR <ea>,Dn
+        binaryLogicalOp(instruction,BinaryLogicalOp.OR,BinaryLogicalOpMode.REGULAR);
+    }
+
+    private void subal(int instruction) {
+        // SUBA.L <ea>,An
+        decodeSourceOperand(instruction,4,false);
+        final int dstReg = (instruction & 0b111000000000) >> 9;
+        addressRegisters[dstReg] -= value;
+        cycles += 8;
+    }
+
+    private void subaw(int instruction) {
+        // SUBA.W <ea>,An
+        decodeSourceOperand(instruction,2,false);
+        final int dstReg = (instruction & 0b111000000000) >> 9;
+        addressRegisters[dstReg] -= value;
+        cycles += 8;
+    }
+
+    private void subx(int instruction) {
+        // SUBX
+        final int sizeBits = (instruction & 0b11000000) >> 6;
+        final int operandSizeInBytes = 1<<sizeBits;
+        final int srcReg = instruction & 0b111;
+        final int dstReg = (instruction & 0b111000000000) >> 9;
+        final boolean isDataRegister = (instruction & 1<<3) == 0;
+
+        // load
+        int srcValue;
+        int dstValue;
+        switch(operandSizeInBytes)
+        {
+            case 1:
+                if ( isDataRegister ) {
+                    srcValue = (dataRegisters[ srcReg ] << 24) >> 24;
+                    dstValue = (dataRegisters[ dstReg ] << 24) >> 24;
+                } else {
+                    addressRegisters[srcReg] -= 1;
+                    addressRegisters[dstReg] -= 1;
+                    srcValue = memory.readByte(addressRegisters[srcReg]);
+                    dstValue = memory.readByte(addressRegisters[dstReg]);
+                }
+                break;
+            case 2:
+                if ( isDataRegister ) {
+                    srcValue = (dataRegisters[ srcReg ] << 16) >> 16;
+                    dstValue = (dataRegisters[ dstReg ] << 16) >> 16;
+                } else {
+                    addressRegisters[srcReg] -= 2;
+                    addressRegisters[dstReg] -= 2;
+                    srcValue = memory.readWord(addressRegisters[srcReg]);
+                    dstValue = memory.readWord(addressRegisters[dstReg]);
+                }
+                break;
+            case 4:
+                if ( isDataRegister ) {
+                    srcValue = dataRegisters[ srcReg ];
+                    dstValue = dataRegisters[ dstReg ];
+                } else {
+                    addressRegisters[srcReg] -= 4;
+                    addressRegisters[dstReg] -= 4;
+                    srcValue = memory.readLong(addressRegisters[srcReg]);
+                    dstValue = memory.readLong(addressRegisters[dstReg]);
+                }
+                break;
+            default:
+                throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction );
+        }
+        final int carry = isExtended() ? 1 : 0;
+        final int result = dstValue - srcValue - carry;
+        // store
+        switch(operandSizeInBytes)
+        {
+            case 1:
+                if ( isDataRegister ) {
+                    dataRegisters[dstReg] = (dataRegisters[dstReg] & 0xffffff00) | (result & 0xff);
+                } else {
+                    memory.writeByte(addressRegisters[dstReg],result);
+                }
+                break;
+            case 2:
+                if ( isDataRegister ) {
+                    dataRegisters[dstReg] = (dataRegisters[dstReg] & 0xffff0000) | (result & 0xffff);
+                } else {
+                    memory.writeWord(addressRegisters[dstReg],result);
+                }
+                break;
+            case 4:
+                if ( isDataRegister ) {
+                    dataRegisters[dstReg] = result;
+                } else {
+                    memory.writeLong(addressRegisters[dstReg],result);
+                }
+                break;
+            default:
+                throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction );
+        }
+                    /*
+X — Set to the value of the carry bit.
+N — Set if the result is negative; cleared otherwise.
+Z — Cleared if the result is nonzero; unchanged otherwise.
+V — Set if an overflow occurs; cleared otherwise.
+C — Set if a borrow occurs; cleared otherwise.
+                     */
+        updateFlags(srcValue,dstValue,result,operandSizeInBytes,CCOperation.SUBTRACTION,FLAG_EXTENDED|FLAG_NEGATIVE|FLAG_OVERFLOW|FLAG_CARRY);
+        if ( result != 0 ) {
+            statusRegister &= ~FLAG_ZERO;
+        }
+    }
+
+    private void cmpm(int instruction) {
+        // CMPM
+        final int srcRegNum = (instruction & 0b000000000111);
+        final int dstRegNum = (instruction & 0b111000000000)>>9;
+        final int sizeBits = (instruction&0b11000000)>>6;
+        final int sizeInBytes = 1<<sizeBits;
+        final int srcValue;
+        final int dstValue;
+        switch( sizeInBytes ) {
+            case 1:
+                srcValue = memory.readByte(addressRegisters[srcRegNum]);
+                dstValue = memory.readByte(addressRegisters[dstRegNum]);
+                break;
+            case 2:
+                srcValue = memory.readWord(addressRegisters[srcRegNum]);
+                dstValue = memory.readWord(addressRegisters[dstRegNum]);
+                break;
+            case 4:
+                srcValue = memory.readWord(addressRegisters[srcRegNum]);
+                dstValue = memory.readWord(addressRegisters[dstRegNum]);
+                break;
+            default:
+                throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction );
+        }
+        addressRegisters[srcRegNum] += sizeInBytes;
+        addressRegisters[dstRegNum] += sizeInBytes;
+        int result = dstValue - srcValue;
+        updateFlags( srcValue, dstValue,result,sizeInBytes,CCOperation.SUBTRACTION,CPU.USERMODE_FLAGS_NO_X );
+    }
+
+    private void cmpa(int instruction) {
+        // CMPA_WORD_ENCODING / CMPA_LONG_ENCODING
+        final int dstReg = (instruction & 0b111000000000) >> 9;
+        final boolean isWordOp = (instruction & 0b100000000) == 0;
+        final int sizeInBytes = isWordOp ? 2 : 4;
+        decodeSourceOperand(instruction,sizeInBytes,false);
+        final int src = value;
+        final int dst = addressRegisters[dstReg];
+        final int result = dst - src;
+        updateFlags(src,dst,result,4,CCOperation.SUBTRACTION,USERMODE_FLAGS_NO_X);
+        cycles += 6;
+    }
+
+//    private void cmp(int instruction) {
+//        // CMP
+//        sub(instruction,true);
+//    }
+
+    private void cmp(int instruction)
+    {
+        final int dstRegNum = (instruction & 0b111000000000)>>9;
+        final int sizeBits = (instruction&0b11000000)>>6;
+        final int sizeInBytes = 1<<sizeBits;
+        decodeSourceOperand(instruction,sizeInBytes,false);
+        final int srcValue = value;
+        final int dstValue;
+        switch(sizeInBytes) {
+            case 1:
+                dstValue = (dataRegisters[dstRegNum] << 24 )>>24;
+                break;
+            case 2:
+                dstValue = (dataRegisters[dstRegNum] << 16 )>>16;
+                break;
+            case 4:
+                dstValue = dataRegisters[dstRegNum];
+                break;
+            default:
+                throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
+        }
+        final int result = dstValue - srcValue;
+        updateFlags( srcValue, dstValue,result,sizeInBytes,CCOperation.SUBTRACTION,CPU.USERMODE_FLAGS_NO_X );
+    }
+
+    private void eorDstEa(int instruction) {
+        // EOR_DST_EA_ENCODING
+        final int dataRegNum = (instruction&0b111000000000) >> 9;
+        final int sizeInBytes= 1 << ( (instruction&0b11000000) >> 6);
+        decodeSourceOperand(instruction, sizeInBytes,false,false);
+        value = dataRegisters[dataRegNum] ^ value;
+        storeValue((instruction&0b111000)>>3, instruction&0b111, sizeInBytes);
+        updateFlagsAfterMove(sizeInBytes);
+    }
+
+    private void muls(int instruction) {
+        // MULS_ENCODING
+        final int dataReg = (instruction & 0b111_000000000) >> 9;
+        decodeSourceOperand(instruction,2,false);
+
+        int pattern = value & 0xffff;
+        pattern <<= 1;
+
+        int grpCount = 0;
+        grpCount += (((pattern & 0b110000000000000000) == 0b100000000000000000) ||
+            ((pattern & 0b110000000000000000) == 0b010000000000000000)) ? 1 : 0;
+        grpCount += (((pattern & 0b001100000000000000) == 0b001000000000000000) ||
+            ((pattern & 0b001100000000000000) == 0b000100000000000000)) ? 1 : 0;
+        grpCount += (((pattern & 0b000011000000000000) == 0b000010000000000000) ||
+            ((pattern & 0b000011000000000000) == 0b000001000000000000)) ? 1 : 0;
+        grpCount += (((pattern & 0b000000110000000000) == 0b000000100000000000) ||
+            ((pattern & 0b000000110000000000) == 0b000000010000000000)) ? 1 : 0;
+        grpCount += (((pattern & 0b000000001100000000) == 0b000000001000000000) ||
+            ((pattern & 0b000000001100000000) == 0b000000000100000000)) ? 1 : 0;
+        grpCount += (((pattern & 0b000000000011000000) == 0b000000000010000000) ||
+            ((pattern & 0b000000000011000000) == 0b000000000001000000)) ? 1 : 0;
+        grpCount += (((pattern & 0b000000000000110000) == 0b000000000000100000) ||
+            ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
+        grpCount += (((pattern & 0b000000000000110000) == 0b000000000000100000) ||
+            ((pattern & 0b000000000000110000) == 0b000000000000010000)) ? 1 : 0;
+        grpCount += (((pattern & 0b000000000000001100) == 0b000000000000001000) ||
+            ((pattern & 0b000000000000001100) == 0b000000000000000100)) ? 1 : 0;
+        grpCount += (((pattern & 0b000000000000000011) == 0b000000000000000010) ||
+            ((pattern & 0b000000000000000011) == 0b000000000000000001)) ? 1 : 0;
+
+        value *= ((dataRegisters[dataReg] << 16 ) >> 16); // sign-extend data register
+        dataRegisters[dataReg] = value;
+        int setMask = 0;
+        if ( value == 0 ) {
+            setMask |= FLAG_ZERO;
+        } else if ( (value & 1<<31) != 0 ) {
+            setMask |= FLAG_NEGATIVE;
+        }
+        final int clearMask = ~(FLAG_OVERFLOW | FLAG_NEGATIVE | FLAG_ZERO | FLAG_CARRY);
+        statusRegister = (statusRegister & clearMask) | setMask;
+        cycles+=(38+2*grpCount);
+    }
+
+    private void mulu(int instruction) {
+        // MULU_ENCODING
+        final int dataReg = (instruction & 0b111_000000000) >> 9;
+        decodeSourceOperand(instruction,2,false);
+        value &= 0xffff; // decodeSourceOperand() always does sign extension but we're doing unsigned multiplication here...
+        final int oneBitCnt = Integer.bitCount(value);
+        value *= (dataRegisters[dataReg] & 0xffff);
+        dataRegisters[dataReg] = value;
+        int setMask = 0;
+        if ( value == 0 ) {
+            setMask |= FLAG_ZERO;
+        } else if ( (value & 1<<31) != 0 ) {
+            setMask |= FLAG_NEGATIVE;
+        }
+        final int clearMask = ~(FLAG_OVERFLOW | FLAG_NEGATIVE | FLAG_ZERO | FLAG_CARRY);
+        statusRegister = (statusRegister & clearMask) | setMask;
+        cycles+=(38+2*oneBitCnt);
+    }
+
+    private void exg(int instruction) {
+        // EXG
+        // hint: variable names are a bit misleading, only apply if EXG between different register types
+        final int dataReg = (instruction & 0b111_000000000) >> 9;
+        final int addressReg = instruction & 0b111;
+        switch( instruction & 0b1111_1000 )
+        {
+            case 0b01000000: // swap Data registers
+                int tmp = dataRegisters[ addressReg ];
+                dataRegisters[ addressReg ] = dataRegisters[ dataReg ];
+                dataRegisters[ dataReg ] = tmp;
+                cycles = 6;
+                return;
+            case 0b01001000: // swap Address registers
+                tmp = addressRegisters[ addressReg ];
+                addressRegisters[ addressReg ] = addressRegisters[ dataReg ];
+                addressRegisters[ dataReg ] = tmp;
+                cycles = 6;
+                return;
+            case 0b10001000: // swap Data register and address register
+                tmp = addressRegisters[ addressReg ];
+                addressRegisters[ addressReg ] = dataRegisters[ dataReg ];
+                dataRegisters[ dataReg ] = tmp;
+                cycles = 6;
+                return;
+        }
+        triggerIRQ(IRQ.ILLEGAL_INSTRUCTION,0);
+    }
+
+    private void and(int instruction) {
+        // AND <ea>,Dn
+        // AND Dn,<ea>
+        binaryLogicalOp(instruction,BinaryLogicalOp.AND,BinaryLogicalOpMode.REGULAR);
+    }
+
+    private void addxPredecrement(int instruction)
+    {
+        // ADDX -(Ax),-(Ay)
+        final int sizeBits = (instruction & 0b11000000) >> 6;
+        int srcReg = instruction&0b111;
+        int dstReg = (instruction&0b111000000000)>>9;
+        final int srcValue;
+        final int dstValue;
+        switch( sizeBits )
+        {
+            case 0b00:
+                addressRegisters[srcReg] -= 1;
+                srcValue = memory.readByte( addressRegisters[srcReg] );
+                addressRegisters[dstReg] -= 1;
+                dstValue = memory.readByte( addressRegisters[dstReg] );
+                cycles += 18;
+                break;
+            case 0b01:
+                addressRegisters[srcReg] -= 2;
+                srcValue = memory.readWord( addressRegisters[srcReg] );
+                addressRegisters[dstReg] -= 2;
+                dstValue = memory.readWord( addressRegisters[dstReg] );
+                cycles += 18;
+                break;
+            case 0b10:
+                addressRegisters[srcReg] -= 4;
+                srcValue = memory.readLong( addressRegisters[srcReg] );
+                addressRegisters[dstReg] -= 4;
+                dstValue = memory.readLong( addressRegisters[dstReg] );
+                cycles += 30;
+                break;
+            default:
+                throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
+        }
+        int result = srcValue + dstValue + (isExtended() ? 1 : 0);
+
+        updateFlags(srcValue,dstValue,result,1<<sizeBits,CCOperation.ADDITION,CPU.ALL_USERMODE_FLAGS);
+
+        switch( sizeBits )
+        {
+            case 0b00:
+                memory.writeByte( addressRegisters[dstReg], result );
+                break;
+            case 0b01:
+                memory.writeWord( addressRegisters[dstReg], result );
+                break;
+            case 0b10:
+                memory.writeLong( addressRegisters[dstReg], result );
+                break;
+            default:
+                throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
+        }
+    }
+
+    private void addxDataReg(int instruction) {
+        // ADDX Dx,Dy
+        final int sizeBits = (instruction & 0b11000000) >> 6;
+        int srcReg = instruction&0b111;
+        int dstReg = (instruction&0b111000000000)>>9;
+        final int srcValue;
+        final int dstValue;
+        switch( sizeBits )
+        {
+            case 0b00:
+                srcValue = (dataRegisters[srcReg]<<24)>>24;
+                dstValue = (dataRegisters[dstReg]<<24)>>24;
+                cycles += 4;
+                break;
+            case 0b01:
+                srcValue = (dataRegisters[srcReg]<<16)>>16;
+                dstValue = (dataRegisters[dstReg]<<16)>>16;
+                cycles += 4;
+                break;
+            case 0b10:
+                srcValue = dataRegisters[srcReg];
+                dstValue = dataRegisters[dstReg];
+                cycles += 8;
+                break;
+            default:
+                throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
+        }
+        int result = srcValue + dstValue + (isExtended() ? 1 : 0);
+
+        updateFlags(srcValue,dstValue,result,1<<sizeBits,CCOperation.ADDITION,CPU.ALL_USERMODE_FLAGS);
+
+        switch( sizeBits )
+        {
+            case 0b00:
+                dataRegisters[dstReg] = (dataRegisters[dstReg] & ~0xff) | (result & 0xff);
+                break;
+            case 0b01:
+                dataRegisters[dstReg] = (dataRegisters[dstReg] & ~0xffff) | (result & 0xffff);
+                break;
+            case 0b10:
+                dataRegisters[dstReg] = result;
+                break;
+        }
+    }
+
+    private void addal(int instruction) {
+        // ADDA_LONG_ENCODING
+        decodeSourceOperand(instruction,4,false);
+        final int dstReg = (instruction & 0b111000000000) >> 9;
+        addressRegisters[dstReg] += value;
+        cycles += 8;
+    }
+
+    private void addaw(int instruction) {
+        // ADDA_WORD_ENCODING
+        decodeSourceOperand(instruction,2,false);
+        final int dstReg = (instruction & 0b111000000000) >> 9;
+        addressRegisters[dstReg] += value;
+        cycles += 8;
+    }
+
+    private void add(int instruction)
+    {
+        // ADD <ea>,Dx
+        // ADD Dx,<ea>
+        int sizeBits = (instruction & 0b11000000) >> 6;
+        int regNum = (instruction&0b111000000000)>>9;
+
+        final int srcValue;
+        final int dstValue;
+        final boolean dstIsEa = (instruction & 1<<8) != 0;
+        if (dstIsEa)
+        {
+            // Dn + <ea> -> <ea>
+            switch(sizeBits)
+            {
+                case 0b00:
+                    srcValue = (dataRegisters[regNum]<<24)>>24;
+                    cycles += 8;
+                    break;
+                case 0b01:
+                    srcValue = (dataRegisters[regNum]<<16)>>16;
+                    cycles += 8;
+                    break;
+                case 0b10:
+                    srcValue = dataRegisters[regNum];
+                    cycles += 12;
+                    break;
+                default:
+                    throw new RuntimeException("Unreachable code reached");
+            }
+            decodeSourceOperand(instruction,1<<sizeBits,false,false);
+            dstValue = value;
+        }
+        else
+        {
+            // <ea> + Dn -> Dn
+            decodeSourceOperand(instruction,1<<sizeBits,false);
+            srcValue = value;
+            switch(sizeBits)
+            {
+                case 0b00:
+                    dstValue = (dataRegisters[regNum]<<24)>>24;
+                    cycles += 4;
+                    break;
+                case 0b01:
+                    dstValue = (dataRegisters[regNum]<<16)>>16;
+                    cycles += 4;
+                    break;
+                case 0b10:
+                    dstValue = dataRegisters[regNum];
+                    cycles += 6;
+                    break;
+                default:
+                    throw new RuntimeException("Unreachable code reached");
+            }
+        }
+        final int result = srcValue + dstValue;
+        value = result;
+
+        updateFlags(srcValue,dstValue,result,1<<sizeBits,CCOperation.ADDITION,CPU.ALL_USERMODE_FLAGS);
+
+        if ( dstIsEa ) {
+            storeValue((instruction&0b111000)>>3,instruction&0b111,1<<sizeBits);
+        } else {
+            dataRegisters[regNum] = mergeValue(dataRegisters[regNum], result,1<<sizeBits);
+        }
+    }
+
+    private void roxImmediate(int instruction) {
+        // ROXL/ROXR IMMEDIATE
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        rotateImmediate(instruction,RotateMode.ROTATE_WITH_EXTEND,rotateLeft);
+    }
+
+    private void asImmediate(int instruction) {
+        // ASL/ASR IMMEDIATE
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        rotateImmediate(instruction,RotateMode.ARITHMETIC_SHIFT,rotateLeft);
+    }
+
+    private void lsImmediate(int instruction) {
+        // LSL/LSR IMMEDIATE
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        rotateImmediate(instruction,RotateMode.LOGICAL_SHIFT,rotateLeft);
+    }
+
+    private void roImmediate(int instruction) {
+        // ROL/ROR IMMEDIATE
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        rotateImmediate(instruction,RotateMode.ROTATE,rotateLeft);
+    }
+
+    private void roxMemory(int instruction) {
+        // ROXL/ROXR MEMORY
+        int sizeBits = (instruction & 0b11000000) >> 6;
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        int eaMode     = (instruction & 0b111000) >> 3;
+        int eaRegister = (instruction & 0b000111);
+        calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
+        int value = memLoadWord( ea );
+        value = rotate( value,2,RotateMode.ROTATE_WITH_EXTEND,rotateLeft,1 );
+        memory.writeWord(ea,value);
+    }
+
+    private void asMemory(int instruction) {
+        // ASL/ASR MEMORY
+        int sizeBits = (instruction & 0b11000000) >> 6;
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        int eaMode     = (instruction & 0b111000) >> 3;
+        int eaRegister = (instruction & 0b000111);
+        calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
+        int value = memLoadWord( ea );
+        value = rotate( value,2,RotateMode.ARITHMETIC_SHIFT,rotateLeft,1 );
+        memory.writeWord(ea,value);
+    }
+
+    private void lsMemory(int instruction) {
+        // LSL/LSR MEMORY
+        int sizeBits = (instruction & 0b11000000) >> 6;
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        int eaMode     = (instruction & 0b111000) >> 3;
+        int eaRegister = (instruction & 0b000111);
+        calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
+        int value = memLoadWord( ea );
+        value = rotate( value,2,RotateMode.LOGICAL_SHIFT,rotateLeft,1 );
+        memory.writeWord(ea,value);
+    }
+
+    private void roMemory(int instruction) {
+        // ROL/ROR MEMORY
+        int sizeBits = (instruction & 0b11000000) >> 6;
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        int eaMode     = (instruction & 0b111000) >> 3;
+        int eaRegister = (instruction & 0b000111);
+        calculateEffectiveAddress(1<<sizeBits, eaMode, eaRegister,true);
+        int value = memLoadWord( ea );
+        value = rotate( value,2,RotateMode.ROTATE,rotateLeft,1 );
+        memory.writeWord(ea,value);
+    }
+
+    private void roxRegister(int instruction) {
+        // ROXL/ROXR REGISTER
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        rotateRegister(instruction,RotateMode.ROTATE_WITH_EXTEND,rotateLeft);
+    }
+
+    private void asRegister(int instruction) {
+        // ASL/ASR REGISTER
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        rotateRegister(instruction,RotateMode.ARITHMETIC_SHIFT,rotateLeft);
+    }
+    private void lsRegister(int instruction) {
+        // LSL/LSR REGISTER
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        rotateRegister(instruction,RotateMode.LOGICAL_SHIFT,rotateLeft);
+    }
+    private void roRegister(int instruction) {
+        // ROL/ROR REGISTER
+        final boolean rotateLeft = (instruction & 1<<8) != 0 ? true:false;
+        rotateRegister(instruction,RotateMode.ROTATE,rotateLeft);
+    }
 }
+
