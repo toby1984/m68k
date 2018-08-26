@@ -85,12 +85,13 @@ public class DisassemblyWindow extends AppWindow
             try
             {
                 final int toDisplay = Integer.parseInt(addressTextfield.getText().toLowerCase(), 16);
+                System.out.println("No longer following PC, disassembling @ "+Misc.hex(toDisplay) );
                 synchronized(LOCK)
                 {
                     followProgramCounter = false;
                     addressToDisplay = toDisplay;
                 }
-                repaint();
+                ui.doWithEmulator(this::tick);
             }
             catch(Exception e)
             {
@@ -151,6 +152,7 @@ public class DisassemblyWindow extends AppWindow
         {
             if (followProgramCounter)
             {
+                System.out.println("Following PC");
                 start = emulator.cpu.pc;
                 addressToDisplay = start;
             }
@@ -184,6 +186,7 @@ public class DisassemblyWindow extends AppWindow
             lines.clear();
             lines.addAll(result);
         }
+        repaint();
         SwingUtilities.invokeLater(() ->
         {
             boolean updateTextField = false;
@@ -206,21 +209,22 @@ public class DisassemblyWindow extends AppWindow
     public void stopped(Emulator emulator)
     {
         tick(emulator);
-        repaint();
     }
 
     @Override
     public void singleStepFinished(Emulator emulator)
     {
+        synchronized (LOCK) {
+            System.out.println("Single step finished @ "+Misc.hex(emulator.cpu.pc));
+            followProgramCounter=true;
+        }
         tick(emulator);
-        repaint();
     }
 
     @Override
     public void enteredContinousMode(Emulator emulator)
     {
         tick(emulator);
-        repaint();
     }
 
     @Override
