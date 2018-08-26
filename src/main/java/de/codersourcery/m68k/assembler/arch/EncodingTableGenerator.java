@@ -344,7 +344,7 @@ outer:
                                         it.remove();
                                     }
                                 }
-                                else if ( ! ( m1.hasFixedEaRegisterValue() | m1.hasFixedEaRegisterValue() ) )
+                                else if ( ! ( m1.hasFixedEaRegisterValue() || m1.hasFixedEaRegisterValue() ) )
                                 {
                                     System.out.println("WARN: Ignoring "+m2+" as it has the same bit pattern as "+m1);
                                     removed = true;
@@ -364,7 +364,7 @@ outer:
         @Override
         public boolean hasNext()
         {
-            if ( currentMode().hasFixedEaRegisterValue() ) {
+            if ( currentMode().hasFixedEaRegisterValue() || (eaRegisterValue+1) == 8) {
                 return (modePtr+1) < modes.size();
             }
             return (eaRegisterValue+1)<8;
@@ -388,7 +388,7 @@ outer:
             }
             else
             {
-                System.out.println("doIncrement(): eaRegister is now " + Misc.binary3Bit(eaRegisterValue));
+                System.out.println("doIncrement(3): eaRegister is now " + Misc.binary3Bit(eaRegisterValue));
             }
         }
 
@@ -493,7 +493,8 @@ outer:
             position++;
             if ( result.containsKey(value) ) {
                 throw new RuntimeException("Internal error,duplicate mapping "+
-                    Misc.binary16Bit(value)+" for "+instruction+" already used by "+result.get(value));
+                    Misc.binary16Bit(value)+" for "+instruction+" already used by "+
+                    result.get(value).instruction);
             }
             result.put(value,new EncodingEntry(instruction,encoding));
 
@@ -519,26 +520,6 @@ outer:
     }
     public static void main(String[] args) throws IOException
     {
-        final Set<AddressingMode> addressingModes =
-            Stream.of(AddressingMode.values())
-                .filter( x -> x.hasKinds(AddressingModeKind.DATA,AddressingModeKind.ALTERABLE))
-            .collect(Collectors.toSet());
-
-        AddressingModeIterator it1 = new AddressingModeIterator(Field.SRC_MODE,Field.SRC_BASE_REGISTER,
-            addressingModes);
-
-        while( it1.hasNext() )
-        {
-            final int v1 = it1.getValue(Field.SRC_MODE);
-            final int v2 = it1.getValue(Field.SRC_BASE_REGISTER);
-//            System.out.println("v1: "+v1);
-//            System.out.println("v2: "+v2);
-            final int value = (v1<<3)|v2;
-            System.out.println( Misc.binary8Bit(value) );
-            it1.doIncrement();
-        }
-        System.exit(1);
-
         final CPUType cpuType = CPUType.M68000;
 
         final Map<Instruction,List<InstructionEncoding>> allEncodings =
@@ -675,13 +656,6 @@ outer:
             Instruction.MOVE_USP_TO_AX_ENCODING));
             
         allEncodings.put(Instruction.LEA,Arrays.asList(Instruction.LEA_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
-
-        // TODO: REMOVE DEBUG CODE
-        allEncodings.clear();
-        // TODO: REMOVE DEBUG CODE ^^^^^^^^^^^^^
-
-        System.out.println("Reset map");
-        allEncodings.put(Instruction.MOVEA,Arrays.asList(Instruction.MOVEA_LONG_ENCODING));
 
         final Map<Integer, EncodingEntry> mappings = new HashMap<>();
 
