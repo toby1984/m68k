@@ -2450,9 +2450,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
 
     private void initializeOpcodeMap() throws IOException, IllegalAccessException
     {
-        for ( int i = 0 ; i < opcodeMap.length ; i++ ) {
-            opcodeMap[i] = ILLEGAL_ENCODING;
-        }
+        Arrays.fill( opcodeMap, ILLEGAL_ENCODING);
 
         final Map<String,InstructionImpl> implCache = new HashMap<>(Instruction.ALL_ENCODINGS.size());
 
