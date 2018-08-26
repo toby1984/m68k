@@ -578,26 +578,27 @@ public enum Instruction
             @Override
             public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
             {
-                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA);
+                return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA)
+                    .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
             }
 
             @Override
-        public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
-        {
-            Instruction.checkSourceAddressingModeKind( node,AddressingModeKind.DATA );
-            Instruction.checkDestinationAddressingMode( node,AddressingMode.DATA_REGISTER_DIRECT );
-
-            if ( ! node.useImpliedOperandSize )
+            public void checkSupports(InstructionNode node, ICompilationContext ctx, boolean estimateSizeOnly)
             {
-                if ( node.getOperandSize() == OperandSize.BYTE )
+                Instruction.checkSourceAddressingModeKind( node,AddressingModeKind.DATA );
+                Instruction.checkDestinationAddressingMode( node,AddressingMode.DATA_REGISTER_DIRECT );
+
+                if ( ! node.useImpliedOperandSize )
                 {
-                    throw new RuntimeException("CHK only supports .w or .l operand sizes");
-                }
-                if ( node.hasOperandSize(OperandSize.LONG) && ! ctx.options().cpuType.supports(CHK_LONG_ENCODING) ) {
-                    throw new RuntimeException("CHK.L needs 68020 or higher");
+                    if ( node.getOperandSize() == OperandSize.BYTE )
+                    {
+                        throw new RuntimeException("CHK only supports .w or .l operand sizes");
+                    }
+                    if ( node.hasOperandSize(OperandSize.LONG) && ! ctx.options().cpuType.supports(CHK_LONG_ENCODING) ) {
+                        throw new RuntimeException("CHK.L needs 68020 or higher");
+                    }
                 }
             }
-        }
 
         @Override
         public boolean supportsExplicitOperandSize()
@@ -1253,9 +1254,12 @@ public enum Instruction
                             Instruction.destAddressingModes(cpuType,AddressingModeKind.MEMORY,AddressingModeKind.ALTERABLE) )
                             .with(Instruction.registerRange(Field.SRC_BASE_REGISTER));
                     }
-                    if ( encoding == ANDI_BYTE_ENCODING || encoding == ANDI_WORD_ENCODING || encoding == ANDI_LONG_ENCODING )
+                    if ( encoding == ANDI_BYTE_ENCODING ||
+                         encoding == ANDI_WORD_ENCODING ||
+                         encoding == ANDI_LONG_ENCODING )
                     {
-                        return Instruction.destAddressingModes(cpuType,AddressingModeKind.MEMORY,AddressingModeKind.ALTERABLE);
+                        return Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,
+                            AddressingModeKind.ALTERABLE);
                     }
                     throw new RuntimeException("Unreachable code reached");
                 }
@@ -1614,7 +1618,9 @@ public enum Instruction
                         return Instruction.registerRange(Field.DST_BASE_REGISTER);
                     }
                     if ( encoding == MOVE_FROM_SR_ENCODING ) {
-                        return Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE);
+                        // 0100000011MMMDDD
+                        return Instruction.destAddressingModes(cpuType,AddressingModeKind.DATA,
+                            AddressingModeKind.ALTERABLE);
                     }
                     if ( encoding == MOVE_TO_SR_ENCODING ) {
                         return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA);

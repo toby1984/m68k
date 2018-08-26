@@ -64,7 +64,7 @@ public class EncodingTableGenerator
          * @param field
          * @return
          */
-        public boolean handles(Field field) {
+        public final boolean handles(Field field) { // MUST be final , called from within constructor
             return fields.contains(field);
         }
 
@@ -306,55 +306,21 @@ public class EncodingTableGenerator
         private final List<AddressingMode> modes = new ArrayList<>();
         private int modePtr = 0;
         private int eaRegisterValue = 0;
+        private final boolean srcMode;
 
         public AddressingModeIterator(Field field1,Field field2,Set<AddressingMode> modes)
         {
             super(field1,field2);
-            this.modes.addAll(modes);
+            srcMode = handles(Field.SRC_MODE);
+            final Map<Integer,AddressingMode> unique =
+                new HashMap<>();
+            modes.stream().forEach(x -> unique.put( x.getHashKey(),x ) );
+            this.modes.addAll(unique.values());
             this.modes.removeIf(x -> x == AddressingMode.IMPLIED ); // internal use only
-            removeModesWithSameBitPattern();
             System.out.println("AddressingModeIterator(): Modes to iterate over: "+this.modes.stream()
                 .map(m->m.name()).collect(Collectors.joining(",")));
             System.out.println("AddressingModeIterator(): eaMode is now "+currentMode());
             reset();
-        }
-
-        private void removeModesWithSameBitPattern()
-        {
-            boolean removed;
-outer:
-            do
-            {
-                removed = false;
-                for ( int i = 0 ; i < this.modes.size() ; i++ )
-                {
-                    final AddressingMode m1 = this.modes.get(i);
-                    for (Iterator<AddressingMode> it = this.modes.iterator() ; it.hasNext() ; )
-                    {
-                        final AddressingMode m2 = it.next();
-                        if ( m1 != m2 )
-                        {
-                            if ( m1.eaModeField == m2.eaModeField )
-                            {
-                                if ( m1.hasFixedEaRegisterValue() && m2.hasFixedEaRegisterValue() )
-                                {
-                                    if ( m1.eaRegisterField == m2.eaRegisterField ) {
-                                        System.out.println("WARN: Ignoring "+m2+" as it has the same bit pattern as "+m1);
-                                        removed = true;
-                                        it.remove();
-                                    }
-                                }
-                                else if ( ! ( m1.hasFixedEaRegisterValue() || m1.hasFixedEaRegisterValue() ) )
-                                {
-                                    System.out.println("WARN: Ignoring "+m2+" as it has the same bit pattern as "+m1);
-                                    removed = true;
-                                    it.remove();
-                                }
-                            }
-                        }
-                    }
-                }
-            } while ( removed );
         }
 
         private AddressingMode currentMode() {
@@ -395,11 +361,24 @@ outer:
         @Override
         protected int internalGetValue(Field value)
         {
-            if ( value == Field.SRC_MODE || value == Field.DST_MODE) {
-                return currentMode().eaModeField;
+            if ( srcMode ) {
+                if ( value == Field.SRC_MODE ) {
+                    return currentMode().eaModeField;
+                }
+                if ( value == Field.SRC_BASE_REGISTER ) {
+                    return eaRegisterValue;
+                }
             }
-            if ( value == Field.SRC_BASE_REGISTER || value == Field.DST_BASE_REGISTER ) {
-                return eaRegisterValue;
+            else
+            {
+                if (value == Field.DST_MODE)
+                {
+                    return currentMode().eaModeField;
+                }
+                if (value == Field.DST_BASE_REGISTER)
+                {
+                    return eaRegisterValue;
+                }
             }
             throw new RuntimeException("Unhandled field: "+value);
         }
@@ -559,7 +538,8 @@ outer:
             Instruction.MOVEP_LONG_TO_MEMORY_ENCODING));
 
         allEncodings.put(Instruction.MOVEM,Arrays.asList(Instruction.MOVEM_FROM_REGISTERS_ENCODING, Instruction.MOVEM_TO_REGISTERS_ENCODING));
-        allEncodings.put(Instruction.CHK,Arrays.asList(Instruction.CHK_WORD_ENCODING,Instruction.CHK_LONG_ENCODING));
+        allEncodings.put(Instruction.CHK,Arrays.asList(Instruction.CHK_WORD_ENCODING,
+            Instruction.CHK_LONG_ENCODING));
         allEncodings.put(Instruction.TAS,Arrays.asList(Instruction.TAS_ENCODING));
         allEncodings.put(Instruction.STOP,Arrays.asList(Instruction.STOP_ENCODING));
         allEncodings.put(Instruction.NOT,Arrays.asList(Instruction.NOT_ENCODING));
@@ -646,12 +626,12 @@ outer:
         allEncodings.put(Instruction.MOVEQ,Arrays.asList(Instruction.MOVEQ_ENCODING));
 
         allEncodings.put(Instruction.MOVE,Arrays.asList(
+            Instruction.MOVE_FROM_SR_ENCODING  ,
+            Instruction.MOVE_TO_SR_ENCODING    ,
             Instruction.MOVE_BYTE_ENCODING     ,
             Instruction.MOVE_WORD_ENCODING     ,
             Instruction.MOVE_LONG_ENCODING     ,
             Instruction.MOVE_TO_CCR_ENCODING   ,
-            Instruction.MOVE_FROM_SR_ENCODING  ,
-            Instruction.MOVE_TO_SR_ENCODING    ,
             Instruction.MOVE_AX_TO_USP_ENCODING,
             Instruction.MOVE_USP_TO_AX_ENCODING));
             
@@ -683,6 +663,7 @@ outer:
             }
         }
 
+        int lines = 0;
         try ( Writer out = new FileWriter("/tmp/68000_instructions.properties") )
         {
             for (Map.Entry<Integer, EncodingEntry> entry : mappings.entrySet())
@@ -695,8 +676,10 @@ outer:
                 out.write("    # ");
                 out.write( Misc.binary16Bit(opcode) );
                 out.write("\n");
+                lines++;
             }
         }
+        System.out.println("Lines: "+lines);
 
         final Map<String,String> insnImplementation = new HashMap<>();
 
@@ -709,10 +692,10 @@ outer:
         insnImplementation.put("ADD_DST_DATA_ENCODING","add");
         insnImplementation.put("ADD_DST_EA_ENCODING","add");
         insnImplementation.put("ANDI_BYTE_ENCODING","andi");
+        insnImplementation.put("ANDI_WORD_ENCODING","andi");
         insnImplementation.put("ANDI_LONG_ENCODING","andi");
         insnImplementation.put("ANDI_TO_CCR_ENCODING","andiToCCR");
         insnImplementation.put("ANDI_TO_SR_ENCODING","andiToSR");
-        insnImplementation.put("ANDI_WORD_ENCODING","andi");
         insnImplementation.put("AND_DST_EA_ENCODING","and");
         insnImplementation.put("AND_SRC_EA_ENCODING","and");
         insnImplementation.put("ASL_IMMEDIATE_ENCODING","asImmediate");
@@ -751,7 +734,7 @@ outer:
         insnImplementation.put("EXG_DATA_DATA_ENCODING","exg");
         insnImplementation.put("EXTL_ENCODING","extLong");
         insnImplementation.put("EXTW_ENCODING","extWord");
-        insnImplementation.put("ILLEGAL","illegal");
+        insnImplementation.put("ILLEGAL_ENCODING","illegal");
         insnImplementation.put("JMP_INDIRECT_ENCODING","jmp");
         insnImplementation.put("JSR_ENCODING","jsr");
         insnImplementation.put("LEA_WORD_ENCODING","lea");

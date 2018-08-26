@@ -327,4 +327,12 @@ public enum AddressingMode
         }
         return Stream.of(AddressingMode.values()).filter( mode -> kinds.stream().anyMatch(mode::hasKind) ).collect(Collectors.toSet());
     }
+
+    public int getHashKey()
+    {
+        if ( hasFixedEaRegisterValue() ) {
+            return (eaModeField<<4| eaRegisterField.value());
+        }
+        return eaModeField<<4| 0b1111;
+    }
 }

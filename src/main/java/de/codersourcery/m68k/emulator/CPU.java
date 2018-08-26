@@ -4066,6 +4066,8 @@ C — Set if a borrow occurs; cleared otherwise.
 
     private final InstructionImpl MOVE_BYTE_ENCODING = this::moveb;
 
+    private final InstructionImpl MOVE_FROM_SR_ENCODING = this::moveFromSR;
+
     private final InstructionImpl MOVE_LONG_ENCODING = this::movel;
 
     private final InstructionImpl MOVE_TO_CCR_ENCODING = this::moveToCCR;
