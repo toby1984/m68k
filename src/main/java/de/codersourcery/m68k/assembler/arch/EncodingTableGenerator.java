@@ -516,6 +516,7 @@ public class EncodingTableGenerator
         allEncodings.put(Instruction.CMPA,Arrays.asList(Instruction.CMPA_WORD_ENCODING,Instruction.CMPA_LONG_ENCODING));
         allEncodings.put(Instruction.SUBA,Arrays.asList(Instruction.SUBA_WORD_ENCODING,Instruction.SUBA_LONG_ENCODING));
         allEncodings.put(Instruction.ADDA,Arrays.asList(Instruction.ADDA_WORD_ENCODING,Instruction.ADDA_LONG_ENCODING));
+        allEncodings.put(Instruction.RTE,Arrays.asList(Instruction.RTE_ENCODING));
         allEncodings.put(Instruction.SUBQ,Arrays.asList(Instruction.SUBQ_ENCODING));
         allEncodings.put(Instruction.ADDQ,Arrays.asList(Instruction.ADDQ_ENCODING));
         allEncodings.put(Instruction.DIVS,Arrays.asList(Instruction.DIVS_ENCODING));
@@ -672,7 +673,9 @@ public class EncodingTableGenerator
                 final EncodingEntry value = entry.getValue();
                 out.write( Integer.toString(opcode) );
                 out.write("=");
-                out.write(getName(value.encoding) );
+                out.write(getName(value.encoding));
+                out.write(",");
+                out.write(value.instruction.name());
                 out.write("    # ");
                 out.write( Misc.binary16Bit(opcode) );
                 out.write("\n");
@@ -776,6 +779,8 @@ public class EncodingTableGenerator
         insnImplementation.put("OR_SRC_EA_ENCODING","orEaDn");
         insnImplementation.put("PEA_ENCODING","pea");
         insnImplementation.put("RESET_ENCODING","reset");
+        insnImplementation.put("RTE_ENCODING","returnFromException");
+
         insnImplementation.put("ROL_IMMEDIATE_ENCODING","roImmediate");
         insnImplementation.put("ROL_MEMORY_ENCODING","roMemory");
         insnImplementation.put("ROL_REGISTER_ENCODING","roRegister");

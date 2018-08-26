@@ -9,7 +9,13 @@ import de.codersourcery.m68k.emulator.CPU;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.BufferedReader;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -29,6 +35,8 @@ public class Disassembler
     private final StringBuilder commentsBuffer = new StringBuilder();
 
     private final Line currentLine = new Line();
+
+    private final Instruction[] opcodeMap = new Instruction[65536];
 
     private boolean dumpHex;
 
@@ -76,8 +84,17 @@ public class Disassembler
 
     private static final class EndOfMemoryAccess extends RuntimeException {
     }
+
     public Disassembler(Memory memory) {
         this.memory = memory;
+        try
+        {
+            initializeOpcodeMap();
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     public interface LineConsumer
@@ -148,81 +165,9 @@ public class Disassembler
             System.out.println("Disassembling at " + Misc.hex(pc));
         }
 
-        Map<Integer,InstructionEncoding> existing = new HashMap<>();
-        for ( var entry : Instruction.ALL_ENCODINGS.entrySet() )
-        {
-            Integer andMask = entry.getKey().getInstructionWordAndMask();
-            final InstructionEncoding otherEncoding = existing.get(andMask);
-            if ( otherEncoding != null ) {
-                if ( otherEncoding.getInstructionWordMask() == entry.getKey().getInstructionWordMask() ) {
-                    System.err.println("Cannot distinguish "+otherEncoding+" from "+entry.getKey()+" - "+entry.getValue());
-                }
-            } else {
-                existing.put( andMask, entry.getKey() );
-            }
-        }
-
         final int insnWord = readWord();
 
-        // TODO: Performance...maybe using a prefix tree
-        // TODO: would be faster than linear search ?
-        final Map<InstructionEncoding,Instruction> candidates = new HashMap<>();
-        for ( var entry : Instruction.ALL_ENCODINGS.entrySet() )
-        {
-            var encoding = entry.getKey();
-            boolean matches = matches( insnWord, encoding );
-            if ( matches )
-            {
-                if ( DEBUG )
-                {
-                    System.out.println(entry.getValue() + " matches (mask: " + Misc.hex(encoding.getInstructionWordAndMask()) + " with len " + getMaskLength(encoding) + " , expected: " + encoding.getInstructionWordMask());
-                }
-                candidates.put(encoding, entry.getValue());
-            }
-        }
-        if ( candidates.isEmpty() )
-        {
-            illegalOperation(insnWord);
-            return;
-        }
-
-        InstructionEncoding encoding;
-        Instruction instruction;
-        if ( candidates.size() > 1 )
-        {
-            List<InstructionEncoding> sortedByMaskLength = new ArrayList<>( candidates.keySet() );
-            sortedByMaskLength.sort( (b,a) -> Integer.compare( getMaskLength(a), getMaskLength(b) ) );
-
-            final InstructionEncoding mostSpecific = sortedByMaskLength.get(0);
-            final Set<Instruction> instructions = new HashSet<>();
-            final List<InstructionEncoding> clashes = new ArrayList<>();
-            for ( var entry : sortedByMaskLength ) {
-                if ( getMaskLength(entry ) == getMaskLength(mostSpecific) ) {
-                    instructions.add( candidates.get( entry ) );
-                    clashes.add( entry );
-                }
-            }
-            if ( clashes.size() > 1 )
-            {
-                if ( instructions.size() > 1 )
-                {
-                    throw new RuntimeException("Same mask len: " + mostSpecific + " <-> " + sortedByMaskLength.get(1));
-                }
-                // System.err.println("WARNING: Found multiple matching encodings for "+instructions);
-            }
-            // same instruction
-            encoding = mostSpecific;
-            instruction = candidates.get(mostSpecific);
-        } else {
-            encoding = candidates.keySet().iterator().next();
-            instruction = candidates.values().iterator().next();
-        }
-
-        if ( DEBUG )
-        {
-            System.out.println("Using: " + encoding + " => " + instruction);
-        }
-
+        final Instruction instruction = opcodeMap[insnWord&0xffff];
         try
         {
             currentLine.instruction = instruction;
@@ -1770,5 +1715,78 @@ public class Disassembler
     public void setDumpHex(boolean dumpHex)
     {
         this.dumpHex = dumpHex;
+    }
+
+    private void initializeOpcodeMap() throws IOException, IllegalAccessException
+    {
+        Arrays.fill( opcodeMap, Instruction.ILLEGAL);
+
+        final InputStream input = getClass().getResourceAsStream(CPU.INSTRUCTION_MAPPINGS);
+        final BufferedReader in = new BufferedReader(new InputStreamReader(input));
+        String line = null;
+
+        int lineNo = 0;
+        while ( ( line = in.readLine() ) != null )
+        {
+            lineNo++;
+            final int len = line.length();
+
+            int i = 0;
+
+            // parse opcode (integer) value
+            while( i < len && Character.isDigit(line.charAt(i)) ) {
+                i++;
+            }
+            if ( i == len ) {
+                throw new EOFException("Premature EOF at line "+lineNo);
+            }
+            final int opCode = Integer.parseInt( line.substring(0,i) );
+            // skip non-letters
+            while( i < len && ! Character.isLetter(line.charAt(i)) ) {
+                i++;
+            }
+            // parse instruction encoding name
+            if ( i == len ) {
+                throw new EOFException("Premature EOF at line "+lineNo);
+            }
+            int start = i;
+            while( i < len )
+            {
+                final char c = line.charAt(i);
+                if ( Character.isLetter(c) || c == '_' || Character.isDigit(c) )
+                {
+                    i++;
+                } else {
+                    break;
+                }
+            }
+            if ( i == len ) {
+                throw new EOFException("Premature EOF at line "+lineNo);
+            }
+            // skip non-letters
+            while( i < len && ! Character.isLetter(line.charAt(i)) ) {
+                i++;
+            }
+            if ( i == len ) {
+                throw new EOFException("Premature EOF at line "+lineNo);
+            }
+            // parse instruction name
+            start = i;
+            while( i < len )
+            {
+                final char c = line.charAt(i);
+                if ( Character.isLetter(c) || c == '_' || Character.isDigit(c) )
+                {
+                    i++;
+                } else {
+                    break;
+                }
+            }
+            if ( i == len ) {
+                throw new EOFException("Premature EOF at line "+lineNo);
+            }
+            final String insnName = line.substring(start,i);
+            opcodeMap[ opCode ] = Instruction.valueOf( insnName );
+        }
     }
 }

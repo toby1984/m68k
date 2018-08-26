@@ -9,7 +9,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CPUStateWindow extends AppWindow implements ITickListener
+public class CPUStateWindow extends AppWindow implements ITickListener, Emulator.IEmulatorStateCallback
 {
     private final Object DATA_LOCK = new  Object();
 
@@ -149,5 +149,22 @@ public class CPUStateWindow extends AppWindow implements ITickListener
                 pcTextfield.setText( hex( pc ) );
             }
         });
+    }
+
+    @Override
+    public void stopped(Emulator emulator)
+    {
+        tick(emulator);
+    }
+
+    @Override
+    public void singleStepFinished(Emulator emulator)
+    {
+        tick(emulator);
+    }
+
+    @Override
+    public void enteredContinousMode(Emulator emulator)
+    {
     }
 }

@@ -31,6 +31,7 @@ import java.util.Map;
  */
 public class CPU
 {
+    public static final String INSTRUCTION_MAPPINGS = "/68000_instructions.properties";
     private final CPUType cpuType;
 
     private final InstructionImpl[] opcodeMap = new InstructionImpl[65536];
@@ -1644,7 +1645,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         this.pc = newAddress;
     }
 
-    private void returnFromException()
+    private void returnFromException(int instruction)
     {
         if ( ! isSupervisorMode() )
         {
@@ -2454,7 +2455,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
 
         final Map<String,InstructionImpl> implCache = new HashMap<>(Instruction.ALL_ENCODINGS.size());
 
-        final InputStream input = getClass().getResourceAsStream("/68000_instructions.properties");
+        final InputStream input = getClass().getResourceAsStream(INSTRUCTION_MAPPINGS);
         final BufferedReader in = new BufferedReader(new InputStreamReader(input));
         String line = null;
 
@@ -4125,6 +4126,8 @@ C — Set if a borrow occurs; cleared otherwise.
     private final InstructionImpl ROXR_MEMORY_ENCODING = this::roxMemory;
 
     private final InstructionImpl ROXR_REGISTER_ENCODING = this::roxRegister;
+
+    private final InstructionImpl RTE_ENCODING = this::returnFromException;
 
     private final InstructionImpl RTR_ENCODING = this::rtr;
 
