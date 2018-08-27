@@ -3,7 +3,9 @@ package de.codersourcery.m68k.emulator;
 import de.codersourcery.m68k.assembler.Assembler;
 import de.codersourcery.m68k.assembler.CompilationMessages;
 import de.codersourcery.m68k.assembler.CompilationUnit;
+import de.codersourcery.m68k.assembler.IObjectCodeWriter;
 import de.codersourcery.m68k.assembler.IResource;
+import de.codersourcery.m68k.assembler.SRecordHelper;
 import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
@@ -15,6 +17,8 @@ import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -24,6 +28,10 @@ import java.util.stream.Collectors;
 
 public class CPUTest extends TestCase
 {
+
+    private static final boolean DEBUG_DUMP_BINARY = true;
+    private static final File DEBUG_BINARY = new File("/tmp/test.h68");
+
     private static final int MEM_SIZE = 10*1024;
 
     private static final int SUPERVISOR_STACK_PTR = MEM_SIZE; // stack grows downwards on M68k
@@ -2561,6 +2569,11 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V)
         execute("moveq #$ff,d0").expectD0(0xffffffff).noCarry().noOverflow().noExtended().negative().notZero().notSupervisor();
     }
 
+    public void testBRA() {
+        System.out.println("Program start is at "+Misc.hex(PROGRAM_START_ADDRESS));
+        execute(cpu -> {},"BRA next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
+    }
+
     public void testBranchTaken()
     {
         /*
@@ -2582,6 +2595,7 @@ BLT Less Than        1101 = (N & !V) | (!N & V) (ok)
 BGT Greater Than     1110 = ((N & V) | (!N & !V)) & !Z; // (ok)
 BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
          */
+        System.out.println("Program start is at "+Misc.hex(PROGRAM_START_ADDRESS));
         execute(cpu -> {},"BRA next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
 
         execute(cpu -> {},"BHI next\nILLEGAL\nnext:").expectPC( PROGRAM_START_ADDRESS + 4).notSupervisor();
@@ -3162,6 +3176,27 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         System.out.println( Memory.hexdump(PROGRAM_START_ADDRESS,executable,0,executable.length) );
 
         memory.writeBytes(PROGRAM_START_ADDRESS,executable );
+
+        if ( DEBUG_DUMP_BINARY)
+        {
+            System.out.println("***");
+            System.out.println("* Binary dumped to "+DEBUG_BINARY.getAbsolutePath());
+            System.out.println("***");
+            SRecordHelper helper = new SRecordHelper();
+            try (FileOutputStream out = new FileOutputStream( DEBUG_BINARY ))
+            {
+                final IObjectCodeWriter.Buffer buffer = new IObjectCodeWriter.Buffer(PROGRAM_START_ADDRESS,1024);
+                for ( byte b : executable )
+                {
+                    buffer.writeByte( b );
+                }
+                helper.write( Arrays.asList( buffer ), out );
+            }
+            catch (Exception e)
+            {
+                throw new RuntimeException( e );
+            }
+        }
 
         cpu.reset();
 

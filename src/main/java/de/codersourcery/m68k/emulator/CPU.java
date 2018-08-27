@@ -10,6 +10,7 @@ import de.codersourcery.m68k.emulator.exceptions.IllegalInstructionException;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.utils.Misc;
+import de.codersourcery.m68k.utils.OpcodeFileReader;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
@@ -31,7 +32,6 @@ import java.util.Map;
  */
 public class CPU
 {
-    public static final String INSTRUCTION_MAPPINGS = "/68000_instructions.properties";
     private final CPUType cpuType;
 
     private final InstructionImpl[] opcodeMap = new InstructionImpl[65536];
@@ -768,10 +768,13 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         pcAtStartOfLastInstruction = pc;
 
         final int instruction= memory.readWordNoCheck(pc);
-        pc += 2;
 
+
+        // TODO: remove debug code
         final String encoding = opcodeDebugMap[instruction & 0xffff];
         System.out.println(">>>> Executing instruction "+Misc.hex(instruction)+" ( "+encoding+" , "+Misc.binary16Bit(instruction)+") at 0x"+Integer.toHexString(pc));
+
+        pc += 2;
         opcodeMap[instruction & 0xffff].execute(instruction);
     }
 
@@ -2455,55 +2458,13 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
 
         final Map<String,InstructionImpl> implCache = new HashMap<>(Instruction.ALL_ENCODINGS.size());
 
-        final InputStream input = getClass().getResourceAsStream(INSTRUCTION_MAPPINGS);
-        final BufferedReader in = new BufferedReader(new InputStreamReader(input));
-        String line = null;
-
-        int lineNo = 0;
-        while ( ( line = in.readLine() ) != null )
-        {
-            lineNo++;
-            final int len = line.length();
-
-            int i = 0;
-
-            // parse opcode (integer) value
-            while( i < len && Character.isDigit(line.charAt(i)) ) {
-                i++;
-            }
-            if ( i == len ) {
-                throw new EOFException("Premature EOF at line "+lineNo);
-            }
-            final int opCode = Integer.parseInt( line.substring(0,i) );
-            // skip non-letters
-            while( i < len && ! Character.isLetter(line.charAt(i)) ) {
-                i++;
-            }
-            // parse instruction encoding name
-            if ( i == len ) {
-                throw new EOFException("Premature EOF at line "+lineNo);
-            }
-            final int start = i;
-            while( i < len )
-            {
-                final char c = line.charAt(i);
-                if ( Character.isLetter(c) || c == '_' || Character.isDigit(c) )
-                {
-                    i++;
-                } else {
-                    break;
-                }
-            }
-            if ( i == len ) {
-                throw new EOFException("Premature EOF at line "+lineNo);
-            }
-            final String insEncodingName = line.substring(start,i);
-            opcodeMap[ opCode ] = lookupInstructionImpl(insEncodingName, implCache);
-            opcodeDebugMap[ opCode ] = insEncodingName;
-        }
+        OpcodeFileReader.parseFile( (opcode,insName,insEncName) -> {
+            opcodeMap[ opcode ] = lookupInstructionImpl(insEncName, implCache);
+            opcodeDebugMap[ opcode ] = insEncName;
+        });
     }
 
-    private InstructionImpl lookupInstructionImpl(String encodingName, Map<String,InstructionImpl> cache) throws IllegalAccessException
+    private InstructionImpl lookupInstructionImpl(String encodingName, Map<String,InstructionImpl> cache)
     {
         InstructionImpl result = cache.get( encodingName );
         if ( result != null )
@@ -2517,7 +2478,14 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
             if ( m.getType() == InstructionImpl.class && Modifier.isFinal(mods) && m.getName().equals(encodingName) )
             {
                 m.setAccessible(true);
-                result = (InstructionImpl) m.get(this);
+                try
+                {
+                    result = (InstructionImpl) m.get(this);
+                }
+                catch (IllegalAccessException e)
+                {
+                    throw new RuntimeException(e);
+                }
                 if (result == null ) {
                     throw new RuntimeException("Internal error, class field returned NULL "+InstructionImpl.class.getSimpleName());
                 }
@@ -3216,7 +3184,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
            {
                case 0x00: // 16 bit offset
                    pushLong( pc+2 );
-                   pc += memLoadWord(pc)-2; // -2 because we already advanced the PC after reading the instruction word
+                   pc += memLoadWord(pc);
                    cycles = 18;
                    return;
                case 0xff: // 32 bit offset
@@ -3225,14 +3193,14 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
                        break;
                    }
                    pushLong( pc+4 );
-                   pc += memLoadLong( pc )-2; // -2because we already advanced the PC after reading the instruction word
+                   pc += memLoadLong( pc );
                    cycles = 24; // TODO: Wrong timing, find out 68020+ timings...
                    return;
                default:
                    // 8-bit branch offset encoded in instruction itself
                    pushLong( pc );
                    final int offset = ((instruction & 0xff) << 24) >> 24;
-                   pc += offset - 2; // -2 because we already advanced the PC after reading the instruction word
+                   pc += offset;
                    cycles = 18;
                    return;
            }
@@ -3244,7 +3212,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
            case 0x00: // 16 bit offset
                if (takeBranch)
                {
-                   pc += memLoadWord(pc) - 2; // -2 because we already advanced the PC after reading the instruction word
+                   pc += memLoadWord(pc);
                    cycles = 10;
                } else {
                    cycles = 12;
@@ -3254,7 +3222,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
            case 0xff: // 32 bit offset (NOT an M68000 addressing mode...)
                if (takeBranch)
                {
-                   pc += memLoadLong(pc) - 2; // -2because we already advanced the PC after reading the instruction word
+                   pc += memLoadLong(pc);
                    cycles = 12; // TODO: Wrong timing, find out 68020+ timings...
                } else {
                    cycles = 10; // TODO: Wrong timing, find out 68020+ timings...
@@ -3266,7 +3234,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
                if (takeBranch)
                {
                    final int offset = ((instruction & 0xff) << 24) >> 24;
-                   pc += offset - 2; // -2 because we already advanced the PC after reading the instruction word
+                   pc += offset;
                    cycles = 10;
                } else {
                    cycles = 8;

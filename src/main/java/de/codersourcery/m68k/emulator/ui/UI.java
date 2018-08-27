@@ -26,8 +26,8 @@ public class UI extends JFrame
 {
     final JDesktopPane desktop = new JDesktopPane();
 
-    //    private File kickstartRom = new File("/home/tgierke/Downloads/kickstart_1.2.rom");
-    private File kickstartRom = new File("/home/tobi/Downloads/kickstart_1.3.rom");
+    private File kickstartRom = new File("/home/tgierke/Downloads/kickstart_1.2.rom");
+//    private File kickstartRom = new File("/home/tobi/Downloads/kickstart_1.3.rom");
     private Emulator emulator;
 
     private final List<AppWindow> windows = new ArrayList<>();
@@ -183,6 +183,9 @@ public class UI extends JFrame
         registerWindow( new DisassemblyWindow(this) );
         registerWindow( new CPUStateWindow("CPU", this) );
         registerWindow( new EmulatorStateWindow("Emulator", this) );
+
+        final File romListing = new File("/home/tgierke/Downloads/exec_disassembly.txt");
+        registerWindow( new ROMListingViewer("ROM listing",romListing,this) );
         setContentPane( desktop );
 
         // display window

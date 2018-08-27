@@ -7,6 +7,7 @@ import de.codersourcery.m68k.assembler.arch.Instruction;
 import de.codersourcery.m68k.assembler.arch.InstructionEncoding;
 import de.codersourcery.m68k.emulator.CPU;
 import de.codersourcery.m68k.utils.Misc;
+import de.codersourcery.m68k.utils.OpcodeFileReader;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.BufferedReader;
@@ -39,6 +40,8 @@ public class Disassembler
     private final Instruction[] opcodeMap = new Instruction[65536];
 
     private boolean dumpHex;
+
+    private boolean resolveRelativeOffsets;
 
     private int pc;
 
@@ -973,7 +976,7 @@ public class Disassembler
                 } else {
                     break;
                 }
-                append( Misc.hex( currentLine.pc + offset ) );
+                append( Misc.hex( currentLine.pc + 2 + offset ) );
                 return;
             // Misc
             case NOP:
@@ -1717,76 +1720,15 @@ public class Disassembler
         this.dumpHex = dumpHex;
     }
 
-    private void initializeOpcodeMap() throws IOException, IllegalAccessException
-    {
+    private void initializeOpcodeMap() throws IOException, IllegalAccessException {
         Arrays.fill( opcodeMap, Instruction.ILLEGAL);
+        OpcodeFileReader.parseFile( (opcode,insnName,insnEncName) -> {
+            opcodeMap[ opcode ] = Instruction.valueOf( insnName );
+        });
+    }
 
-        final InputStream input = getClass().getResourceAsStream(CPU.INSTRUCTION_MAPPINGS);
-        final BufferedReader in = new BufferedReader(new InputStreamReader(input));
-        String line = null;
-
-        int lineNo = 0;
-        while ( ( line = in.readLine() ) != null )
-        {
-            lineNo++;
-            final int len = line.length();
-
-            int i = 0;
-
-            // parse opcode (integer) value
-            while( i < len && Character.isDigit(line.charAt(i)) ) {
-                i++;
-            }
-            if ( i == len ) {
-                throw new EOFException("Premature EOF at line "+lineNo);
-            }
-            final int opCode = Integer.parseInt( line.substring(0,i) );
-            // skip non-letters
-            while( i < len && ! Character.isLetter(line.charAt(i)) ) {
-                i++;
-            }
-            // parse instruction encoding name
-            if ( i == len ) {
-                throw new EOFException("Premature EOF at line "+lineNo);
-            }
-            int start = i;
-            while( i < len )
-            {
-                final char c = line.charAt(i);
-                if ( Character.isLetter(c) || c == '_' || Character.isDigit(c) )
-                {
-                    i++;
-                } else {
-                    break;
-                }
-            }
-            if ( i == len ) {
-                throw new EOFException("Premature EOF at line "+lineNo);
-            }
-            // skip non-letters
-            while( i < len && ! Character.isLetter(line.charAt(i)) ) {
-                i++;
-            }
-            if ( i == len ) {
-                throw new EOFException("Premature EOF at line "+lineNo);
-            }
-            // parse instruction name
-            start = i;
-            while( i < len )
-            {
-                final char c = line.charAt(i);
-                if ( Character.isLetter(c) || c == '_' || Character.isDigit(c) )
-                {
-                    i++;
-                } else {
-                    break;
-                }
-            }
-            if ( i == len ) {
-                throw new EOFException("Premature EOF at line "+lineNo);
-            }
-            final String insnName = line.substring(start,i);
-            opcodeMap[ opCode ] = Instruction.valueOf( insnName );
-        }
+    public void setResolveRelativeOffsets(boolean resolveRelativeOffsets)
+    {
+        this.resolveRelativeOffsets = resolveRelativeOffsets;
     }
 }

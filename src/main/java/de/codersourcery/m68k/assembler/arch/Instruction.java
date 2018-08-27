@@ -1808,7 +1808,7 @@ public enum Instruction
                                 if ( (branchTargetAddress & 1) != 0 ) {
                                     throw new RuntimeException("Relative branch needs an even target address but got "+branchTargetAddress);
                                 }
-                                return branchTargetAddress - instructionAddress;
+                                return branchTargetAddress - instructionAddress - 2;
                             }
                             break;
                         case NONE:
@@ -2267,7 +2267,11 @@ destination Dn mode, not the destination < ea > mode.
                 if ( targetAddress == null )
                 {
                     if ( estimateSizeOnly ) {
-                        return BCC_32BIT_ENCODING; // worst-case scenario
+                        // unknown destination, assume worst-case scenario
+                        if ( context.options().cpuType.supports(  BCC_32BIT_ENCODING ) ) {
+                            return BCC_32BIT_ENCODING;
+                        }
+                        return BCC_16BIT_ENCODING;
                     }
                     throw new RuntimeException("Failed to get displacement from "+insn.source());
                 }
@@ -2277,7 +2281,7 @@ destination Dn mode, not the destination < ea > mode.
                 }
 
                 final int currentAddress = context.getCodeWriter().offset();
-                int relativeOffset = targetAddress - currentAddress;
+                int relativeOffset = targetAddress - currentAddress -2; // offset is always relative to PC+2
                 if ( relativeOffset == 0 ) {
                     /* A branch to the immediately following instruction automatically
                      * uses the 16-bit displacement format because the 8-bit
@@ -2297,7 +2301,7 @@ destination Dn mode, not the destination < ea > mode.
                 }
                 if ( size <= 32 )
                 {
-                    if ( context.options().cpuType.isNotCompatibleWith( CPUType.M68020 ) ) {
+                    if ( ! context.options().cpuType.supports( Instruction.BCC_32BIT_ENCODING) ) {
                         context.error("32-bit relative branch offset only supported on M68020+");
                     }
                     return BCC_32BIT_ENCODING;

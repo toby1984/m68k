@@ -13,6 +13,9 @@ public enum CPUType
             if ( encoding == Instruction.CHK_LONG_ENCODING) {
                 return false;
             }
+            if ( encoding == Instruction.BCC_32BIT_ENCODING ) {
+                return false;
+            }
             return super.supports(encoding);
         }
     },

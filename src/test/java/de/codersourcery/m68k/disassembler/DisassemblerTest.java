@@ -13,12 +13,19 @@ import junit.framework.TestCase;
 public class DisassemblerTest extends TestCase
 {
     private Assembler asm;
+    private MMU mmu;
+    private Memory memory;
+    private Disassembler disasm;
 
     @Override
     protected void setUp() throws Exception
     {
         super.setUp();
         asm = new Assembler();
+
+        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500) );
+        memory = new Memory(mmu);
+        disasm = new Disassembler( memory );
     }
 
     public void testBitOps() {
@@ -340,26 +347,28 @@ public class DisassemblerTest extends TestCase
         compile("sgt $2000");
         compile("sle $2000");
         compile("sf $2000");
-
     }
 
     public void testRelativeBranching()
     {
-        compile("BRA loop\nloop:","00000000: bra $2");
-        compile("BHI loop\nloop:","00000000: bhi $2");
-        compile("BLS loop\nloop:","00000000: bls $2");
-        compile("BCC loop\nloop:","00000000: bcc $2");
-        compile("BCS loop\nloop:","00000000: bcs $2");
-        compile("BNE loop\nloop:","00000000: bne $2");
-        compile("BEQ loop\nloop:","00000000: beq $2");
-        compile("BVC loop\nloop:","00000000: bvc $2");
-        compile("BVS loop\nloop:","00000000: bvs $2");
-        compile("BPL loop\nloop:","00000000: bpl $2");
-        compile("BMI loop\nloop:","00000000: bmi $2");
-        compile("BGE loop\nloop:","00000000: bge $2");
-        compile("BLT loop\nloop:","00000000: blt $2");
-        compile("BGT loop\nloop:","00000000: bgt $2");
-        compile("BLE loop\nloop:","00000000: ble $2");
+        // hint: Because of the way the instruction encoding works,
+        //       a branch to the next instruction is generated using a 16 bit offset
+        //       so the jump instruction itself occupies 2+2 = 4 bytes.
+        compile("BRA loop\nloop:","00000000: bra $4");
+        compile("BHI loop\nloop:","00000000: bhi $4");
+        compile("BLS loop\nloop:","00000000: bls $4");
+        compile("BCC loop\nloop:","00000000: bcc $4");
+        compile("BCS loop\nloop:","00000000: bcs $4");
+        compile("BNE loop\nloop:","00000000: bne $4");
+        compile("BEQ loop\nloop:","00000000: beq $4");
+        compile("BVC loop\nloop:","00000000: bvc $4");
+        compile("BVS loop\nloop:","00000000: bvs $4");
+        compile("BPL loop\nloop:","00000000: bpl $4");
+        compile("BMI loop\nloop:","00000000: bmi $4");
+        compile("BGE loop\nloop:","00000000: bge $4");
+        compile("BLT loop\nloop:","00000000: blt $4");
+        compile("BGT loop\nloop:","00000000: bgt $4");
+        compile("BLE loop\nloop:","00000000: ble $4");
     }
 
     public void testTAS() {
@@ -367,6 +376,16 @@ public class DisassemblerTest extends TestCase
         compile("tas d3"  );
     }
     public void testBSR() {
+        compile("org $2000\n" +
+                "bsr sub\n" +
+                "illegal\n" +
+                "sub:\n","00000000: bsr $4\n" +
+                "00000002: illegal");
+    }
+
+    public void testBSRResolveRelative()
+    {
+        disasm.setResolveRelativeOffsets( true );
         compile("org $2000\n" +
                 "bsr sub\n" +
                 "illegal\n" +
@@ -605,12 +624,9 @@ public class DisassemblerTest extends TestCase
         final byte[] executable = this.asm.getBytes(false);
         System.out.println("COMPILED: "+Memory.hexdump(0,executable,0,executable.length));
 
-        final MMU mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500) );
-        final Memory memory = new Memory(mmu);
         memory.writeBytes( 0,executable );
 
-        Disassembler asm = new Disassembler( memory );
-        final String disassembled = asm.disassemble( 0, executable.length );
+        final String disassembled = disasm.disassemble( 0, executable.length );
         assertEquals(expectedSource,disassembled);
     }
 }

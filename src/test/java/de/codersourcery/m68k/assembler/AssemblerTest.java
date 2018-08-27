@@ -210,11 +210,12 @@ public class AssemblerTest extends TestCase
                 "illegal\n" +
                 "sub:\n" +
                 "move #1,d0\n" +
-                "rts")    ,         0x61,0x08,
-            0x32,0x3c,0x00,0x02,
-            0x4a,0xfc,
-            0x30,0x3c,0x00,0x01,
-            0x4e,0x75);
+                "rts")    ,
+                0x61,0x06,
+                0x32,0x3c,0x00,0x02,
+                0x4a,0xfc,
+                0x30,0x3c,0x00,0x01,
+                0x4e,0x75);
     }
 
     public void testMovea() {
@@ -305,15 +306,15 @@ public class AssemblerTest extends TestCase
             case 8:
                 offset = 100;
                 firstByte = (0b0110_0000 | it.condition.bits);
-                secondByte = offset;
+                secondByte = offset-2;
                 check = actualBytes -> assertArrayEquals(actualBytes,firstByte,secondByte);
                 break;
             case 16:
                 offset = 16384;
                 firstByte = (0b0110_0000 | it.condition.bits);
                 secondByte = 0;
-                thirdByte = (offset & 0xff00) >> 8;
-                fourthByte = offset & 0x00ff;
+                thirdByte = (offset-2 & 0xff00) >> 8;
+                fourthByte = offset-2 & 0x00ff;
                 check = actualBytes -> assertArrayEquals(actualBytes,firstByte,secondByte,thirdByte,fourthByte);
                 break;
             case 32:
@@ -321,10 +322,10 @@ public class AssemblerTest extends TestCase
                 firstByte = (0b0110_0000 | it.condition.bits);
                 secondByte = 0xff;
 
-                thirdByte =  (offset & 0xff000000) >> 24;
-                fourthByte = (offset & 0x00ff0000) >> 16;
-                fifthByte =  (offset & 0x0000ff00) >>  8;
-                sixthByte =  (offset & 0x000000ff);
+                thirdByte =  (offset-2 & 0xff000000) >> 24;
+                fourthByte = (offset-2 & 0x00ff0000) >> 16;
+                fifthByte =  (offset-2 & 0x0000ff00) >>  8;
+                sixthByte =  (offset-2 & 0x000000ff);
                 check = actualBytes -> assertArrayEquals(actualBytes,firstByte,secondByte,thirdByte,fourthByte,fifthByte,sixthByte);
                 break;
             default:
@@ -333,6 +334,7 @@ public class AssemblerTest extends TestCase
         final String source = "B"+conditionCode+" next\n" +
             "ORG "+offset+"\n"+
             "next:";
+        System.out.println("Compiled:\n"+source);
         final byte[] bytes = compile(source);
         check.accept(bytes );
     }
