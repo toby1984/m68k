@@ -109,6 +109,9 @@ public class DisassemblyWindow extends AppWindow
             {
                 System.out.println("Disassembly paint(): Rendering "+lines.size()+" lines");
                 updateMaxLines();
+                if ( lines.size() > 0 ) {
+                    System.out.println("First line starts at "+Misc.hex(lines.get(0).pc));
+                }
 
                 final Rectangle rect = new Rectangle();
                 rect.x = 1;
@@ -143,10 +146,11 @@ public class DisassemblyWindow extends AppWindow
     private void updateMaxLines()
     {
         final FontMetrics metrics = getFontMetrics(getFont());
-        final int lineHeight = (int) (metrics.getHeight()*1.2f);
+        final int lineHeight = (int) (metrics.getHeight()*2f);
         synchronized ( LOCK )
         {
             maxLines = getHeight() / lineHeight;
+            System.out.println("maxLines : "+maxLines);
         }
     }
 
@@ -193,7 +197,7 @@ public class DisassemblyWindow extends AppWindow
                     addressToDisplay = lines.get(0).pc;
                 }
             }
-            repaint();
+            ui.doWithEmulator(this::tick);
         }));
 
         // Page down
@@ -207,7 +211,7 @@ public class DisassemblyWindow extends AppWindow
                     addressToDisplay = lines.get( lines.size()-1 ).pc;
                 }
             }
-            repaint();
+            ui.doWithEmulator(this::tick);
         }));
 
         addressTextfield.setColumns( 8 );

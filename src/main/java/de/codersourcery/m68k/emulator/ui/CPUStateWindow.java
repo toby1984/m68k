@@ -2,47 +2,100 @@ package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.CPU;
 import de.codersourcery.m68k.emulator.Emulator;
-import de.codersourcery.m68k.utils.Misc;
 
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class CPUStateWindow extends AppWindow implements ITickListener, Emulator.IEmulatorStateCallback
 {
     private final Object DATA_LOCK = new  Object();
 
     // @GuardedBy( DATA_LOCK )
-    private final List<JCheckBox> cpuFlagCheckboxes =
-            new ArrayList<>();
+    private final List<JCheckBox> cpuFlagCheckboxes = new ArrayList<>();
 
     // @GuardedBy( DATA_LOCK )
-    private final List<JTextField> dataRegistersTextfields =
-            new ArrayList<>();
+    private final List<JTextField> dataRegistersTextfields = new ArrayList<>();
 
     // @GuardedBy( DATA_LOCK )
-    private final List<JTextField> addressRegistersTextfields =
-            new ArrayList<>();
+    private final List<JTextField> addressRegistersTextfields = new ArrayList<>();
 
     // @GuardedBy( DATA_LOCK )
-    private JTextField pcTextfield = new JTextField("");
+    private JTextField pcTextfield;
 
     // @GuardedBy( DATA_LOCK )
     private int pc;
 
     // @GuardedBy( DATA_LOCK )
     private int flags;
+
     // @GuardedBy( DATA_LOCK )
     private final int[] dataRegisters = new int[8];
+
     // @GuardedBy( DATA_LOCK )
     private final int[] addressRegisters = new int[8];
 
-    private static JTextField createTextField()  {
+    private static JTextField createTextField(Consumer<JTextField> listener)
+    {
         final JTextField result = new JTextField("00000000");
         result.setColumns( 8 );
         result.setHorizontalAlignment( JTextField.RIGHT );
+        result.addActionListener(ev ->
+        {
+            listener.accept(result);
+        });
         return result;
+    }
+
+    private void doWithNumber(JTextField tf, Consumer<Integer>c)
+    {
+        final String text = tf.getText();
+        try
+        {
+            if ( text != null && text.trim().length() > 0 )
+            {
+                final int value = Integer.parseInt(text, 16);
+                c.accept(value );
+            }
+        }
+        catch(Exception e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    private void updateDataRegister(int regNum,JTextField tf)
+    {
+        doWithNumber(tf, adr ->
+        {
+            System.out.println("Set[ D"+regNum+"] = "+adr);
+            ui.doWithEmulator(emu -> emu.cpu.dataRegisters[regNum] = adr);
+        });
+    }
+
+    private void updateAddressRegister(int regNum,JTextField tf)
+    {
+        doWithNumber(tf, adr ->
+        {
+            System.out.println("Set[ A"+regNum+"] = "+adr);
+            ui.doWithEmulator(emu -> emu.cpu.addressRegisters[regNum] = adr);
+        });
+    }
+
+    private void updateCPUFlag(int flag,JCheckBox cb)
+    {
+        boolean isSet = cb.isSelected();
+        ui.doWithEmulator(emu ->
+        {
+            System.out.println((isSet ?"Setting":"Clearing")+" flag "+flag);
+            if ( isSet ) {
+                emu.cpu.setFlags(flag);
+            } else {
+                emu.cpu.clearFlags(flag);
+            }
+        });
     }
 
     private static String hex(int value)
@@ -50,23 +103,58 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         return Integer.toHexString( value );
     }
 
+    private JCheckBox createCheckbox(String label, Consumer<JCheckBox> cb)
+    {
+        final JCheckBox result = new JCheckBox( label ,false );
+        result.addActionListener(ev -> {
+            cb.accept(result);
+        });
+        return result;
+    }
+
     public CPUStateWindow(String title, UI ui)
     {
         super( title, ui );
         setPreferredSize( new Dimension(600,200 ) );
         getContentPane().setLayout( new GridBagLayout() );
-        for ( int i = 0 ; i < 8 ; i++ ) {
-            dataRegistersTextfields.add( createTextField() );
-            addressRegistersTextfields.add( createTextField() );
+        for ( int i = 0 ; i < 8 ; i++ )
+        {
+            final int regNum = i;
+            dataRegistersTextfields.add( createTextField( tf -> updateDataRegister(regNum,tf) ) );
+            addressRegistersTextfields.add( createTextField( tf -> updateAddressRegister(regNum,tf)) );
         }
 
+        final int[] flagMasks =
+        {
+            CPU.FLAG_CARRY,
+            CPU.FLAG_OVERFLOW,
+            CPU.FLAG_ZERO,
+            CPU.FLAG_NEGATIVE,
+            CPU.FLAG_EXTENDED,
+            CPU.FLAG_I0,
+            CPU.FLAG_I1,
+            CPU.FLAG_I2,
+            CPU.FLAG_MASTER_INTERRUPT,
+            CPU.FLAG_SUPERVISOR_MODE,
+            CPU.FLAG_T0,
+            CPU.FLAG_T1
+        };
         final String[] checkboxLabels = {"C","V","Z","N","X","I0","I1","I2","Master-IRQ","S","T0","T1"};
-        for ( int i = 0 ; i < checkboxLabels.length ; i++ ) {
-            cpuFlagCheckboxes.add( new JCheckBox( checkboxLabels[i],false ) );
+        for ( int i = 0 ; i < checkboxLabels.length ; i++ )
+        {
+            final int maskBits = flagMasks[i];
+            cpuFlagCheckboxes.add( createCheckbox( checkboxLabels[i],cb -> updateCPUFlag(maskBits,cb)) );
         }
 
         // add PC
-        pcTextfield = createTextField();
+        pcTextfield = createTextField( tf -> doWithNumber(tf, adr ->
+        {
+            ui.doWithEmulator(emu ->
+            {
+                System.out.println("Setting PC to "+(adr&~1));
+                emu.cpu.pc = (adr & ~1);
+            });
+        }));
         GridBagConstraints cnstrs = cnstrsNoResize( 0, 0 );
         cnstrs.gridwidth = 1;
         getContentPane().add( pcTextfield, cnstrs );
@@ -151,20 +239,34 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         });
     }
 
+    private void updateUIState(boolean enableInput) {
+
+        runOnEDT(() ->
+        {
+            dataRegistersTextfields.forEach( x -> x.setEditable(enableInput));
+            addressRegistersTextfields.forEach( x -> x.setEditable(enableInput));
+            cpuFlagCheckboxes.forEach(cb -> cb.setEnabled(enableInput) );
+            pcTextfield.setEditable(enableInput);
+        });
+    }
+
     @Override
     public void stopped(Emulator emulator)
     {
         tick(emulator);
+        updateUIState(true);
     }
 
     @Override
     public void singleStepFinished(Emulator emulator)
     {
         tick(emulator);
+        updateUIState(true);
     }
 
     @Override
     public void enteredContinousMode(Emulator emulator)
     {
+        updateUIState(false);
     }
 }
