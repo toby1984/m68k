@@ -7,26 +7,26 @@ import java.awt.*;
 
 public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulatorStateCallback
 {
-    private JButton runButton;
-    private JButton stopButton;
-    private JButton stepButton;
-    private JButton resetButton;
+    private final JButton runButton;
+    private final JButton stopButton;
+    private final JButton stepButton;
+    private final JButton resetButton;
 
     public EmulatorStateWindow(String title, UI ui)
     {
         super( title, ui );
 
         setLayout( new FlowLayout() );
-        JButton runButton = addButton("Run", () -> {
+        runButton = addButton("Run", () -> {
             ui.doWithEmulator( emu -> emu.start() );
         });
-        JButton stopButton = addButton("Stop", () -> {
+        stopButton = addButton("Stop", () -> {
             ui.doWithEmulator( emu -> emu.stop() );
         });
-        JButton stepButton = addButton("Step", () -> {
+        stepButton = addButton("Step", () -> {
             ui.doWithEmulator( emu -> emu.singleStep() );
         });
-        JButton resetButton = addButton("Reset", () -> {
+        resetButton = addButton("Reset", () -> {
             ui.doWithEmulator( emu -> emu.reset() );
         });
     }

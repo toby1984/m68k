@@ -1,11 +1,17 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.disassembler.Disassembler;
+import de.codersourcery.m68k.emulator.Breakpoint;
+import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.Emulator;
 import de.codersourcery.m68k.utils.Misc;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,18 +32,69 @@ public class DisassemblyWindow extends AppWindow
     private int maxLines = -1;
 
     // @GuardedBy( LOCK )
+    private Breakpoints breakpoints = new Breakpoints();
+
+    // @GuardedBy( LOCK )
     private final List<Disassembler.Line> lines = new ArrayList<>();
+
+    {
+        addComponentListener(new ComponentAdapter()
+        {
+            @Override
+            public void componentShown(ComponentEvent e)
+            {
+                synchronized(LOCK) {
+                    updateMaxLines();
+                }
+            }
+        });
+    }
 
     private JPanel panel = new JPanel()
     {
         {
             setFont( new Font(Font.MONOSPACED,Font.PLAIN,14 ) );
-        }
-
-        private void drawString(Graphics g, FontMetrics metrics, String text, Rectangle rect)
-        {
-            final int y = rect.y + ((rect.height - metrics.getHeight()) / 2) + metrics.getAscent();
-            g.drawString(text, rect.x, y);
+            setFocusable(true);
+            addMouseListener(new MouseAdapter()
+            {
+                @Override
+                public void mouseClicked(MouseEvent e)
+                {
+                    if ( e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1 )
+                    {
+                        boolean gotMatch = false;
+                        int matchAdr = -1;
+                        synchronized(LOCK)
+                        {
+                            for (int i = 0; i < lines.size(); i++)
+                            {
+                                Disassembler.Line l = lines.get(i);
+                                if ( ((Rectangle) l.data).contains(e.getX(),e.getY()) )
+                                {
+                                    gotMatch = true;
+                                    matchAdr = l.pc;
+                                }
+                            }
+                        }
+                        if ( gotMatch )
+                        {
+                            final int finalAdr = matchAdr;
+                            runOnEmulator(emulator ->
+                            {
+                                final Breakpoints emBp = emulator.getBreakpoints();
+                                Breakpoint existing = emBp.getBreakpoint(finalAdr);
+                                if ( existing == null ) {
+                                    emBp.add(new Breakpoint(finalAdr));
+                                } else {
+                                    emBp.remove(existing);
+                                }
+                                System.out.println("BREAKPOINTS: "+emBp);
+                                tick(emulator);
+                            });
+                        }
+                    }
+                }
+            });
         }
 
         @Override
@@ -50,7 +107,8 @@ public class DisassemblyWindow extends AppWindow
 
             synchronized ( LOCK )
             {
-                maxLines = getHeight() / lineHeight;
+                System.out.println("Disassembly paint(): Rendering "+lines.size()+" lines");
+                updateMaxLines();
 
                 final Rectangle rect = new Rectangle();
                 rect.x = 1;
@@ -61,12 +119,36 @@ public class DisassemblyWindow extends AppWindow
                     rect.y = y;
 
                     final Disassembler.Line line = lines.get(i);
-                    final String prefix = addressToDisplay == line.pc ? ">>>" : "   ";
-                    drawString(g, metrics, prefix+line.toString(), rect);
+                    final Breakpoint bp = breakpoints.getBreakpoint(line.pc);
+                    final String prefix;
+                    if ( bp != null ) {
+                        if ( breakpoints.isEnabled(bp ) ) {
+                            prefix = addressToDisplay == line.pc ? ">>>[B]" : "   [B]";
+                        } else {
+                            prefix = addressToDisplay == line.pc ? ">>>[ ]" : "   [ ]";
+                        }
+                    }
+                    else
+                    {
+                        prefix = addressToDisplay == line.pc ? ">>>   " : "      ";
+                    }
+                    final int y1 = rect.y + ((rect.height - metrics.getHeight()) / 2) + metrics.getAscent();
+                    line.data = new Rectangle(rect.x,rect.y, 50,lineHeight );
+                    g.drawString(prefix+line.toString(), rect.x, y1);
                 }
             }
         }
     };
+
+    private void updateMaxLines()
+    {
+        final FontMetrics metrics = getFontMetrics(getFont());
+        final int lineHeight = (int) (metrics.getHeight()*1.2f);
+        synchronized ( LOCK )
+        {
+            maxLines = getHeight() / lineHeight;
+        }
+    }
 
     private JButton button(String label,Runnable action) {
         final JButton button = new JButton(label);
@@ -150,10 +232,15 @@ public class DisassemblyWindow extends AppWindow
         int start;
         synchronized( LOCK )
         {
+            if ( emulator.getBreakpoints().hasChanged )
+            {
+                breakpoints = emulator.getBreakpoints().createCopy();
+                emulator.getBreakpoints().hasChanged = false;
+            }
             if (followProgramCounter)
             {
-                System.out.println("Following PC");
                 start = emulator.cpu.pc;
+                System.out.println("Disassembly tick: Following PC @ "+Misc.hex(start));
                 addressToDisplay = start;
             }
             else
@@ -165,7 +252,6 @@ public class DisassemblyWindow extends AppWindow
             start = start - maxLines * 2;
         }
         final List<Disassembler.Line> result = new ArrayList<>();
-        System.out.println("Disassembling "+maxLines+" lines starting at "+ Misc.hex(start));
         final Disassembler.LineConsumer lineConsumer = new Disassembler.LineConsumer()
         {
             @Override
@@ -180,6 +266,7 @@ public class DisassemblyWindow extends AppWindow
                 result.add(line.createCopy());
             }
         };
+        System.out.println("Starting to disassemble @ "+Misc.hex(start));
         disasm.disassemble(start, lineConsumer);
         synchronized( LOCK )
         {
@@ -187,6 +274,7 @@ public class DisassemblyWindow extends AppWindow
             lines.addAll(result);
         }
         repaint();
+
         SwingUtilities.invokeLater(() ->
         {
             boolean updateTextField = false;

@@ -119,9 +119,8 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     @Override
     public String getWindowKey()
     {
-        return "rom-listing";
+        return "romlisting";
     }
-
 
     @Override
     public void stopped(Emulator emulator)

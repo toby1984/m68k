@@ -1,7 +1,10 @@
 package de.codersourcery.m68k.emulator.ui;
 
+import de.codersourcery.m68k.emulator.Emulator;
+
 import javax.swing.*;
 import java.awt.*;
+import java.util.function.Consumer;
 
 /**
  * Abstract base class for application windows.
@@ -49,6 +52,10 @@ public abstract class AppWindow extends JInternalFrame
 
     protected final void error(Throwable cause) {
         ui.error(cause);
+    }
+
+    protected final void runOnEmulator(Consumer<Emulator> c) {
+        ui.doWithEmulator(c);
     }
 
     protected final void runOnEDT(Runnable r) {

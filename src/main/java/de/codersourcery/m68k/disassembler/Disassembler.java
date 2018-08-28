@@ -47,6 +47,7 @@ public class Disassembler
 
     public static final class Line
     {
+        public Object data; // field is not used by the Disassembler, just there for client code to store additional data
         public int pc;
         public Instruction instruction;
         public String text;
@@ -61,6 +62,7 @@ public class Disassembler
             result.text = text;
             result.ascii = ascii;
             result.comments = comments;
+            result.data = data;
             return result;
         }
 

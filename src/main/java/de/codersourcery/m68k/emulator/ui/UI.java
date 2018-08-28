@@ -24,10 +24,10 @@ import java.util.function.Function;
 
 public class UI extends JFrame
 {
+    private static final String MAIN_WINDOW_KEY = "mainWindow";
+
     final JDesktopPane desktop = new JDesktopPane();
 
-    private File kickstartRom = new File("/home/tgierke/Downloads/kickstart_1.2.rom");
-//    private File kickstartRom = new File("/home/tobi/Downloads/kickstart_1.3.rom");
     private Emulator emulator;
 
     private final List<AppWindow> windows = new ArrayList<>();
@@ -58,10 +58,12 @@ public class UI extends JFrame
 
     private byte[] loadKickstartRom() throws IOException
     {
-        if ( kickstartRom == null ) {
+        if ( loadConfig().getKickRomLocation() == null ) {
             throw new IOException("No kickstart ROM file selected");
         }
-        return Files.readAllBytes(kickstartRom.toPath() );
+        final File file = loadConfig().getKickRomLocation();
+        System.out.println("*** Loading kickstart ROM from "+file.getAbsolutePath());
+        return Files.readAllBytes(file.toPath() );
     }
 
     private void setupEmulator() throws Exception
@@ -110,27 +112,19 @@ public class UI extends JFrame
         {
             for (ITickListener l : tickListeners)
             {
-                System.out.println("Refreshing "+l);
                 l.tick(e);
             }
         });
+        refresh();
     }
 
-    private Optional<File> selectFile(File existing) {
-        return selectFile(existing,new FileFilter() {
-
-            @Override
-            public boolean accept(File f)
-            {
-                return true;
-            }
-
-            @Override
-            public String getDescription()
-            {
-                return "*.*";
-            }
-        });
+    private void refresh()
+    {
+        for (ITickListener l : tickListeners)
+        {
+            System.out.println("REFRESH: "+l);
+            emulator.runOnThread(() -> l.tick(emulator),false);
+        }
     }
 
     private Optional<File> selectFile(File existing, FileFilter filter)
@@ -147,8 +141,7 @@ public class UI extends JFrame
     }
 
     private final List<ITickListener> tickListeners = new ArrayList<>();
-    private final List<Emulator.IEmulatorStateCallback> stateChangeListeners
-            = new ArrayList<>();
+    private final List<Emulator.IEmulatorStateCallback> stateChangeListeners = new ArrayList<>();
 
     private void registerWindow(AppWindow window)
     {
@@ -184,16 +177,24 @@ public class UI extends JFrame
         registerWindow( new CPUStateWindow("CPU", this) );
         registerWindow( new EmulatorStateWindow("Emulator", this) );
 
-        final File romListing = new File("/home/tgierke/Downloads/exec_disassembly.txt");
+        // final File romListing = new File("/home/tgierke/Downloads/exec_disassembly.txt");
+        final File romListing = new File("/home/tobi/Downloads/kickrom_disassembly.txt");
         registerWindow( new ROMListingViewer("ROM listing",romListing,this) );
         setContentPane( desktop );
 
-        // display window
+        // display main window
         pack();
         setLocationRelativeTo(null);
         setVisible(true);
 
-        if ( kickstartRom != null && kickstartRom.exists() ) {
+        // apply main window state
+        final Optional<WindowState> state = loadConfig().getWindowState(MAIN_WINDOW_KEY);
+        state.ifPresent(s ->
+        {
+            setBounds(s.getLocationAndSize());
+        });
+
+        if ( loadConfig().getKickRomLocation() != null && loadConfig().getKickRomLocation().exists() ) {
             try
             {
                 setupEmulator();
@@ -229,9 +230,10 @@ public class UI extends JFrame
                 }
             };
 
-            final Optional<File> selection = selectFile(kickstartRom,filter);
-            if ( selection.isPresent() ) {
-                kickstartRom = selection.get();
+            final Optional<File> selection = selectFile(loadConfig().getKickRomLocation(),filter);
+            if ( selection.isPresent() )
+            {
+                loadConfig().setKickRomLocation(selection.get());
                 setupEmulator();
             }
         }));
@@ -352,8 +354,18 @@ public class UI extends JFrame
     private void saveConfig()
     {
         final UIConfig config = loadConfig();
+
+        // persist windows
         windows.stream().map( x->x.getWindowState() )
                 .forEach(  config::setWindowState );
+
+        // persist main window state
+        final WindowState mainWindow = new WindowState();
+        mainWindow.setEnabled(true);
+        mainWindow.setVisible(true);
+        mainWindow.setWindowKey(MAIN_WINDOW_KEY);
+        mainWindow.setLocationAndSize( UI.this.getBounds());
+        config.setWindowState(mainWindow);
 
         final File file = getConfigPath();
         System.out.println("*** Saving configuration to "+file);

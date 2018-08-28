@@ -74,6 +74,8 @@ public class Emulator
         }
     }
 
+    private final Breakpoints breakpoints = new Breakpoints();
+
     // after how many ticks the callback should get invoked
     public final byte[] kickstartRom;
     public final Amiga amiga;
@@ -371,6 +373,16 @@ public class Emulator
                 {
                     try
                     {
+                        if ( breakpoints.hasEnabledBreakpoints() )
+                        {
+                            if ( cpu.cycles == 0 && breakpoints.isBreakpointHit(Emulator.this ) )
+                            {
+                                mode = EmulatorMode.STOPPED;
+                                System.err.println("*** emulation stopped because of breakpoint ***");
+                                stateCallback.stopped(Emulator.this);
+                                continue;
+                            }
+                        }
                         tickCount++;
                         cpu.executeOneCycle();
                         if ((tickCount % callbackInvocationTicks) == 0)
@@ -446,5 +458,17 @@ public class Emulator
             System.out.println("Emulator callback will be invoked every "+callbackInvocationTicks+" ticks.");
             thread.callback.tick(Emulator.this );
         });
+    }
+
+    /**
+     * Returns the emulator's breakpoints.
+     *
+     * Breakpoints may ONLY be manipulated from inside the emulator thread.
+     *
+     * @return
+     */
+    public Breakpoints getBreakpoints()
+    {
+        return breakpoints;
     }
 }

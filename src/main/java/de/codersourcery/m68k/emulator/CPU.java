@@ -32,6 +32,8 @@ import java.util.Map;
  */
 public class CPU
 {
+    private static final boolean DEBUG = false;
+
     private final CPUType cpuType;
 
     private final InstructionImpl[] opcodeMap = new InstructionImpl[65536];
@@ -760,7 +762,8 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
         if ( ( pc & 1 ) != 0 )
         {
-            System.out.println(">>>> Executing instruction "+memory.readWordNoCheck(pc)+" at 0x"+Integer.toHexString(pc));
+            System.err.println(">>>> Badly aligned instruction " + memory.readWordNoCheck(pc) +
+                " at 0x" + Integer.toHexString(pc));
             badAlignment(pc,MemoryAccessException.Operation.READ_WORD);
             return;
         }
@@ -769,10 +772,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
         final int instruction= memory.readWordNoCheck(pc);
 
-
-        // TODO: remove debug code
-        final String encoding = opcodeDebugMap[instruction & 0xffff];
-        System.out.println(">>>> Executing instruction "+Misc.hex(instruction)+" ( "+encoding+" , "+Misc.binary16Bit(instruction)+") at 0x"+Integer.toHexString(pc));
+        if ( DEBUG )
+        {
+            final String encoding = opcodeDebugMap[instruction & 0xffff];
+            System.out.println(">>>> Executing instruction " + Misc.hex(instruction) + " ( " + encoding + " , " + Misc.binary16Bit(instruction) + ") at 0x" + Integer.toHexString(pc));
+        }
 
         pc += 2;
         opcodeMap[instruction & 0xffff].execute(instruction);

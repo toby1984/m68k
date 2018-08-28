@@ -20,7 +20,7 @@ import java.util.Arrays;
  */
 public class MMU
 {
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     private static final int PAGE_SIZE_LEFT_SHIFT = 12;
     public  static final int PAGE_SIZE = 0x1000;
