@@ -375,7 +375,7 @@ public class Emulator
                     {
                         if ( breakpoints.hasEnabledBreakpoints() )
                         {
-                            if ( cpu.cycles == 0 && breakpoints.isBreakpointHit(Emulator.this ) )
+                            if ( cpu.cycles == 1 && breakpoints.isBreakpointHit(Emulator.this ) )
                             {
                                 mode = EmulatorMode.STOPPED;
                                 System.err.println("*** emulation stopped because of breakpoint ***");

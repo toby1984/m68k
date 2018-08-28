@@ -34,6 +34,7 @@ public class Disassembler
     private final StringBuilder textBuffer = new StringBuilder();
     private final StringBuilder asciiBuffer = new StringBuilder();
     private final StringBuilder commentsBuffer = new StringBuilder();
+    private final StringBuilder hexBuffer = new StringBuilder();
 
     private final Line currentLine = new Line();
 
@@ -51,6 +52,7 @@ public class Disassembler
         public int pc;
         public Instruction instruction;
         public String text;
+        public String hex;
         public String ascii;
         public String comments;
 
@@ -60,6 +62,7 @@ public class Disassembler
             result.pc = pc;
             result.instruction = instruction;
             result.text = text;
+            result.hex = hex;
             result.ascii = ascii;
             result.comments = comments;
             result.data = data;
@@ -73,17 +76,19 @@ public class Disassembler
         @Override
         public String toString()
         {
+            final boolean needsPadding = hex != null || comments != null;
             final String textPadded;
-            if ( ascii != null || comments != null )
+            if ( needsPadding )
             {
-                textPadded = StringUtils.rightPad(text, 20, ' ');
+                textPadded = StringUtils.rightPad(text, 30, ' ')+" ; ";
             } else {
                 textPadded = text;
             }
-            return StringUtils.leftPad(Integer.toHexString(pc ),8,'0')+
+            return StringUtils.leftPad(Integer.toHexString(pc),8,'0')+
                     ": "+textPadded+
+                    (hex == null ? "" : " "+hex ) +
                     (ascii == null ? "" : " "+ascii) +
-                    ( comments == null ? "" : " "+comments );
+                    (comments == null ? "" : " "+comments);
         }
     }
 
@@ -120,6 +125,7 @@ public class Disassembler
             }
 
             textBuffer.setLength(0);
+            hexBuffer.setLength(0);
             asciiBuffer.setLength(0);
             commentsBuffer.setLength(0);
 
@@ -134,7 +140,11 @@ public class Disassembler
             }
             currentLine.text = textBuffer.toString();
             currentLine.comments = commentsBuffer.length() > 0 ? commentsBuffer.toString() : null;
-            currentLine.ascii = asciiBuffer.length() > 0 ? asciiBuffer.toString() : null;
+            if ( dumpHex )
+            {
+                currentLine.ascii = asciiBuffer.length() > 0 ? asciiBuffer.toString() : null;
+                currentLine.hex = hexBuffer.length() > 0 ? hexBuffer.toString() : null;
+            }
             lineConsumer.consume(currentLine);
         }
     }
@@ -182,7 +192,7 @@ public class Disassembler
         {
             e.printStackTrace();
             textBuffer.append("dc.w ").append( Misc.hex(insnWord) );
-            commentsBuffer.append(" ; ").append( Misc.binary16Bit(insnWord) ).append(" , caught "+e.getMessage());
+            commentsBuffer.append( Misc.binary16Bit(insnWord) ).append(" , caught "+e.getMessage());
             pc = currentLine.pc+2;
         }
     }
@@ -1264,12 +1274,12 @@ public class Disassembler
 
         final char low = HEX_CHARS[ value & 0b1111 ];
         final char hi = HEX_CHARS[ (value & 0b11110000)>>4 ];
-        asciiBuffer.append(hi).append(low);
+        hexBuffer.append(hi).append(low);
         if ( value >= 32 && value < 127)
         {
-            commentsBuffer.append(hi);
+            asciiBuffer.append(value);
         } else {
-            commentsBuffer.append('.');
+            asciiBuffer.append('.');
         }
     }
 
@@ -1519,9 +1529,14 @@ public class Disassembler
                 {
                     case 0b010:
                         // PC_INDIRECT_WITH_DISPLACEMENT(0b111,fixedValue(0b010),1),
+                        int adr = pc;
                         baseDisplacement = memory.readWordNoCheckNoSideEffects(pc);
                         pc += 2;
-                        append( Misc.hex(baseDisplacement ) ).append("(pc)");
+                        if ( resolveRelativeOffsets )
+                        {
+                            commentsBuffer.append( "address =").append( Misc.hex(adr+baseDisplacement) );
+                        }
+                        append(Misc.hex(baseDisplacement)).append("(pc)");
                         return;
                     case 0b011:
                      /*
@@ -1559,7 +1574,7 @@ public class Disassembler
                          * MOVE (xxx).W,... (1 extra word).
                          * ABSOLUTE_SHORT_ADDRESSING(0b111,fixedValue(000),1 ),
                          */
-                        int adr = memLoadWord(pc);
+                        adr = memLoadWord(pc);
                         append( Misc.hex(adr) );
                         pc += 2;
                         return;

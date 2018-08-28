@@ -232,6 +232,7 @@ public class DisassemblyWindow extends AppWindow
     {
         final Disassembler disasm = new Disassembler(emulator.memory);
         disasm.setDumpHex(true);
+        disasm.setResolveRelativeOffsets(true);
 
         int start;
         synchronized( LOCK )
