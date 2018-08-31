@@ -4,10 +4,20 @@ import de.codersourcery.m68k.disassembler.Disassembler;
 import de.codersourcery.m68k.emulator.Breakpoint;
 import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.Emulator;
+import de.codersourcery.m68k.emulator.IBreakpointCondition;
 import de.codersourcery.m68k.utils.Misc;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.JButton;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.JToolBar;
+import javax.swing.SwingUtilities;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Rectangle;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
@@ -83,8 +93,9 @@ public class DisassemblyWindow extends AppWindow
                             {
                                 final Breakpoints emBp = emulator.getBreakpoints();
                                 Breakpoint existing = emBp.getBreakpoint(finalAdr);
-                                if ( existing == null ) {
-                                    emBp.add(new Breakpoint(finalAdr));
+                                if ( existing == null )
+                                {
+                                    emBp.add(new Breakpoint(finalAdr, IBreakpointCondition.unconditional( finalAdr ) ));
                                 } else {
                                     emBp.remove(existing);
                                 }

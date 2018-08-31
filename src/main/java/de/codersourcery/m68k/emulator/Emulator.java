@@ -91,7 +91,10 @@ public class Emulator
     // @GuardedBy(EMULATOR_LOCK)
     private EmulatorThread emulatorThread;
 
-    private BlockingQueue<EmulatorCommand> cmdQueue = new ArrayBlockingQueue<>(1000, true);
+    private final Object CMD_QUEUE_LOCK = new Object();
+
+    // @GuardedBy( CMD_QUEUE_LOCK );
+    private BlockingQueue<EmulatorCommand> commandQueue = new ArrayBlockingQueue<>(1000, true);
 
     public Emulator(Amiga amiga, byte[] kickstartRom)
     {
@@ -164,17 +167,25 @@ public class Emulator
     private void sendCommand(EmulatorCommand cmd, boolean waitForCompletion)
     {
         Validate.notNull(cmd, "cmd must not be null");
-        cmdQueue.add(cmd);
         synchronized (EMULATOR_LOCK)
         {
             if (emulatorThread == null || !emulatorThread.isAlive())
             {
+                if ( cmd.type == CommandType.DESTROY ) {
+                    return;
+                }
                 System.out.println("Starting emulator thread");
                 emulatorThread = new EmulatorThread();
                 emulatorThread.start();
             }
-            emulatorThread.wakeup();
         }
+
+        synchronized( CMD_QUEUE_LOCK )
+        {
+            commandQueue.add( cmd );
+            CMD_QUEUE_LOCK.notifyAll();
+        }
+
         if (waitForCompletion)
         {
             try
@@ -190,8 +201,6 @@ public class Emulator
 
     private class EmulatorThread extends Thread
     {
-        private final Object STOP_LOCK = new Object();
-
         private int callbackInvocationTicks = 1000;
         private ITickListener callback = e -> {};
         private IEmulatorStateCallback stateCallback = new IEmulatorStateCallback()
@@ -213,28 +222,23 @@ public class Emulator
 
         private void waitForCommand()
         {
-            while (cmdQueue.peek() == null)
+            while (true)
             {
-                System.out.println("Emulator is going to sleep");
-                synchronized (STOP_LOCK)
+                synchronized (CMD_QUEUE_LOCK)
                 {
+                    if ( commandQueue.peek() != null ) {
+                        return;
+                    }
+                    System.out.println("Emulator is going to sleep");
                     try
                     {
-                        STOP_LOCK.wait();
+                        CMD_QUEUE_LOCK.wait();
                         System.out.println("Emulator thread woke up.");
                     }
                     catch (InterruptedException e)
                     {
                     }
                 }
-            }
-        }
-
-        public void wakeup()
-        {
-            synchronized (STOP_LOCK)
-            {
-                STOP_LOCK.notifyAll();
             }
         }
 
@@ -253,7 +257,7 @@ public class Emulator
             // copy first 1 KB from ROM to IRQ vectors starting at 0x00
             memory.bulkWrite(0x000000, kickstartRom, 0, 1024);
 
-            System.out.println( memory.hexdump(amiga.getKickRomStartAddress(),1024));
+            // System.out.println( memory.hexdump(amiga.getKickRomStartAddress(),1024));
 
             cpu.reset();
 
@@ -263,49 +267,57 @@ public class Emulator
         @Override
         public void run()
         {
+            boolean regularTermination = false;
             try
             {
                 System.out.println("Emulator thread start");
                 internalRun();
+                regularTermination = true;
             }
             finally
             {
-                System.err.println("Emulator thread died unexpectedly.");
-                final AtomicReference<ITickListener> finalCallback = new AtomicReference<>(this.callback);
-                final AtomicReference<IEmulatorStateCallback> finalStateCallback =
-                        new AtomicReference<>(this.stateCallback);
-                final AtomicInteger finalTickCnt = new AtomicInteger(this.callbackInvocationTicks);
-
-                final Thread t = new Thread(() ->
+                if ( regularTermination ) {
+                    System.err.println( "Emulator thread finished." );
+                }
+                else
                 {
-                    try
+                    System.err.println( "Emulator thread died unexpectedly." );
+                    final AtomicReference<ITickListener> finalCallback = new AtomicReference<>( this.callback );
+                    final AtomicReference<IEmulatorStateCallback> finalStateCallback =
+                            new AtomicReference<>( this.stateCallback );
+                    final AtomicInteger finalTickCnt = new AtomicInteger( this.callbackInvocationTicks );
+
+                    final Thread t = new Thread( () ->
                     {
-                        System.err.println("Restarting emulator thread in 10 seconds");
-                        Thread.sleep(10 * 1000);
-                    } catch (Exception e)
-                    {
-                        e.printStackTrace();
-                        ;
-                    }
-                    synchronized (EMULATOR_LOCK)
-                    {
-                        if (emulatorThread == null || !emulatorThread.isAlive())
+                        try
                         {
-                            System.err.println("Restarting emulator thread");
-                            emulatorThread = new EmulatorThread();
-                            emulatorThread.callback = finalCallback.get();
-                            emulatorThread.callbackInvocationTicks = finalTickCnt.get();
-                            emulatorThread.stateCallback = finalStateCallback.get();
-                            emulatorThread.start();
-                        }
-                        else
+                            System.err.println( "Restarting emulator thread in 10 seconds" );
+                            Thread.sleep( 10 * 1000 );
+                        } catch (Exception e)
                         {
-                            System.err.println("Emulator thread already running");
+                            e.printStackTrace();
+                            ;
                         }
-                    }
-                });
-                t.setDaemon(true);
-                t.start();
+                        synchronized (EMULATOR_LOCK)
+                        {
+                            if ( emulatorThread == null || !emulatorThread.isAlive() )
+                            {
+                                System.err.println( "Restarting emulator thread" );
+                                emulatorThread = new EmulatorThread();
+                                emulatorThread.callback = finalCallback.get();
+                                emulatorThread.callbackInvocationTicks = finalTickCnt.get();
+                                emulatorThread.stateCallback = finalStateCallback.get();
+                                emulatorThread.start();
+                            }
+                            else
+                            {
+                                System.err.println( "Emulator thread already running" );
+                            }
+                        }
+                    } );
+                    t.setDaemon( true );
+                    t.start();
+                }
             }
         }
 
@@ -316,7 +328,17 @@ public class Emulator
 
             while (true)
             {
-                EmulatorCommand cmd = cmdQueue.poll();
+                EmulatorCommand cmd;
+
+                synchronized (CMD_QUEUE_LOCK)
+                {
+                    cmd = commandQueue.poll();
+                    if ( cmd == null && mode != EmulatorMode.RUNNING ) {
+                        waitForCommand();
+                        continue;
+                    }
+                }
+
                 if (cmd != null)
                 {
                     final EmulatorMode oldMode = mode;
@@ -397,10 +419,6 @@ public class Emulator
                         System.err.println("*** emulation stopped because of error ***");
                         stateCallback.stopped(Emulator.this);
                     }
-                }
-                else
-                {
-                    waitForCommand();
                 }
             }
         }

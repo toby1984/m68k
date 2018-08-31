@@ -27,7 +27,7 @@ public enum Amiga
         @Override
         public int getKickRomSize()
         {
-            return 512*1024; // 512kB
+            return 256*1024; // 512kB
         }
 
         @Override

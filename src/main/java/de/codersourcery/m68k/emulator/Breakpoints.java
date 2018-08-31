@@ -55,19 +55,19 @@ public class Breakpoints
 
     public void setDisabled(Breakpoint bp)
     {
-        for (int i = 0; i < disabledBreakpoints.length; i++)
+        for (int i = 0,len=disabledBreakpoints.length; i < len; i++)
         {
             Breakpoint existing = disabledBreakpoints[i];
-            if (bp.address == existing.address)
+            if (bp == existing)
             {
                 return;
             }
         }
 
-        for (int i = 0; i < enabledBreakpoints.length; i++)
+        for (int i = 0,len=enabledBreakpoints.length; i < len; i++)
         {
             Breakpoint existing = enabledBreakpoints[i];
-            if (bp.address == existing.address)
+            if (bp == existing)
             {
                 enabledBreakpoints = removeFromArray(enabledBreakpoints,bp);
                 disabledBreakpoints = addToArray( disabledBreakpoints,bp);
@@ -80,18 +80,19 @@ public class Breakpoints
 
     public void setEnabled(Breakpoint bp)
     {
-        for (int i = 0; i < enabledBreakpoints.length; i++)
+        for (int i = 0,len = enabledBreakpoints.length ; i < len; i++)
         {
             Breakpoint existing = enabledBreakpoints[i];
-            if (bp.address == existing.address)
+            if (bp == existing)
             {
                 return;
             }
         }
-        for (int i = 0; i < disabledBreakpoints.length; i++)
+
+        for (int i = 0,len = disabledBreakpoints.length ; i < len ; i++)
         {
             Breakpoint existing = disabledBreakpoints[i];
-            if (bp.address == existing.address)
+            if (bp == existing)
             {
                 disabledBreakpoints = removeFromArray(disabledBreakpoints,bp);
                 enabledBreakpoints = addToArray( enabledBreakpoints,bp);
@@ -105,12 +106,12 @@ public class Breakpoints
     public Breakpoint getBreakpoint(int address)
     {
         for ( Breakpoint bp : enabledBreakpoints ) {
-            if ( bp.address == address ) {
+            if ( bp.matchesAddress( address ) ) {
                 return bp;
             }
         }
         for ( Breakpoint bp : disabledBreakpoints ) {
-            if ( bp.address == address ) {
+            if ( bp.matchesAddress( address ) ) {
                 return bp;
             }
         }
@@ -123,8 +124,18 @@ public class Breakpoints
         for (int i = 0, len = enabledBreakpoints.length ; i < len ; i++)
         {
             final Breakpoint bp = enabledBreakpoints[i];
-            if (bp.address == adr )
+            if ( bp.matchesAddress( adr ) && bp.matches( emulator ) )
             {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean contains(Breakpoint[] array,Breakpoint bp)
+    {
+        for ( int i = 0,len=array.length ; i < len ; i++) {
+            if ( array[i] == bp ) {
                 return true;
             }
         }
@@ -133,21 +144,21 @@ public class Breakpoints
 
     public boolean isEnabled(Breakpoint b)
     {
-        if ( Stream.of(enabledBreakpoints).anyMatch(x -> x.hasSameAddress(b) ) ) {
+        if ( contains(enabledBreakpoints,b) ) {
             return true;
         }
-        if ( Stream.of(disabledBreakpoints).anyMatch(x -> x.hasSameAddress(b) ) ) {
+        if ( contains(disabledBreakpoints,b) ) {
             return false;
         }
         throw new IllegalArgumentException("Unknown breakpoint: "+b);
     }
 
-    private static Breakpoint[] removeFromArray(Breakpoint[] array,Breakpoint toRemove)
+    private static Breakpoint[] removeFromArray(Breakpoint[] array, Breakpoint toRemove)
     {
-        return Stream.of( array ).filter( x -> x != toRemove ).toArray(Breakpoint[]::new);
+        return Stream.of( array ).filter( x -> x != toRemove ).toArray( Breakpoint[]::new);
     }
 
-    private static Breakpoint[] addToArray(Breakpoint[] array,Breakpoint toAdd)
+    private static Breakpoint[] addToArray(Breakpoint[] array, Breakpoint toAdd)
     {
         final Breakpoint[] tmp = Arrays.copyOf(array,array.length+1);
         tmp[tmp.length-1] = toAdd;
@@ -167,7 +178,7 @@ public class Breakpoints
         boolean removed = false;
         for ( Breakpoint existing : enabledBreakpoints )
         {
-            if ( existing.hasSameAddress(b) ) {
+            if ( existing == b ) {
                 enabledBreakpoints = removeFromArray(enabledBreakpoints,existing);
                 removed = true;
                 hasChanged = true;
@@ -175,7 +186,7 @@ public class Breakpoints
         }
         for ( Breakpoint existing : disabledBreakpoints )
         {
-            if ( existing.hasSameAddress(b) ) {
+            if ( existing == b ) {
                 enabledBreakpoints = removeFromArray(enabledBreakpoints,existing);
                 removed = true;
                 hasChanged = true;

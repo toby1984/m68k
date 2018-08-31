@@ -1,34 +1,41 @@
 package de.codersourcery.m68k.emulator;
 
-import de.codersourcery.m68k.utils.Misc;
+import org.apache.commons.lang3.Validate;
 
-public class Breakpoint
+/**
+ * A conditional breakpoint.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public final class Breakpoint
 {
     public final int address;
+    public final IBreakpointCondition condition;
 
-    public Breakpoint(int address) {
+    public Breakpoint(int address,IBreakpointCondition condition)
+    {
+        Validate.notNull( condition, "condition must not be null" );
+        this.condition = condition;
         this.address = address;
     }
 
-    public Breakpoint(Breakpoint other) {
-        this.address = other.address;
+    public boolean matches(Emulator emulator)
+    {
+        return condition.matches( emulator );
     }
 
-    public Breakpoint createCopy() {
-        return new Breakpoint(this);
+    public boolean matchesAddress(int address) {
+        return this.address == address;
     }
 
-    public boolean hasSameAddress(Breakpoint other) {
-        return this.address == other.address;
-    }
-
-    public boolean hasSameAddress(Emulator emulator) {
-        return emulator.cpu.pc == address;
+    public Breakpoint createCopy()
+    {
+        return new Breakpoint(this.address,this.condition);
     }
 
     @Override
     public String toString()
     {
-        return "Breakpoint[ "+ Misc.hex(address)+" ]";
+        return "Breakpoint[ address="+ this.address+", condition = "+condition +" ]";
     }
 }
