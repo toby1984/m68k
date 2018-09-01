@@ -264,7 +264,7 @@ public class Memory
             result.append(StringUtils.leftPad(adr,4,'0')).append(": ");
 
             ascii.setLength(0);
-            for ( int i = 0 ; i < 16 && count > 0 ; count-- )
+            for ( int i = 0 ; i < 16 && count > 0 ; count--,i++ )
             {
                 final byte v = data[offset++];
                 if ( v >=32 && v <127) {

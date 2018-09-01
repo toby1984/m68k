@@ -84,35 +84,26 @@ public class UI extends JFrame
             @Override
             public void stopped(Emulator emulator)
             {
-                for (Emulator.IEmulatorStateCallback listener : stateChangeListeners)
-                {
-                    listener.stopped( emulator );
-                }
+                stateChangeListeners.forEach( listener -> listener.stopped( emulator ) );
             }
 
             @Override
             public void singleStepFinished(Emulator emulator)
             {
-                for (Emulator.IEmulatorStateCallback listener : stateChangeListeners)
-                {
-                    listener.singleStepFinished( emulator );
-                }
+                stateChangeListeners.forEach( listener -> listener.singleStepFinished( emulator ) );
             }
 
             @Override
             public void enteredContinousMode(Emulator emulator)
             {
-                for (Emulator.IEmulatorStateCallback listener : stateChangeListeners)
-                {
-                    listener.enteredContinousMode( emulator );
-                }
+                stateChangeListeners.forEach( listener -> listener.enteredContinousMode( emulator ) );
             }
         } );
         emulator.setTickCallback( e ->
         {
-            for (ITickListener l : tickListeners)
+            for (int i = 0, tickListenersSize = tickListeners.size(); i < tickListenersSize; i++)
             {
-                l.tick(e);
+                tickListeners.get( i ).tick( e );
             }
         });
         refresh();
@@ -176,6 +167,7 @@ public class UI extends JFrame
         registerWindow( new DisassemblyWindow(this) );
         registerWindow( new CPUStateWindow("CPU", this) );
         registerWindow( new EmulatorStateWindow("Emulator", this) );
+        registerWindow( new MemoryViewWindow(this) );
 
         // final File romListing = new File("/home/tgierke/Downloads/exec_disassembly.txt");
         final File romListing = new File("/home/tobi/Downloads/kickrom_disassembly.txt");
