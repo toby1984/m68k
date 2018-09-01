@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.emulator;
 
+import de.codersourcery.m68k.disassembler.Disassembler;
 import de.codersourcery.m68k.emulator.chips.CIA8520;
 import de.codersourcery.m68k.emulator.chips.IRQController;
 import de.codersourcery.m68k.emulator.memory.MMU;
@@ -11,6 +12,7 @@ import org.apache.commons.lang3.Validate;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -321,6 +323,41 @@ public class Emulator
             }
         }
 
+        private void printBacktrace() {
+
+            if ( cpu.isBackTraceAvailable() )
+            {
+                System.err.println("=== BACKTRACE ===\n");
+                Disassembler disasm = new Disassembler( memory );
+                disasm.setResolveRelativeOffsets( true );
+                disasm.setDumpHex( true );
+
+                final int[] adrs = cpu.getBackTrace();
+                final AtomicBoolean gotLine = new AtomicBoolean();
+                for ( int adr : adrs )
+                {
+                    gotLine.set(false);
+                    final Disassembler.LineConsumer consumer = new Disassembler.LineConsumer()
+                    {
+                        @Override
+                        public boolean stop(int pc)
+                        {
+                            return gotLine.get();
+                        }
+
+                        @Override
+                        public void consume(Disassembler.Line line)
+                        {
+                            gotLine.set(true);
+                            System.err.println( line.toString() );
+                        }
+                    };
+                    disasm.disassemble( adr,consumer );
+                }
+                System.err.println();
+            }
+        }
+
         @SuppressWarnings( "deprecation" )
         public void internalRun()
         {
@@ -375,6 +412,7 @@ public class Emulator
                             }
                             catch (Exception e)
                             {
+                                printBacktrace();
                                 e.printStackTrace();
                             }
                             finally
@@ -414,6 +452,7 @@ public class Emulator
                     }
                     catch (Exception e)
                     {
+                        printBacktrace();
                         e.printStackTrace();
                         mode = EmulatorMode.STOPPED;
                         System.err.println("*** emulation stopped because of error ***");

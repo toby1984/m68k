@@ -14,11 +14,7 @@ import de.codersourcery.m68k.utils.OpcodeFileReader;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
-import java.io.BufferedReader;
-import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
@@ -33,11 +29,17 @@ import java.util.Map;
 public class CPU
 {
     private static final boolean DEBUG = false;
+    private static final boolean DEBUG_RECORD_BACKTRACE = true;
 
     private final CPUType cpuType;
 
     private final InstructionImpl[] opcodeMap = new InstructionImpl[65536];
     private final String[] opcodeDebugMap = new String[65536];
+
+    private final int[] backtrace = new int[16];
+    private boolean backtraceBufferFull;
+    private int backtraceReadPtr=0;
+    private int backtraceWritePtr=0;
 
     protected interface InstructionImpl
     {
@@ -283,8 +285,6 @@ public class CPU
 
     private int userModeStackPtr;
     private int supervisorModeStackPtr;
-
-    private boolean addressRegisterDirectAllowed;
 
     public int pcAtStartOfLastInstruction;
     public int pc;
@@ -758,7 +758,18 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
     private void internalExecutionOneCycle()
     {
-        addressRegisterDirectAllowed = true;
+        if ( DEBUG_RECORD_BACKTRACE )
+        {
+            backtrace[backtraceWritePtr] = pc;
+            backtraceWritePtr = (backtraceWritePtr+1) & 0b1111;
+            if ( backtraceBufferFull ) {
+                backtraceReadPtr = (backtraceReadPtr+1) & 0b1111;
+            }
+            else
+            {
+                backtraceBufferFull = backtraceWritePtr == 0;
+            }
+        }
 
         if ( ( pc & 1 ) != 0 )
         {
@@ -780,6 +791,40 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
         pc += 2;
         opcodeMap[instruction & 0xffff].execute(instruction);
+    }
+
+    public boolean isBackTraceAvailable()
+    {
+        return DEBUG_RECORD_BACKTRACE && (backtraceBufferFull || backtraceWritePtr>0);
+    }
+
+    /**
+     * Returns the addresses of the last executed instructions
+     * (up to 16) starting with the oldest.
+     *
+     * @return
+     * @see #DEBUG_RECORD_BACKTRACE
+     */
+    public int[] getBackTrace()
+    {
+        if ( ! isBackTraceAvailable() ) {
+            return new int[0];
+        }
+        final int[] result;
+        if ( backtraceBufferFull )
+        {
+            result = new int[16];
+            for ( int i = 0,start = backtraceReadPtr ; i < 16 ; i++ ) {
+                result[i] = backtrace[start];
+                start = (start+1) & 0b1111;
+            }
+        } else {
+            result = new int[backtraceWritePtr];
+            for ( int i = 0 ; i < backtraceWritePtr ; i++ ) {
+                result[i] = backtrace[i];
+            }
+        }
+        return result;
     }
 
     private void illegalInstruction() {
@@ -1270,10 +1315,6 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 return true;
             case 0b001:
                 // ADDRESS_REGISTER_DIRECT;
-                if ( ! addressRegisterDirectAllowed )
-                {
-                    throw new IllegalInstructionException(pcAtStartOfLastInstruction,instruction);
-                }
                 ea = addressRegisters[eaRegister];
                 switch(operandSizeInBytes) {
                     case 2:
@@ -1554,6 +1595,13 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         if ( irq == IRQ.RESET )
         {
             cycles = 0;
+
+            if ( DEBUG_RECORD_BACKTRACE )
+            {
+                backtraceBufferFull = false;
+                backtraceReadPtr = 0;
+                backtraceWritePtr = 0;
+            }
 
             // clear interrupt stack
             irqStackPtr = 0;
@@ -2575,7 +2623,9 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
             stopped = true;
         }
     }
-    private void reset(int instruction) {
+
+    private void reset(int instruction)
+    {
         cycles = 132;
     }
 
