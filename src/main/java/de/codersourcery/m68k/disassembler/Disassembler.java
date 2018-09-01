@@ -951,9 +951,14 @@ public class Disassembler
                 cond = Condition.fromBits( (insnWord & 0b0000111100000000) >>> 8 );
                 int register = insnWord & 0b111;
                 int offset = readWord();
-                int destinationAdress = currentLine.pc + offset;
-                appendln("db").append(cond.suffix.toLowerCase()).append(" d").append( register ).append(",").append(
-                        Misc.hex(destinationAdress));
+                int destinationAdress = currentLine.pc + 2 + offset;
+
+                if ( cond == Condition.BSR ) {
+                    appendln("dbra");
+                } else {
+                    appendln("db").append(cond.suffix.toLowerCase());
+                }
+                append(" d").append( register ).append(",").append(Misc.hex(destinationAdress));
                 return;
             // Bcc
             case BRA:
@@ -978,15 +983,15 @@ public class Disassembler
                     suffix = "ra";
                 }
                 appendln("b").append( suffix ).append(" ");
-                if ( matches(insnWord, Instruction.BCC_8BIT_ENCODING ) ) {
-                    offset = insnWord & 0xff;
-                    offset = (offset<<24) >> 24;
-                } else if ( matches(insnWord, Instruction.BCC_16BIT_ENCODING ) ) {
-                    offset = readWord();
-                } else if ( matches(insnWord, Instruction.BCC_32BIT_ENCODING ) ) {
-                    offset = readLong();
-                } else {
-                    break;
+                switch( insnWord & 0xff ) {
+                    case 0x00:
+                        offset = readWord();
+                        break;
+                    case 0xff:
+                        offset = readLong();
+                        break;
+                    default:
+                        offset = ((insnWord & 0xff) <<24) >> 24;
                 }
                 append( Misc.hex( currentLine.pc + 2 + offset ) );
                 return;

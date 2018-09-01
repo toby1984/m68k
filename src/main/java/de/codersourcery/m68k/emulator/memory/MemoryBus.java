@@ -67,7 +67,12 @@ public class MemoryBus
 
     public boolean occupy(Owner owner)
     {
-        this.owner = owner;
+        if ( this.owner == null || this.owner == owner )
+        {
+            this.owner = owner;
+            return true;
+        }
+        return false;
     }
 
     public void tick()

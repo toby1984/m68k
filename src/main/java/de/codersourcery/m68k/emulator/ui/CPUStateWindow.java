@@ -2,6 +2,7 @@ package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.CPU;
 import de.codersourcery.m68k.emulator.Emulator;
+import de.codersourcery.m68k.utils.Misc;
 
 import javax.swing.*;
 import java.awt.*;
@@ -71,7 +72,11 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         doWithNumber(tf, adr ->
         {
             System.out.println("Set[ D"+regNum+"] = "+adr);
-            ui.doWithEmulator(emu -> emu.cpu.dataRegisters[regNum] = adr);
+            ui.doWithEmulator(emu ->
+            {
+                emu.cpu.dataRegisters[regNum] = adr;
+                emu.invokeTickCallback();
+            });
         });
     }
 
@@ -80,7 +85,11 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         doWithNumber(tf, adr ->
         {
             System.out.println("Set[ A"+regNum+"] = "+adr);
-            ui.doWithEmulator(emu -> emu.cpu.addressRegisters[regNum] = adr);
+            ui.doWithEmulator(emu ->
+            {
+                emu.cpu.addressRegisters[regNum] = adr;
+                emu.invokeTickCallback();
+            });
         });
     }
 
@@ -95,6 +104,7 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
             } else {
                 emu.cpu.clearFlags(flag);
             }
+            emu.invokeTickCallback();
         });
     }
 
@@ -151,8 +161,10 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         {
             ui.doWithEmulator(emu ->
             {
-                System.out.println("Setting PC to "+(adr&~1));
+                System.out.println("Setting PC to "+ Misc.hex(adr&~1));
+                emu.cpu.cycles = 1;
                 emu.cpu.pc = (adr & ~1);
+                emu.invokeTickCallback();
             });
         }));
         GridBagConstraints cnstrs = cnstrsNoResize( 0, 0 );

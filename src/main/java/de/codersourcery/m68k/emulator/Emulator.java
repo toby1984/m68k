@@ -468,6 +468,11 @@ public class Emulator
         sendCommand(new EmulatorCallback(action),false);
     }
 
+    private void internalSyncSendCommand(Consumer<EmulatorThread> action)
+    {
+        sendCommand(new EmulatorCallback(action),true);
+    }
+
     /**
      * Set callback to be invoked every {@link #setCallbackInvocationTicks(int)} emulation
      * ticks.
@@ -498,6 +503,10 @@ public class Emulator
         internalAsyncSendCommand( thread -> thread.stateCallback = cb );
     }
 
+    /**
+     * Externally trigger an invocation of the emulator's tick callback.
+     *
+     */
     public void invokeTickCallback()
     {
         internalAsyncSendCommand( thread -> thread.callback.tick(Emulator.this ) );

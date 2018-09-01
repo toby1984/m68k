@@ -20,10 +20,13 @@ import java.awt.GridBagLayout;
 import java.awt.Rectangle;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class DisassemblyWindow extends AppWindow
         implements ITickListener, Emulator.IEmulatorStateCallback
@@ -135,20 +138,25 @@ public class DisassemblyWindow extends AppWindow
                     final Disassembler.Line line = lines.get(i);
                     final Breakpoint bp = breakpoints.getBreakpoint(line.pc);
                     final String prefix;
+                    final boolean markLine = followProgramCounter && addressToDisplay == line.pc;
                     if ( bp != null ) {
                         if ( breakpoints.isEnabled(bp ) ) {
-                            prefix = addressToDisplay == line.pc ? ">>>[B]" : "   [B]";
+                            prefix = markLine ? ">>>[B]" : "   [B]";
                         } else {
-                            prefix = addressToDisplay == line.pc ? ">>>[ ]" : "   [ ]";
+                            prefix = markLine ? ">>>[ ]" : "   [ ]";
                         }
                     }
                     else
                     {
-                        prefix = addressToDisplay == line.pc ? ">>>   " : "      ";
+                        prefix = markLine ? ">>>   " : "      ";
                     }
                     final int y1 = rect.y + ((rect.height - metrics.getHeight()) / 2) + metrics.getAscent();
                     line.data = new Rectangle(rect.x,rect.y, 50,lineHeight );
                     g.drawString(prefix+line.toString(), rect.x, y1);
+                    if ( markLine )
+                    {
+                        g.drawRect(rect.x,rect.y,getWidth(), lineHeight-1 );
+                    }
                 }
             }
         }
@@ -171,12 +179,64 @@ public class DisassemblyWindow extends AppWindow
         return button;
     }
 
+    private final KeyAdapter keyAdapter = new KeyAdapter()
+    {
+        @Override
+        public void keyReleased(KeyEvent e)
+        {
+            if ( e.getKeyCode() == KeyEvent.VK_PAGE_UP ) {
+                synchronized (LOCK)
+                {
+                    addressToDisplay = lines.get(0).pc;
+                    followProgramCounter = false;
+                }
+                ui.doWithEmulator(DisassemblyWindow.this::tick);
+            }
+            else if ( e.getKeyCode() == KeyEvent.VK_PAGE_DOWN ) {
+                synchronized (LOCK)
+                {
+                    addressToDisplay = lines.get(lines.size()-1).pc;
+                    followProgramCounter = false;
+                }
+                ui.doWithEmulator(DisassemblyWindow.this::tick);
+            }
+            else if ( e.getKeyCode() == KeyEvent.VK_UP || e.getKeyCode() == KeyEvent.VK_DOWN )
+            {
+                synchronized(LOCK)
+                {
+                    for (int i = 0; i < lines.size(); i++)
+                    {
+                        final Disassembler.Line l = lines.get(i);
+                        if ( l.pc == addressToDisplay )
+                        {
+
+                            if ( e.getKeyCode() == KeyEvent.VK_UP && i>0 )
+                            {
+                                followProgramCounter = false;
+                                addressToDisplay = lines.get(i-1).pc;
+                            }
+                            else if (  e.getKeyCode() == KeyEvent.VK_DOWN && (i+1) < lines.size() )
+                            {
+                                followProgramCounter = false;
+                                addressToDisplay = lines.get(i+1).pc;
+                            }
+                            break;
+                        }
+                    }
+                }
+                ui.doWithEmulator(DisassemblyWindow.this::tick);
+            }
+        }
+    };
+
+
     public DisassemblyWindow(UI ui)
     {
         super("Disassembly",ui);
 
         final JToolBar toolbar = new JToolBar(JToolBar.HORIZONTAL );
 
+        addKeyListener(keyAdapter );
         addressTextfield.addActionListener( ev -> {
 
             try
@@ -196,35 +256,6 @@ public class DisassemblyWindow extends AppWindow
             }
         });
 
-        // Page up
-        toolbar.add( button("Up" , ()->
-        {
-            System.out.println("Up clicked");
-            synchronized(LOCK)
-            {
-                if ( lines.size() > 0 )
-                {
-                    followProgramCounter = false;
-                    addressToDisplay = lines.get(0).pc;
-                }
-            }
-            ui.doWithEmulator(this::tick);
-        }));
-
-        // Page down
-        toolbar.add( button("Down" , ()->
-        {
-            synchronized(LOCK)
-            {
-                if ( lines.size() > 0 )
-                {
-                    followProgramCounter = false;
-                    addressToDisplay = lines.get( lines.size()-1 ).pc;
-                }
-            }
-            ui.doWithEmulator(this::tick);
-        }));
-
         addressTextfield.setColumns( 8 );
         toolbar.add( addressTextfield );
 
@@ -235,6 +266,8 @@ public class DisassemblyWindow extends AppWindow
         getContentPane().add( toolbar, cnstrs );
         cnstrs = cnstrs(0,1);
         cnstrs.weighty = 1;
+        panel.setFocusable(true);
+        panel.addKeyListener(keyAdapter );
         getContentPane().add( panel, cnstrs);
     }
 

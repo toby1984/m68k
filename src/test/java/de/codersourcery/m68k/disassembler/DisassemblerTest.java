@@ -321,12 +321,12 @@ public class DisassemblerTest extends TestCase
 
     public void testDBRA()
     {
-        testDBcc(Instruction.DBHI);
+        testDBcc(Instruction.DBRA);
     }
 
     private void testDBcc(Instruction instruction)
     {
-        final String expected = "00000000: "+instruction.getMnemonic()+" d1,$fffffffe";
+        final String expected = "00000000: "+instruction.getMnemonic()+" d1,$0";
         compile("loop: "+instruction.getMnemonic()+" d1,loop", expected );
     }
 

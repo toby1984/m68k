@@ -87,4 +87,13 @@ public abstract class AppWindow extends JInternalFrame
         state.setWindowKey( getWindowKey() );
         return state;
     }
+
+    protected static int parseNumber(String value)
+    {
+        value = value.trim();
+        if ( value.startsWith("$" ) ) {
+            return Integer.parseInt( value.substring(1),16 );
+        }
+        return Integer.parseInt( value );
+    }
 }

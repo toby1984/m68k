@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.Emulator;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import javax.swing.text.Style;
@@ -29,6 +30,8 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
 
     private final Style highlightStyle;
     private final Style defaultStyle;
+
+    private final JTextField addressTextfield = new JTextField("$fc0000");
 
     private Highlight currentHighlight;
 
@@ -83,7 +86,29 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
         this.textfield.setText( buffer.toString() );
         this.textfield.setEditable( false );
         getContentPane().setLayout( new GridBagLayout() );
-        getContentPane().add( new JScrollPane(textfield) , cnstrs(0,0) );
+        addressTextfield.setColumns(8);
+        addressTextfield.addActionListener( ev ->
+        {
+            final String text = addressTextfield.getText();
+            if (StringUtils.isNotBlank(text) )
+            {
+                final int adr = parseNumber(text);
+                synchronized (LOCK)
+                {
+                    followPC = false;
+                    addressToDisplay = adr;
+                }
+                ui.doWithEmulator(this::tick );
+            }
+        });
+        GridBagConstraints cnstrs = cnstrs(0, 0);
+        cnstrs.fill=GridBagConstraints.HORIZONTAL;
+        cnstrs.weighty=0.1;cnstrs.weightx=1;
+        getContentPane().add( addressTextfield , cnstrs);
+
+        cnstrs = cnstrs(0,1);
+        cnstrs.weighty=0.9;cnstrs.weightx=1;
+        getContentPane().add( new JScrollPane(textfield) , cnstrs );
 
         highlightStyle = document().addStyle( "highlightstyle", null );
         StyleConstants.setBackground(highlightStyle,Color.RED);
@@ -125,7 +150,7 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     @Override
     public void stopped(Emulator emulator)
     {
-
+        tick(emulator);
     }
 
     @Override

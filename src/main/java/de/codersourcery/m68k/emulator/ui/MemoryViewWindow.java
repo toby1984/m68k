@@ -143,15 +143,6 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
         });
     }
 
-    private int parseNumber(String value)
-    {
-        value = value.trim();
-        if ( value.startsWith("$" ) ) {
-            return Integer.parseInt( value.substring(1),16 );
-        }
-        return Integer.parseInt( value );
-    }
-
     private void parseExpression(String value)
     {
         if ( ! StringUtils.isBlank(value) )

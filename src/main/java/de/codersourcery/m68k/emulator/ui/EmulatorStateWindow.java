@@ -16,6 +16,7 @@ public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulator
     {
         super( title, ui );
 
+
         setLayout( new FlowLayout() );
         runButton = addButton("Run", () -> {
             ui.doWithEmulator( emu -> emu.start() );
@@ -29,6 +30,7 @@ public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulator
         resetButton = addButton("Reset", () -> {
             ui.doWithEmulator( emu -> emu.reset() );
         });
+        stopButton.setEnabled(false);
     }
 
     @Override

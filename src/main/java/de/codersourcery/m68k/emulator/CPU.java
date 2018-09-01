@@ -2465,7 +2465,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         final int eaMode = (instruction & 0b111000) >> 3;
         final int eaRegister = instruction & 0b111;
 
-        if ( decodeSourceOperand(instruction,operandSizeInBytes,false,false) ) {
+        if ( decodeSourceOperand(instruction,operandSizeInBytes,false,isCompareInsn) ) {
             // register operand
             switch(operandSizeInBytes) {
                 case 1:
@@ -3137,7 +3137,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
                  *   counter plus the sign-extended 16-bit displacement. The value in the program counter is
                  *   the address of the instruction word of the DBcc instruction plus two. The
                  */
-                pc = pc + memory.readWordNoCheck(pc);
+                pc += memory.readWordNoCheck(pc);
                 cycles = 10;
                 return;
             } else {
@@ -3270,8 +3270,8 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
                    cycles = 10;
                } else {
                    cycles = 12;
+                   pc += 2; // skip offset
                }
-               pc += 2; // skip offset
                break;
            case 0xff: // 32 bit offset (NOT an M68000 addressing mode...)
                if (takeBranch)
@@ -3280,15 +3280,14 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
                    cycles = 12; // TODO: Wrong timing, find out 68020+ timings...
                } else {
                    cycles = 10; // TODO: Wrong timing, find out 68020+ timings...
+                   pc += 4;
                }
-               pc += 4;
                break;
            default:
                // 8-bit branch offset encoded in instruction itself
                if (takeBranch)
                {
-                   final int offset = ((instruction & 0xff) << 24) >> 24;
-                   pc += offset;
+                   pc += ((instruction & 0xff) << 24) >> 24;
                    cycles = 10;
                } else {
                    cycles = 8;
