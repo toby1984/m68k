@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.Emulator;
 
 import javax.swing.*;
@@ -30,6 +31,8 @@ public class UI extends JFrame
 
     private Emulator emulator;
 
+    private final List<ITickListener> tickListeners = new ArrayList<>();
+    private final List<Emulator.IEmulatorStateCallback> stateChangeListeners = new ArrayList<>();
     private final List<AppWindow> windows = new ArrayList<>();
 
     private UIConfig uiConfig;
@@ -77,6 +80,7 @@ public class UI extends JFrame
         System.out.println("Setting up new emulator instance for "+Amiga.AMIGA_500);
 
         emulator = new Emulator(Amiga.AMIGA_500,loadKickstartRom());
+        emulator.getBreakpoints().populateFrom( loadConfig().getBreakpoints() );
         emulator.setCallbackInvocationTicks(1000000);
 
         emulator.setStateCallback( new Emulator.IEmulatorStateCallback()
@@ -131,9 +135,6 @@ public class UI extends JFrame
         return Optional.ofNullable( result == JFileChooser.APPROVE_OPTION ? fileChooser.getSelectedFile() : null );
     }
 
-    private final List<ITickListener> tickListeners = new ArrayList<>();
-    private final List<Emulator.IEmulatorStateCallback> stateChangeListeners = new ArrayList<>();
-
     private void registerWindow(AppWindow window)
     {
         windows.add(window);
@@ -168,6 +169,7 @@ public class UI extends JFrame
         registerWindow( new CPUStateWindow("CPU", this) );
         registerWindow( new EmulatorStateWindow("Emulator", this) );
         registerWindow( new MemoryViewWindow(this) );
+        registerWindow( new BreakpointsWindow(this) );
 
         // final File romListing = new File("/home/tgierke/Downloads/exec_disassembly.txt");
         final File romListing = new File("/home/tobi/Downloads/kickrom_disassembly.txt");
@@ -359,11 +361,18 @@ public class UI extends JFrame
         mainWindow.setLocationAndSize( UI.this.getBounds());
         config.setWindowState(mainWindow);
 
+        final AtomicReference<Breakpoints> bps = new AtomicReference<>();
+        doWithEmulator(emu -> {
+           bps.set( emu.getBreakpoints().createCopy() );
+        });
+
+        config.setBreakpoints(bps.get());
+
         final File file = getConfigPath();
         System.out.println("*** Saving configuration to "+file);
         try (FileOutputStream out = new FileOutputStream( file ) )
         {
-            uiConfig.write( out );
+            config.write( out );
         }
         catch (IOException e)
         {

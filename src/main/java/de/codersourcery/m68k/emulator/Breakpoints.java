@@ -1,6 +1,11 @@
 package de.codersourcery.m68k.emulator;
 
+import de.codersourcery.m68k.emulator.ui.ConditionalBreakpointExpressionParser;
+
 import java.util.Arrays;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -13,7 +18,19 @@ public class Breakpoints
     private Breakpoint[] enabledBreakpoints = new Breakpoint[0];
     private Breakpoint[] disabledBreakpoints = new Breakpoint[0];
 
-    public boolean hasChanged = true;
+    private int hashcode;
+
+    public void populateFrom(Breakpoints breakpoints)
+    {
+        enabledBreakpoints = Stream.of(breakpoints.enabledBreakpoints).toArray(Breakpoint[]::new);
+        disabledBreakpoints = Stream.of(breakpoints.disabledBreakpoints).toArray(Breakpoint[]::new);
+        updateHashCode();
+    }
+
+    public interface IBreakpointVisitor
+    {
+        boolean visit(Breakpoint bp);
+    }
 
     public Breakpoints() {
     }
@@ -24,13 +41,62 @@ public class Breakpoints
         return "enabled={"+Arrays.toString(enabledBreakpoints)+"},disabled={"+Arrays.toString(disabledBreakpoints)+"}";
     }
 
+    public void visitBreakpoints(IBreakpointVisitor c)
+    {
+        for (int i = 0, enabledBreakpointsLength = enabledBreakpoints.length; i < enabledBreakpointsLength; i++)
+        {
+            if (!c.visit(enabledBreakpoints[i]))
+            {
+                return;
+            }
+        }
+        for (int i = 0, disabledBreakpointsLength = disabledBreakpoints.length; i < disabledBreakpointsLength; i++)
+        {
+            if (!c.visit(disabledBreakpoints[i]))
+            {
+                return;
+            }
+        }
+    }
+
+    public int getHashCode() {
+        return hashcode;
+    }
+
+    public boolean isDifferent(Breakpoints other) {
+        boolean result = this.hashcode != other.hashcode;
+        System.out.println("THIS: "+this.hashcode+" <-> OTHER: "+other.hashcode);
+        return result;
+    }
+
+    private void updateHashCode()
+    {
+        int result = 0;
+        for (int i = 0, enabledBreakpointsLength = enabledBreakpoints.length; i < enabledBreakpointsLength; i++)
+        {
+            result = (result+1)*31 + enabledBreakpoints[i].hashCode();
+        }
+        for (int i = 0, disabledBreakpointsLength = disabledBreakpoints.length; i < disabledBreakpointsLength; i++)
+        {
+            result = (result+1)*37 + disabledBreakpoints[i].hashCode();
+        }
+        hashcode = result;
+        System.out.println("updateHashCode(): "+result);
+    }
+
+    public int size() {
+        return enabledBreakpoints.length + disabledBreakpoints.length;
+    }
+
     public boolean hasEnabledBreakpoints() {
         return enabledBreakpoints.length > 0;
     }
 
-    public Breakpoints(Breakpoints other) {
+    public Breakpoints(Breakpoints other)
+    {
         this.enabledBreakpoints = Arrays.copyOf(other.enabledBreakpoints,other.enabledBreakpoints.length);
         this.disabledBreakpoints = Arrays.copyOf(other.disabledBreakpoints,other.disabledBreakpoints.length);
+        this.hashcode = other.hashcode;
     }
 
     public Breakpoints createCopy() {
@@ -41,10 +107,10 @@ public class Breakpoints
     {
         internalRemove(b);
         enabledBreakpoints = addToArray(enabledBreakpoints,b);
-        hasChanged = true;
+        updateHashCode();
     }
 
-    public void setStatus(Breakpoint bp, boolean enabled)
+    public void setEnabled(Breakpoint bp, boolean enabled)
     {
         if ( enabled ) {
             setEnabled(bp);
@@ -71,7 +137,7 @@ public class Breakpoints
             {
                 enabledBreakpoints = removeFromArray(enabledBreakpoints,bp);
                 disabledBreakpoints = addToArray( disabledBreakpoints,bp);
-                hasChanged = true;
+                updateHashCode();
                 return;
             }
         }
@@ -96,7 +162,7 @@ public class Breakpoints
             {
                 disabledBreakpoints = removeFromArray(disabledBreakpoints,bp);
                 enabledBreakpoints = addToArray( enabledBreakpoints,bp);
-                hasChanged = true;
+                updateHashCode();
                 return;
             }
         }
@@ -153,6 +219,16 @@ public class Breakpoints
         throw new IllegalArgumentException("Unknown breakpoint: "+b);
     }
 
+    public boolean hasEnabledBreakpoint(int address)
+    {
+        for ( var bp : enabledBreakpoints ) {
+            if ( bp.address == address ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static Breakpoint[] removeFromArray(Breakpoint[] array, Breakpoint toRemove)
     {
         return Stream.of( array ).filter( x -> x != toRemove ).toArray( Breakpoint[]::new);
@@ -181,17 +257,57 @@ public class Breakpoints
             if ( existing == b ) {
                 enabledBreakpoints = removeFromArray(enabledBreakpoints,existing);
                 removed = true;
-                hasChanged = true;
             }
         }
         for ( Breakpoint existing : disabledBreakpoints )
         {
             if ( existing == b ) {
-                enabledBreakpoints = removeFromArray(enabledBreakpoints,existing);
+                disabledBreakpoints = removeFromArray(disabledBreakpoints,existing);
                 removed = true;
-                hasChanged = true;
             }
         }
+        if ( removed ) {
+            updateHashCode();
+        }
         return removed;
+    }
+
+    public static Breakpoints load(Map<String,String> data)
+    {
+        final Breakpoints result = new Breakpoints();
+        final Pattern p = Pattern.compile("breakpoint\\.(\\d+)\\.(.*)");
+        for ( var entry : data.entrySet() )
+        {
+            final Matcher matcher =
+                p.matcher(entry.getKey());
+            if ( matcher.matches() )
+            {
+                final int adr = Integer.parseInt( matcher.group(1) );
+                if ( result.getBreakpoint(adr) == null )
+                {
+                    final String prefix = "breakpoint."+adr+".";
+                    final boolean enabled = Boolean.parseBoolean(data.get(prefix+"enabled") );
+                    final Breakpoint bp = new Breakpoint(adr, ConditionalBreakpointExpressionParser.parse(data.get(prefix + "condition")));
+                    result.add(bp);
+                    if ( ! enabled )
+                    {
+                        result.setDisabled(bp);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    public void save(Map<String,String> data) {
+
+        visitBreakpoints(bp ->
+        {
+            final boolean enabled = isEnabled(bp);
+            final String prefix = "breakpoint."+bp.address+".";
+            data.put( prefix+"enabled", Boolean.toString( enabled ) );
+            data.put( prefix+"condition", bp.condition.getExpression());
+            return true;
+        });
     }
 }

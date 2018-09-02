@@ -1,14 +1,30 @@
 package de.codersourcery.m68k.emulator;
 
+import org.apache.commons.lang3.Validate;
+
 /**
  * Condition for conditional breakpoints.
  *
  * @see Breakpoint#Breakpoint(int, IBreakpointCondition)
  * @see Breakpoint#matches(Emulator)
  */
-public interface IBreakpointCondition
+public abstract class IBreakpointCondition
 {
-    IBreakpointCondition TRUE = new AlwaysTrueBreakpoint();
+    public static final IBreakpointCondition TRUE = new IBreakpointCondition() {
+
+        @Override
+        public boolean matches(Emulator emulator)
+        {
+            return true;
+        }
+
+        @Override
+        public String getExpression()
+        {
+            return "";
+        }
+    };
+
 
     /**
      * Returns whether the emulator's state satisfies this condition.
@@ -16,34 +32,22 @@ public interface IBreakpointCondition
      * @param emulator
      * @return <code>true</code> if the emulator's state satisfies this condition.
      */
-    boolean matches(Emulator emulator);
+    public abstract boolean matches(Emulator emulator);
 
-    static IBreakpointCondition unconditional(int adr) {
-        return new UnconditionalBreakpoint(adr);
+    public abstract String getExpression();
+
+    public final boolean equals(Object o)
+    {
+        if ( o != null && o.getClass() == getClass() )
+        {
+            return ((IBreakpointCondition) o).getExpression().equals(this.getExpression());
+        }
+        return false;
     }
 
-    final class AlwaysTrueBreakpoint implements IBreakpointCondition
+    @Override
+    public final int hashCode()
     {
-        @Override
-        public boolean matches(Emulator emulator)
-        {
-            return true;
-        }
-    }
-
-    final class UnconditionalBreakpoint implements IBreakpointCondition
-    {
-        private final int adr;
-
-        public UnconditionalBreakpoint(int adr)
-        {
-            this.adr = adr;
-        }
-
-        @Override
-        public boolean matches(Emulator emulator)
-        {
-            return emulator.cpu.cycles == 1 && emulator.cpu.pc == adr;
-        }
+        return getExpression().hashCode();
     }
 }

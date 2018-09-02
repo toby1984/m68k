@@ -12,6 +12,7 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.JToolBar;
 import javax.swing.SwingUtilities;
+import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
@@ -26,7 +27,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class DisassemblyWindow extends AppWindow
         implements ITickListener, Emulator.IEmulatorStateCallback
@@ -98,12 +98,12 @@ public class DisassemblyWindow extends AppWindow
                                 Breakpoint existing = emBp.getBreakpoint(finalAdr);
                                 if ( existing == null )
                                 {
-                                    emBp.add(new Breakpoint(finalAdr, IBreakpointCondition.unconditional( finalAdr ) ));
+                                    emBp.add(new Breakpoint(finalAdr, IBreakpointCondition.TRUE));
                                 } else {
                                     emBp.remove(existing);
                                 }
                                 System.out.println("BREAKPOINTS: "+emBp);
-                                tick(emulator);
+                                emulator.invokeTickCallback();
                             });
                         }
                     }
@@ -152,7 +152,14 @@ public class DisassemblyWindow extends AppWindow
                     }
                     final int y1 = rect.y + ((rect.height - metrics.getHeight()) / 2) + metrics.getAscent();
                     line.data = new Rectangle(rect.x,rect.y, 50,lineHeight );
-                    g.drawString(prefix+line.toString(), rect.x, y1);
+
+                    if ( breakpoints.hasEnabledBreakpoint(line.pc ) ) {
+                        g.setColor(Color.RED);
+                        g.drawString(prefix+line.toString(), rect.x, y1);
+                        g.setColor(getForeground());
+                    } else {
+                        g.drawString(prefix+line.toString(), rect.x, y1);
+                    }
                     if ( markLine )
                     {
                         g.drawRect(rect.x,rect.y,getWidth(), lineHeight-1 );
@@ -171,12 +178,6 @@ public class DisassemblyWindow extends AppWindow
             maxLines = getHeight() / lineHeight;
             System.out.println("maxLines : "+maxLines);
         }
-    }
-
-    private JButton button(String label,Runnable action) {
-        final JButton button = new JButton(label);
-        button.addActionListener(ev -> action.run() );
-        return button;
     }
 
     private final KeyAdapter keyAdapter = new KeyAdapter()
@@ -281,10 +282,9 @@ public class DisassemblyWindow extends AppWindow
         int start;
         synchronized( LOCK )
         {
-            if ( emulator.getBreakpoints().hasChanged )
+            if (emulator.getBreakpoints().isDifferent(breakpoints))
             {
                 breakpoints = emulator.getBreakpoints().createCopy();
-                emulator.getBreakpoints().hasChanged = false;
             }
             if (followProgramCounter)
             {

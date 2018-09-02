@@ -48,9 +48,35 @@ public class ConditionalBreakpointExpressionParser
             switch(operator)
             {
                 case EQUALS:
-                    return emu -> (emu.cpu.statusRegister & mask) == mask;
+                    return new IBreakpointCondition()
+                    {
+                        @Override
+                        public boolean matches(Emulator emulator)
+                        {
+                            return (emulator.cpu.statusRegister & mask) == mask;
+                        }
+
+                        @Override
+                        public String getExpression()
+                        {
+                            return "sr == "+rhs;
+                        }
+                    };
                 case NOT_EQUALS:
-                    return emu -> (emu.cpu.statusRegister & mask) == mask;
+                    return new IBreakpointCondition()
+                    {
+                        @Override
+                        public boolean matches(Emulator emulator)
+                        {
+                            return (emulator.cpu.statusRegister & mask) != mask;
+                        }
+
+                        @Override
+                        public String getExpression()
+                        {
+                            return "sr != "+rhs;
+                        }
+                    };
             }
             throw new IllegalArgumentException( "Unsupported operator "+operator+" for status register" );
         }
@@ -64,9 +90,35 @@ public class ConditionalBreakpointExpressionParser
             switch(operator)
             {
                 case EQUALS:
-                    return emu -> emu.cpu.dataRegisters[regNum] == value;
+                    return new IBreakpointCondition()
+                    {
+                        @Override
+                        public boolean matches(Emulator emulator)
+                        {
+                            return emulator.cpu.dataRegisters[regNum] == value;
+                        }
+
+                        @Override
+                        public String getExpression()
+                        {
+                            return "d"+regNum+" == "+rhs;
+                        }
+                    };
                 case NOT_EQUALS:
-                    return emu -> emu.cpu.dataRegisters[regNum] != value;
+                    return new IBreakpointCondition()
+                    {
+                        @Override
+                        public boolean matches(Emulator emulator)
+                        {
+                            return emulator.cpu.dataRegisters[regNum] != value;
+                        }
+
+                        @Override
+                        public String getExpression()
+                        {
+                            return "d"+regNum+" != "+rhs;
+                        }
+                    };
             }
             throw new IllegalArgumentException( "Unsupported operator "+operator+" for data register" );
         }
@@ -75,9 +127,35 @@ public class ConditionalBreakpointExpressionParser
             switch(operator)
             {
                 case EQUALS:
-                    return emu -> emu.cpu.addressRegisters[regNum] == value;
+                    return new IBreakpointCondition()
+                    {
+                        @Override
+                        public boolean matches(Emulator emulator)
+                        {
+                            return emulator.cpu.addressRegisters[regNum] == value;
+                        }
+
+                        @Override
+                        public String getExpression()
+                        {
+                            return "a"+regNum+" == "+rhs;
+                        }
+                    };
                 case NOT_EQUALS:
-                    return emu -> emu.cpu.addressRegisters[regNum] == value;
+                    return new IBreakpointCondition()
+                    {
+                        @Override
+                        public boolean matches(Emulator emulator)
+                        {
+                            return emulator.cpu.addressRegisters[regNum] != value;
+                        }
+
+                        @Override
+                        public String getExpression()
+                        {
+                            return "a"+regNum+" != "+rhs;
+                        }
+                    };
             }
             throw new IllegalArgumentException( "Unsupported operator "+operator+" for data register" );
         }
@@ -144,7 +222,6 @@ public class ConditionalBreakpointExpressionParser
         throw new IllegalArgumentException("Not a valid register number");
     }
 
-
     private static Operator parseOperator(String s)
     {
         switch(s)
@@ -164,5 +241,4 @@ public class ConditionalBreakpointExpressionParser
         }
         return Integer.parseInt( number );
     }
-
 }

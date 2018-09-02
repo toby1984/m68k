@@ -215,7 +215,6 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
             adr = adrProvider.getAddress( emulator );
         }
         final String tmp = emulator.memory.hexdump( adr , bytesToDump );
-        System.out.println( tmp );
         SwingUtilities.invokeLater( () -> {
             hexdump.setText(
                     "<html>"+tmp.replaceAll( "\n","<br>" )+"</html>");

@@ -1,5 +1,8 @@
 package de.codersourcery.m68k.emulator.ui;
 
+import de.codersourcery.m68k.emulator.Breakpoints;
+import org.apache.commons.lang3.Validate;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,6 +21,8 @@ public class UIConfig
 
     private final Map<String,WindowState> windowStates=
             new HashMap<>();
+
+    private Breakpoints breakpoints = new Breakpoints();
 
     private File kickRomLocation;
 
@@ -57,6 +62,9 @@ public class UIConfig
         if ( kickRomLocation != null ) {
             props.put( KEY_KICKROM_LOCATION, kickRomLocation.getAbsolutePath() );
         }
+        final Map<String, String> tmp = new HashMap<>();
+        breakpoints.save(tmp);
+        props.putAll(tmp);
         props.store( out ,"Automatically gnerated");
     }
 
@@ -81,6 +89,19 @@ public class UIConfig
         }
         final List<WindowState> states = WindowState.fromMap( map );
         states.forEach( state -> result.windowStates.put( state.getWindowKey(), state ) );
+
+        result.breakpoints = Breakpoints.load(map);
         return result;
+    }
+
+    public Breakpoints getBreakpoints()
+    {
+        return breakpoints;
+    }
+
+    public void setBreakpoints(Breakpoints breakpoints)
+    {
+        Validate.notNull(breakpoints, "breakpoints must not be null");
+        this.breakpoints = breakpoints;
     }
 }
