@@ -1,7 +1,10 @@
 package de.codersourcery.m68k;
 
 import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.memory.Blitter;
+import de.codersourcery.m68k.emulator.memory.DMAController;
 import de.codersourcery.m68k.emulator.memory.MMU;
+import de.codersourcery.m68k.emulator.memory.Memory;
 import junit.framework.TestCase;
 
 public class MMUTest extends TestCase
@@ -12,7 +15,10 @@ public class MMUTest extends TestCase
     protected void setUp() throws Exception
     {
         super.setUp();
-        this.mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500));
+        final Blitter blitter = new Blitter(new DMAController());
+        this.mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500, blitter ));
+        final Memory memory = new Memory(this.mmu);
+        blitter.setMemory( memory );
     }
 
     public void testGetOffsetInPage() {

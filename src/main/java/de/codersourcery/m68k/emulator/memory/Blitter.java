@@ -64,8 +64,9 @@ $dff09c	INTREQ	Interrupt request bits (clear or set bits)
     public static final int BLTBDAT  = 0x32; //  0xdff072	Blitter source B data reg
     public static final int BLTADAT  = 0x34; //  0xdff074	Blitter source A data reg
 
-    private int bltcon0;
-    private int bltcon1;
+    public final DMAController dmaController;
+    public int bltcon0;
+    public int bltcon1;
     private int bltcon0l;
 
     private int bltafwm; // first word mask source A
@@ -99,10 +100,10 @@ $dff09c	INTREQ	Interrupt request bits (clear or set bits)
     public int bltcdat;
 
     // transient stuff
-    public final Memory memory;
+    public Memory memory;
 
-    private boolean blitterActive;
-    private boolean blitterDone;
+    public boolean blitterActive;
+    public boolean blitterDone;
 
     // fields populated when the blitter gets activated
     private int wordsToProcess;
@@ -114,6 +115,8 @@ $dff09c	INTREQ	Interrupt request bits (clear or set bits)
     public int bltbptr;
     public int bltcptr;
     public int bltdptr;
+
+    public boolean blitterNasty;
 
     // shifts
     /*
@@ -131,12 +134,11 @@ $dff09c	INTREQ	Interrupt request bits (clear or set bits)
     The Zero flag is only valid after the blitter has completed its operation
 and can be read from bit (13) DMAF_BLTNZERO of the  DMACONR  register.
      */
-    private int totalResult; // TODO: Part of DMACONR register
+    public int totalResult; // TODO: Part of DMACONR register
     private boolean ascendingMode;
 
-
-    public Blitter(Memory memory) {
-        this.memory = memory;
+    public Blitter(DMAController ctrl) {
+        this.dmaController = ctrl;
     }
 
     @Override
@@ -364,7 +366,7 @@ width 1008 pixels.
 
     public void tick()
     {
-        if ( blitterActive )
+        if ( blitterActive & dmaController.isBlitterDMAEnabled() )
         {
             if ( isAreaMode() )
             {
@@ -780,4 +782,34 @@ width 1008 pixels.
          LINE DRAW The "B" source is used for
          LINE DRAW texturing the drawn lines.
      */
+
+    public void setMemory(Memory memory)
+    {
+        this.memory = memory;
+    }
+
+    public void reset()
+    {
+        wordsToProcess = 1;
+        wordsToProcessThisRow = 1;
+        rowsToProcess  = 1;
+
+        bltaptr = 0;
+        bltbptr = 0;
+        bltcptr = 0;
+        bltdptr = 0;
+
+        ascendingMode = true;
+        shiftA = 0;
+        shiftB = 0;
+        shiftAOut = 0;
+        shiftBOut = 0;
+        totalResult = 0;
+        shiftAMask = 0;
+        shiftBMask = 0;
+
+        blitterNasty = false;
+        blitterDone = false;
+        blitterActive = false;
+    }
 }

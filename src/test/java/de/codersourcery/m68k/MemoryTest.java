@@ -1,6 +1,8 @@
 package de.codersourcery.m68k;
 
 import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.memory.Blitter;
+import de.codersourcery.m68k.emulator.memory.DMAController;
 import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.emulator.exceptions.BadAlignmentException;
@@ -18,8 +20,10 @@ public class MemoryTest extends TestCase
     protected void setUp() throws Exception
     {
         super.setUp();
-        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500) );
+        final Blitter blitter = new Blitter(new DMAController());
+        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500, blitter ) );
         memory = new Memory(mmu);
+        blitter.setMemory( memory );
     }
 
     public void testBadAlignment() {
@@ -98,12 +102,13 @@ public class MemoryTest extends TestCase
 
     public void testWords() {
 
+        memory.writeWord(0, 0x1234 );
+        System.out.println( memory.hexdump( 0,16 ) );
+        assertEquals(0x1234,memory.readWord(0 ) );
+
         memory.writeByte(0,0x12 );
         memory.writeByte(1,0x34 );
 
-        assertEquals(0x1234,memory.readWord(0 ) );
-
-        memory.writeWord(0, 0x1234 );
         assertEquals(0x1234,memory.readWord(0 ) );
 
         memory.writeByte(1,0x12 );

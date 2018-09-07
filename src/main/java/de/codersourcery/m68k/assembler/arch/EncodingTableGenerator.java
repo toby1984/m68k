@@ -2,6 +2,8 @@ package de.codersourcery.m68k.assembler.arch;
 
 import de.codersourcery.m68k.disassembler.Disassembler;
 import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.memory.Blitter;
+import de.codersourcery.m68k.emulator.memory.DMAController;
 import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.utils.Misc;
@@ -15,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -896,8 +897,10 @@ public class EncodingTableGenerator
 
     private static void sanityCheck(Instruction insn,int opcode) {
 
-        final MMU mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500));
+        final Blitter blitter = new Blitter(new DMAController());
+        final MMU mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter));
         final Memory memory = new Memory(mmu);
+        blitter.setMemory( memory );
         final Disassembler disassembler = new Disassembler(memory);
         memory.writeWord(0,opcode);
         final String[] disasm = disassembler.disassemble(0, 2 + 4 + 4).split("\n");

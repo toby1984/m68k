@@ -119,14 +119,9 @@ public class Memory
         final int p0 = mmu.getPageNo( address );
         final MemoryPage page = mmu.getPage( p0 );
         final int offset = mmu.getOffsetInPage( address );
-        int hi = page.readByte(offset);
-        int lo;
-        if ( (offset+1) < MMU.PAGE_SIZE ) {
-            lo = page.readByteNoSideEffects(offset+1);
-        } else {
-            lo = mmu.getPage( p0+1 ).readByteNoSideEffects(0);
-        }
-        return (short) (hi<<8|(lo & 0xff));
+        int hi = page.readByteNoSideEffects(offset);
+        int lo = page.readByteNoSideEffects(offset+1);
+        return (short) ((hi<<8) | (lo & 0xff));
     }
 
     public void writeWord(int address,int value)

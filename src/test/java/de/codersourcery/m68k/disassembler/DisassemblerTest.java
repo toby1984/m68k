@@ -1,6 +1,8 @@
 package de.codersourcery.m68k.disassembler;
 
 import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.memory.Blitter;
+import de.codersourcery.m68k.emulator.memory.DMAController;
 import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.assembler.Assembler;
@@ -23,8 +25,10 @@ public class DisassemblerTest extends TestCase
         super.setUp();
         asm = new Assembler();
 
-        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500) );
+        final Blitter blitter = new Blitter(new DMAController());
+        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500, blitter ) );
         memory = new Memory(mmu);
+        blitter.setMemory( memory );
         disasm = new Disassembler( memory );
     }
 

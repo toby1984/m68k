@@ -39,7 +39,7 @@ public abstract class MemoryPage
     public short readWord(int offset) {
         int hi = readByte(offset);
         int lo = readByte(offset+1);
-        return (short) ( (( hi & 0xff)<< 8) | (lo & 0xff) );
+        return (short) ( ( hi<< 8) | (lo & 0xff) );
     }
 
     /**
@@ -70,6 +70,6 @@ public abstract class MemoryPage
     public void writeWord(int offset,int value) throws MemoryAccessException
     {
         writeByte(offset,value>> 8); // hi
-        writeByte(offset,value); // lo
+        writeByte(offset+1,value); // lo
     }
 }

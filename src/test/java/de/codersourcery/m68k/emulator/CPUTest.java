@@ -10,6 +10,8 @@ import de.codersourcery.m68k.assembler.Symbol;
 import de.codersourcery.m68k.assembler.arch.CPUType;
 import de.codersourcery.m68k.assembler.arch.Condition;
 import de.codersourcery.m68k.assembler.arch.Instruction;
+import de.codersourcery.m68k.emulator.memory.Blitter;
+import de.codersourcery.m68k.emulator.memory.DMAController;
 import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.parser.Identifier;
@@ -51,8 +53,10 @@ public class CPUTest extends TestCase
     protected void setUp() throws Exception
     {
         super.setUp();
-        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500) );
+        final Blitter blitter = new Blitter(new DMAController());
+        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter) );
         memory = new Memory(mmu);
+        blitter.setMemory( memory );
         cpu = new CPU(CPUType.BEST,memory);
     }
 
