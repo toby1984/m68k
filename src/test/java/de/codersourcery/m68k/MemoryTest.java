@@ -7,6 +7,7 @@ import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
 import de.codersourcery.m68k.emulator.exceptions.BadAlignmentException;
 import de.codersourcery.m68k.emulator.exceptions.MemoryWriteProtectedException;
+import de.codersourcery.m68k.emulator.memory.Video;
 import junit.framework.TestCase;
 
 import java.util.Random;
@@ -21,9 +22,11 @@ public class MemoryTest extends TestCase
     {
         super.setUp();
         final Blitter blitter = new Blitter(new DMAController());
-        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500, blitter ) );
+        final Video video = new Video();
+        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500, blitter, video ) );
         memory = new Memory(mmu);
         blitter.setMemory( memory );
+        video.setMemory( memory );
     }
 
     public void testBadAlignment() {

@@ -6,6 +6,7 @@ import de.codersourcery.m68k.emulator.memory.Blitter;
 import de.codersourcery.m68k.emulator.memory.DMAController;
 import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
+import de.codersourcery.m68k.emulator.memory.Video;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
 
@@ -898,9 +899,11 @@ public class EncodingTableGenerator
     private static void sanityCheck(Instruction insn,int opcode) {
 
         final Blitter blitter = new Blitter(new DMAController());
-        final MMU mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter));
+        Video video=new Video();
+        final MMU mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter,video));
         final Memory memory = new Memory(mmu);
         blitter.setMemory( memory );
+        video.setMemory( memory );
         final Disassembler disassembler = new Disassembler(memory);
         memory.writeWord(0,opcode);
         final String[] disasm = disassembler.disassemble(0, 2 + 4 + 4).split("\n");

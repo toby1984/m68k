@@ -171,7 +171,7 @@ public class UI extends JFrame
         registerWindow( new EmulatorStateWindow("Emulator", this) );
         registerWindow( new MemoryViewWindow(this) );
         registerWindow( new BreakpointsWindow(this) );
-
+        registerWindow( new ScreenWindow("Screen", this) );
         registerWindow( new ROMListingViewer("ROM listing",ROM_LISTING,this) );
         setContentPane( desktop );
 

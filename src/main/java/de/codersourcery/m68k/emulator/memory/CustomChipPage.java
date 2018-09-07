@@ -293,10 +293,12 @@ NAME        ADD  R/W  CHIP    FUNCTION
 [ ] HCENTER      1E2  W   A( E )  Horizontal position for Vsync on interlace
 [ ] DIWHIGH      1E4  W   AD( E ) Display window -  upper bits for start, stop
      */
+    public final Video video;
 
-    public CustomChipPage(int startAddress,Blitter blitter) {
+    public CustomChipPage(int startAddress,Blitter blitter,Video video) {
         this.startAddress = startAddress;
         this.blitter = blitter;
+        this.video = video;
     }
 
     @Override
@@ -307,10 +309,16 @@ NAME        ADD  R/W  CHIP    FUNCTION
         {
             final int regOffset = adr - 0x040;
             return blitter.readByte( regOffset );
-        } else if ( adr == 0x02 ) {
+        }
+        if ( adr == 0x02 ) {
             return (byte) (readDMACONR() >> 8);
-        } else if ( adr == 0x03 ) {
+        }
+        if ( adr == 0x03 ) {
             return (byte) readDMACONR();
+        }
+        // 0x0E0...0x1e4 => video
+        if ( adr >= 0x0e0 && adr <= 0x1E5) {
+            return video.readByte( adr );
         }
         return 0;
     }
@@ -323,10 +331,16 @@ NAME        ADD  R/W  CHIP    FUNCTION
         {
             final int regOffset = adr - 0x040;
             return blitter.readByteNoSideEffects( regOffset );
-        } else if ( adr == 0x02 ) {
+        }
+        if ( adr == 0x02 ) {
             return (byte) (readDMACONR() >> 8);
-        } else if ( adr == 0x03 ) {
+        }
+        if ( adr == 0x03 ) {
             return (byte) readDMACONR();
+        }
+        // 0x0E0...0x1e4 => video
+        if ( adr >= 0x0e0 && adr <= 0x1E5) {
+            return video.readByte( adr );
         }
         return 0;
     }
@@ -339,6 +353,12 @@ NAME        ADD  R/W  CHIP    FUNCTION
         {
             final int regOffset = adr - 0x040;
             blitter.writeByte( regOffset, value);
+            return;
+        }
+        // 0x0E0...0x1e4 => video
+        if ( adr >= 0x0e0 && adr <= 0x1E5) {
+            video.writeByte( adr, value );
+            return;
         }
     }
 
@@ -352,6 +372,9 @@ NAME        ADD  R/W  CHIP    FUNCTION
             blitter.writeWord( regOffset, value);
         } else if ( adr == 0x02 ) {
             writeDMACON( value );
+        } else if ( adr >= 0x0e0 && adr <= 0x1E5) {
+            // 0x0E0...0x1e4 => video
+            video.writeWord( adr, value );
         }
     }
 

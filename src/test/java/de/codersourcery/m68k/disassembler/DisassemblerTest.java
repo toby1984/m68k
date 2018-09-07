@@ -10,6 +10,7 @@ import de.codersourcery.m68k.assembler.CompilationMessages;
 import de.codersourcery.m68k.assembler.CompilationUnit;
 import de.codersourcery.m68k.assembler.IResource;
 import de.codersourcery.m68k.assembler.arch.Instruction;
+import de.codersourcery.m68k.emulator.memory.Video;
 import junit.framework.TestCase;
 
 public class DisassemblerTest extends TestCase
@@ -26,9 +27,12 @@ public class DisassemblerTest extends TestCase
         asm = new Assembler();
 
         final Blitter blitter = new Blitter(new DMAController());
-        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500, blitter ) );
+
+        final Video video = new Video();
+        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500, blitter, video ) );
         memory = new Memory(mmu);
         blitter.setMemory( memory );
+        video.setMemory( memory );
         disasm = new Disassembler( memory );
     }
 

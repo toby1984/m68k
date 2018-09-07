@@ -47,13 +47,15 @@ public class MMU
         private final Amiga amiga;
 
         private final Blitter blitter;
+        private final Video video;
         private CIA8520 ciaa;
         private CIA8520 ciab;
 
-        public PageFaultHandler(Amiga amiga,Blitter blitter)
+        public PageFaultHandler(Amiga amiga,Blitter blitter,Video video)
         {
             this.amiga = amiga;
             this.blitter = blitter;
+            this.video = video;
             this.firstRomPageNo = amiga.getKickRomStartAddress() & PAGE_SIZE_MASK;
             this.lastRomPageNo = (amiga.getKickRomEndAddress()-1) & PAGE_SIZE_MASK;
         }
@@ -62,6 +64,7 @@ public class MMU
             ciaa.reset();
             ciab.reset();
             blitter.reset();
+            video.reset();
         }
 
         public void setCIAA(CIA8520 cia) {
@@ -120,7 +123,7 @@ FC0000-FFFFFF 256 KB -- Kickstart ROM
             }
             // custom chips
             if ( pageNo >= FIRST_CUSTOM_CHIP_PAGENO && pageNo <= LAST_CUSTOM_CHIP_PAGENO) {
-                return new CustomChipPage(pageNo*PAGE_SIZE, blitter);
+                return new CustomChipPage(pageNo*PAGE_SIZE, blitter, video);
             }
             return AbsentPage.SINGLETON;
         }

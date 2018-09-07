@@ -5,6 +5,7 @@ import de.codersourcery.m68k.emulator.memory.Blitter;
 import de.codersourcery.m68k.emulator.memory.DMAController;
 import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
+import de.codersourcery.m68k.emulator.memory.Video;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,8 +19,10 @@ public class Main
 
         final byte[] data = Files.readAllBytes(kickRom.toPath() );
         final Blitter blitter = new Blitter(new DMAController());
-        final Memory memory = new Memory( new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter) ) );
+        final Video video = new Video();
+        final Memory memory = new Memory( new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter,video) ) );
         blitter.setMemory( memory );
+        video.setMemory( memory );
         memory.bulkWrite(0,data,0,1024);
 
         memory.bulkWrite(0xF80000,data,0,data.length);

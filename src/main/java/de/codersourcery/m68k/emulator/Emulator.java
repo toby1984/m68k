@@ -7,6 +7,7 @@ import de.codersourcery.m68k.emulator.memory.Blitter;
 import de.codersourcery.m68k.emulator.memory.DMAController;
 import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
+import de.codersourcery.m68k.emulator.memory.Video;
 import de.codersourcery.m68k.emulator.ui.ITickListener;
 import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
@@ -84,7 +85,9 @@ public class Emulator
     public final byte[] kickstartRom;
     public final Amiga amiga;
     public final MMU mmu;
+    public final DMAController dmaController;
     public final Blitter blitter;
+    public final Video video;
     public final Memory memory;
     public final CPU cpu;
     public final CIA8520 ciaa;
@@ -110,10 +113,14 @@ public class Emulator
         {
             throw new IllegalArgumentException("Kickstart ROM for "+amiga+" needs to have " + amiga.getKickRomSize() + " bytes but had "+kickstartRom.length);
         }
-        this.blitter = new Blitter(new DMAController());
-        final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler(amiga,blitter);
+        this.dmaController = new DMAController();
+        this.blitter = new Blitter(this.dmaController);
+        this.video = new Video();
+        final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler(amiga,blitter,video);
         this.mmu = new MMU(faultHandler);
         this.memory = new Memory(this.mmu);
+        video.setMemory( this.memory );
+        this.blitter.setMemory( this.memory );
         this.cpu = new CPU(amiga.getCPUType(), memory);
         this.irqController = new IRQController(this.cpu);
         this.ciaa = new CIA8520(CIA8520.Name.CIAA, irqController);

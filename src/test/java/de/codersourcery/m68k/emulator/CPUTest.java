@@ -14,6 +14,7 @@ import de.codersourcery.m68k.emulator.memory.Blitter;
 import de.codersourcery.m68k.emulator.memory.DMAController;
 import de.codersourcery.m68k.emulator.memory.MMU;
 import de.codersourcery.m68k.emulator.memory.Memory;
+import de.codersourcery.m68k.emulator.memory.Video;
 import de.codersourcery.m68k.parser.Identifier;
 import de.codersourcery.m68k.utils.Misc;
 import junit.framework.TestCase;
@@ -54,9 +55,11 @@ public class CPUTest extends TestCase
     {
         super.setUp();
         final Blitter blitter = new Blitter(new DMAController());
-        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter) );
+        final Video video = new Video();
+        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter, video ) );
         memory = new Memory(mmu);
         blitter.setMemory( memory );
+        video.setMemory( memory );
         cpu = new CPU(CPUType.BEST,memory);
     }
 
