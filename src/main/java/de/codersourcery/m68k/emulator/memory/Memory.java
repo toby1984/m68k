@@ -82,7 +82,7 @@ public class Memory
                 throw new MemoryWriteProtectedException( "Memory at "+Misc.hex(pageStart)+" is not writeable", MemoryAccessException.Operation.WRITE_BYTE,pageStart);
             }
             currentPage++;
-            for ( ; count > 0 && offsetInPage <= 4095 ; count--) {
+            for ( ; count > 0 && offsetInPage < MMU.PAGE_SIZE ; count--) {
                 page.writeByte( offsetInPage++, data[srcOffset++]);
             }
             offsetInPage = 0;
@@ -106,14 +106,12 @@ public class Memory
         final int p0 = mmu.getPageNo( address );
         final MemoryPage page = mmu.getPage( p0 );
         final int offset = mmu.getOffsetInPage( address );
-        int hi = page.readByte(offset);
-        int lo;
-        if ( (offset+1) < 4096  ) {
-            lo = page.readByte(offset+1);
-        } else {
-            lo = mmu.getPage( p0+1 ).readByte(0);
-        }
-        return (short) (hi<<8|(lo & 0xff));
+
+        // since MMU.PAGE_SIZE always needs to be a multiple of 2
+        // and 68000 does not allow word/long accesses on odd
+        // addresses we know that we can never cross
+        // a memory page boundary here
+        return page.readWord(offset);
     }
 
     public short readWordNoCheckNoSideEffects(int address) // return type NEEDS to be short, used for implicit sign extension 16 bits -> 32 bits when assigned to int later on
@@ -123,7 +121,7 @@ public class Memory
         final int offset = mmu.getOffsetInPage( address );
         int hi = page.readByte(offset);
         int lo;
-        if ( (offset+1) < 4096  ) {
+        if ( (offset+1) < MMU.PAGE_SIZE ) {
             lo = page.readByteNoSideEffects(offset+1);
         } else {
             lo = mmu.getPage( p0+1 ).readByteNoSideEffects(0);
@@ -137,28 +135,24 @@ public class Memory
         writeWordNoCheck(address,value);
     }
 
+    private void writeWordNoCheck(int address,int value)
+    {
+        final int p0 = mmu.getPageNo( address );
+        final MemoryPage page = mmu.getPage( p0 );
+        checkPageWriteable(page,p0);
+        final int offset = mmu.getOffsetInPage( address );
+        // since MMU.PAGE_SIZE always needs to be a multiple of 2
+        // and 68000 does not allow word/long accesses on odd
+        // addresses we know that we can never cross
+        // a memory page boundary here
+        page.writeWord(offset,value);
+    }
+
     private void checkPageWriteable(MemoryPage page, int pageNo)
     {
         if ( ! page.isWriteable() ) {
             final int pageStart = mmu.getPageStartAddress( pageNo );
             throw new MemoryWriteProtectedException( "Memory at "+Misc.hex(pageStart)+" is not writeable", MemoryAccessException.Operation.WRITE_BYTE,pageStart);
-        }
-    }
-
-    private void writeWordNoCheck(int address,int value)
-    {
-        int p0 = mmu.getPageNo( address );
-        MemoryPage page = mmu.getPage( p0 );
-        checkPageWriteable(page,p0);
-        final int offset = mmu.getOffsetInPage( address );
-        page.writeByte(offset,value>>8); // hi
-        if ( (offset+1) < 4096  ) {
-            page.writeByte(offset+1,value); // lo
-        } else {
-            p0++;
-            page = mmu.getPage( p0 );
-            checkPageWriteable(page,p0);
-            page.writeByte(0,value); // lo
         }
     }
 
@@ -194,7 +188,7 @@ public class Memory
         while ( count > 0 ) {
             final MemoryPage page = mmu.getPage( pageNo );
             checkPageWriteable( page, pageNo );
-            while ( count > 0 && offset < 4096 ) {
+            while ( count > 0 && offset < MMU.PAGE_SIZE ) {
                 page.writeByte( offset++, data[srcIdx++] );
                 count--;
             }

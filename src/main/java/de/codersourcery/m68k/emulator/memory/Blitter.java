@@ -66,27 +66,153 @@ $dff09c	INTREQ	Interrupt request bits (clear or set bits)
 
     private int bltcon0;
     private int bltcon1;
-    private int bltafwm;
-    private int bltalwm;
-    private int bltcpth;
-    private int bltcptl;
+    private int bltcon0l;
+
+    private int bltafwm; // first word mask source A
+    private int bltalwm; // last word mask source A
+
+    private int bltapth; // Source A ptr HIGH
+    private int bltaptl; // Source A ptr low
+
     private int bltbpth;
     private int bltbptl;
-    private int bltapth;
-    private int bltaptl;
+
+    private int bltcpth;
+    private int bltcptl;
+
     private int bltdpth;
     private int bltdptl;
+
     private int bltsize;
-    private int bltcon0l;
     private int bltsizv;
     private int bltsizh;
-    private int bltcmod;
-    private int bltbmod;
+
+    // module values
     private int bltamod;
+    private int bltbmod;
+    private int bltcmod;
     private int bltdmod;
-    private int bltcdat;
-    private int bltbdat;
-    private int bltadat;
+
+    // blitter data values
+    public int bltadat;
+    public int bltbdat;
+    public int bltcdat;
+
+    // transient stuff
+    public final Memory memory;
+
+    private boolean blitterActive;
+    private boolean blitterDone;
+
+    // fields populated when the blitter gets activated
+    private int wordsToProcess;
+    private int rowsToProcess;
+    private int wordsToProcessThisRow;
+
+    // memory access ptrs
+    public int bltaptr;
+    public int bltbptr;
+    public int bltcptr;
+    public int bltdptr;
+
+    // shifts
+    /*
+    - The shift value for the A channel is set with bits 15 through 12 of BLTCON0
+    - The B shift value is set with bits 15 through 12 of  BLTCON1
+     */
+    private int shiftA;
+    private int shiftAMask; // AND mask to get all bits shifted out
+    private int shiftAOut; // bits shifted out by the previous operation (ORed)
+    private int shiftB;
+    private int shiftBMask; // AND mask to get all bits shifted out
+    private int shiftBOut; // bits shifted out by the previous operation (ORed)
+
+    private boolean ascendingMode;
+
+
+    public Blitter(Memory memory) {
+        this.memory = memory;
+    }
+
+    @Override
+    public void writeWord(int offset, int value) throws MemoryAccessException
+    {
+        super.writeWord( offset, value );
+        if ( offset == 0x18 ) {
+
+        /*
+All data copy blits are performed as rectangles of words, with a given
+width and height.  All four DMA channels use a single blit size register,
+called BLTSIZE, used for both the width and height.  The width can take a
+value of from 1 to 64 words (16 to 1024 bits).  The height can run from 1
+to 1024 rows.  The width is stored in the least significant six bits of
+the BLTSIZE register.  If a value of zero is stored, a width count of 64
+words is used.  This is the only parameter in the blitter that is given in
+words.  The height is stored in the upper ten bits of the BLTSIZE
+register, with zero representing a height of 1024 rows.  Thus, the largest
+blit possible with the current Amiga blitter is 1024 by 1024 pixels.
+However,  shifting  and  masking  operations may require an extra word be
+fetched for each raster scan line, making the maximum practical horizontal
+width 1008 pixels.
+
+   Blitter counting.
+   -----------------
+   To emphasize the above paragraph:  Blit width is in words with a
+   zero representing 64 words.  Blit height is in lines with a zero
+   representing 1024 lines.
+         */
+            // BLTSIZE
+
+            // initialize width in words and height in lines
+            final int widthmask = 0b0000_0000_0000_0000_0000_0000_0011_1111;
+            wordsToProcess = (bltsize & widthmask)+1;
+            wordsToProcessThisRow = wordsToProcess;
+            int height = ( bltsize & ~widthmask) >>> 6;
+            if ( height == 0 ) {
+                height = 1024;
+            }
+            rowsToProcess  = height;
+
+            // initialize memory pointers
+            bltaptr = ((bltapth<<8) & 0xff) | (bltaptl & 0xff);
+            bltbptr = ((bltbpth<<8) & 0xff) | (bltbptl & 0xff);
+            bltcptr = ((bltcpth<<8) & 0xff) | (bltcptl & 0xff);
+            bltdptr = ((bltdpth<<8) & 0xff) | (bltdptl & 0xff);
+
+            ascendingMode = (bltcon1 & 1<<1) == 0;
+            shiftA = (bltcon0>> 12) & 0b1111;
+            shiftB = (bltcon1>> 12) & 0b1111;
+            shiftAOut = 0;
+            shiftBOut = 0;
+
+            if ( ascendingMode ) {
+                if ( shiftA == 0 ) {
+                    shiftAMask = 0;
+                } else {
+                    shiftAMask = (1<<shiftA)-1;
+                }
+                if ( shiftB == 0 ) {
+                    shiftBMask = 0;
+                } else {
+                    shiftBMask = (1<<shiftB)-1;
+                }
+            } else {
+                if ( shiftA == 0 ) {
+                    shiftAMask = 0;
+                } else {
+                    shiftAMask = ((1<<shiftA)-1) << (15-shiftA);
+                }
+                if ( shiftB == 0 ) {
+                    shiftBMask = 0;
+                } else {
+                    shiftBMask = ((1<<shiftB)-1) << (15-shiftB);
+                }
+            }
+
+            blitterDone = false;
+            blitterActive = true;
+        }
+    }
 
     @Override
     public byte readByte(int offset)
@@ -231,7 +357,282 @@ $dff09c	INTREQ	Interrupt request bits (clear or set bits)
 
     public void tick()
     {
+        if ( blitterActive )
+        {
+            if ( isAreaMode() )
+            {
+                tickAreaMode();
+            }
+            else
+            {
+                tickLineMode();
+            }
+        }
+    }
 
+    private void tickAreaMode()
+    {
+        final int con = bltcon0;
+
+        int valueA;
+        int valueB;
+        int valueC;
+        final boolean outputEnabled;
+
+        final boolean endOfLine = --wordsToProcessThisRow == 0;
+        if ( endOfLine && --rowsToProcess == 0 )
+        {
+            blitterDone = true;
+            blitterActive = false;
+        }
+
+        switch( (con>>8) & 0b1111 )
+        {
+            //     ABCD
+            case 0b0000:
+                valueA = bltadat;
+                valueB = bltbdat;
+                valueC = bltcdat;
+                outputEnabled = false;
+                break;
+            case 0b0010:
+                valueA = bltadat;
+                valueB = bltbdat;
+                valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
+                if ( endOfLine )
+                {
+                    bltcptr += bltcmod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b0100:
+                valueA = bltadat;
+                valueB = memory.readWord(bltbptr); if ( ascendingMode ) { bltbptr+=2; } else { bltbptr-=2; }
+                valueC = bltcdat;
+                if ( endOfLine )
+                {
+                    bltbptr += bltbmod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b1000:
+                valueA = memory.readWord(bltaptr); if ( ascendingMode ) { bltaptr+=2; } else { bltaptr-=2; }
+                valueB = bltbdat;
+                valueC = bltcdat;
+                if ( endOfLine )
+                {
+                    bltaptr += bltamod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b1010:
+                valueA = memory.readWord(bltaptr); if ( ascendingMode ) { bltaptr+=2; } else { bltaptr-=2; }
+                valueB = bltbdat;
+                valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
+                if ( endOfLine )
+                {
+                    bltaptr += bltamod;
+                    bltcptr += bltcmod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b1100:
+                valueA = memory.readWord(bltaptr); if ( ascendingMode ) { bltaptr+=2; } else { bltaptr-=2; }
+                valueB = memory.readWord(bltbptr); if ( ascendingMode ) { bltbptr+=2; } else { bltbptr-=2; }
+                valueC = bltcdat;
+                if ( endOfLine )
+                {
+                    bltaptr += bltamod;
+                    bltbptr += bltbmod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b0110:
+                valueA = bltadat;
+                valueB = memory.readWord(bltbptr); if ( ascendingMode ) { bltbptr+=2; } else { bltbptr-=2; }
+                valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
+                if ( endOfLine )
+                {
+                    bltbptr += bltbmod;
+                    bltcptr += bltcmod;
+                }
+                outputEnabled = false;
+                break;
+            // D enabled
+            case 0b0001:
+                valueA = bltadat;
+                valueB = bltbdat;
+                valueC = bltcdat;
+                outputEnabled = false;
+                break;
+            case 0b0011:
+                valueA = bltadat;
+                valueB = bltbdat;
+                valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
+                if ( endOfLine )
+                {
+                    bltcptr += bltcmod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b0101:
+                valueA = bltadat;
+                valueB = memory.readWord(bltbptr); if ( ascendingMode ) { bltbptr+=2; } else { bltbptr-=2; }
+                valueC = bltcdat;
+                if ( endOfLine )
+                {
+                    bltbptr += bltbmod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b1001:
+                valueA = memory.readWord(bltaptr); if ( ascendingMode ) { bltaptr+=2; } else { bltaptr-=2; }
+                valueB = bltbdat;
+                valueC = bltcdat;
+                if ( endOfLine )
+                {
+                    bltaptr += bltamod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b1011:
+                valueA = memory.readWord(bltaptr); if ( ascendingMode ) { bltaptr+=2; } else { bltaptr-=2; }
+                valueB = bltbdat;
+                valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
+                if ( endOfLine )
+                {
+                    bltaptr += bltamod;
+                    bltcptr += bltcmod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b1101:
+                valueA = memory.readWord(bltaptr); if ( ascendingMode ) { bltaptr+=2; } else { bltaptr-=2; }
+                valueB = memory.readWord(bltbptr); if ( ascendingMode ) { bltbptr+=2; } else { bltbptr-=2; }
+                valueC = bltcdat;
+                if ( endOfLine )
+                {
+                    bltaptr += bltamod;
+                    bltbptr += bltbmod;
+                }
+                outputEnabled = false;
+                break;
+            case 0b0111:
+                valueA = bltadat;
+                valueB = memory.readWord(bltbptr); if ( ascendingMode ) { bltbptr+=2; } else { bltbptr-=2; }
+                valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
+                if ( endOfLine )
+                {
+                    bltbptr += bltbmod;
+                    bltcptr += bltcmod;
+                }
+                outputEnabled = false;
+                break;
+            default:
+                throw new RuntimeException("Unreachable code reached");
+        }
+
+        // apply masks
+        if ( ascendingMode )
+        {
+            if ( wordsToProcessThisRow == 1 ) {
+                // first word mask
+                valueA &= bltafwm;
+            }
+            if ( wordsToProcess == wordsToProcessThisRow )
+            {
+                // last word mask
+                valueA &= bltalwm;
+            }
+        }
+        else
+        {
+            if ( wordsToProcessThisRow == 1 ) {
+                // last word mask
+                valueA &= bltalwm;
+            }
+            if ( wordsToProcess == wordsToProcessThisRow )
+            {
+                // first word mask
+                valueA &= bltafwm;
+            }
+        }
+
+        // apply shifts
+        if ( ascendingMode )
+        {
+            // ascending => shift right
+            if ( shiftA != 0 ) {
+                int shiftedOut = (valueA & shiftAMask)<<(15-shiftA);
+                valueA >>>= shiftA;
+                valueA |= shiftAOut;
+                shiftAOut = shiftedOut;
+            }
+            if ( shiftB != 0 ) {
+                int shiftedOut = (valueB & shiftBMask)<<(15-shiftB);
+                valueB >>>= shiftB;
+                valueB |= shiftBOut;
+                shiftBOut = shiftedOut;
+            }
+        } else {
+            // descending => shift left
+            if ( shiftA != 0 ) {
+                int shiftedOut = (valueA & shiftAMask)>>>(15-shiftA);
+                valueA <<= shiftA;
+                valueA |= shiftAOut;
+                shiftAOut = shiftedOut;
+            }
+            if ( shiftB != 0 ) {
+                int shiftedOut = (bltbdat & shiftBMask)>>>(15-shiftB);
+                valueB <<= shiftB;
+                valueB |= shiftBOut;
+                shiftBOut = shiftedOut;
+            }
+        }
+
+        // Apply function
+        /*
+                                                        ___
+         0       0       0       ?         0            ABC
+                                                        __
+         0       0       1       ?         1            ABC
+                                                        _ _
+         0       1       0       ?         2            ABC
+                                                        _
+         0       1       1       ?         3            ABC
+                                                         __
+         1       0       0       ?         4            ABC
+                                                         _
+         1       0       1       ?         5            ABC
+                                                          _
+         1       1       0       ?         6            ABC
+
+         1       1       1       ?         7            ABC
+         */
+        int valueD = 0;
+        if ( (bltcon0 & 1<<0) != 0 ) { valueD |= ~valueA & ~valueB & ~valueC; }
+        if ( (bltcon0 & 1<<1) != 0 ) { valueD |= ~valueA & ~valueB &  valueC; }
+        if ( (bltcon0 & 1<<2) != 0 ) { valueD |= ~valueA &  valueB & ~valueC; }
+        if ( (bltcon0 & 1<<3) != 0 ) { valueD |= ~valueA &  valueB &  valueC; }
+        if ( (bltcon0 & 1<<4) != 0 ) { valueD |=  valueA & ~valueB & ~valueC; }
+        if ( (bltcon0 & 1<<5) != 0 ) { valueD |=  valueA & ~valueB &  valueC; }
+        if ( (bltcon0 & 1<<6) != 0 ) { valueD |=  valueA &  valueB & ~valueC; }
+        if ( (bltcon0 & 1<<7) != 0 ) { valueD |=  valueA &  valueB &  valueC; }
+
+        // Write result
+        if ( outputEnabled )
+        {
+            memory.writeWord(bltdptr,valueD);
+            bltdptr += 2;
+            if ( endOfLine )
+            {
+                bltdptr += bltdmod;
+            }
+        }
+    }
+
+    private void tickLineMode()
+    {
     }
 
     /*

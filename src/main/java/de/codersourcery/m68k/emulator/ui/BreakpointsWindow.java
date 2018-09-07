@@ -48,8 +48,6 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
                     return Boolean.class;
                 case 2:
                     return String.class;
-                case 3:
-                    return String.class;
                 default:
                     throw new IllegalArgumentException("Invalid column " + columnIndex);
             }
@@ -58,13 +56,13 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
         @Override
         public boolean isCellEditable(int rowIndex, int columnIndex)
         {
-            return columnIndex == 1 || columnIndex == 3;
+            return columnIndex == 1 || columnIndex == 2;
         }
 
         @Override
         public int getColumnCount()
         {
-            return 4;
+            return 3;
         }
 
         @Override
@@ -92,7 +90,7 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
                 });
                 return;
             }
-            else if (columnIndex == 3)
+            else if (columnIndex == 2)
             {
                 // expression
                 final String newExpr = (String) aValue;
@@ -131,6 +129,21 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
         }
 
         @Override
+        public String getColumnName(int column)
+        {
+            switch(column) {
+                case 0:
+                    return "Address";
+                case 1:
+                    return "Enabled?";
+                case 2:
+                    return "Expression";
+                default:
+                    throw new IllegalArgumentException("Invalid column "+column);
+            }
+        }
+
+        @Override
         public Object getValueAt(int rowIndex, int columnIndex)
         {
             final Breakpoint bp = getBreakpoint(rowIndex);
@@ -144,8 +157,6 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
                         return breakpoints.isEnabled(bp);
                     }
                 case 2:
-                    return bp.condition.toString();
-                case 3:
                     return bp.condition.getExpression();
                 default:
                     throw new IllegalArgumentException("Invalid column " + columnIndex);

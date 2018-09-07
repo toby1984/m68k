@@ -2,87 +2,158 @@ package de.codersourcery.m68k.emulator.memory;
 
 public class MemoryBus
 {
-/*
+    /*
+     * 227.5 DMA slots per scan line,
+     * 226 slots are actually available.
+     * 1 DMA slot = 2 CPU cycles
+     *
+     * 68k needs 2 cycles to set address lines and 2 more cycles to do the data transfer, CPU and
+     *
+     * Fixed cycle assignments
+     *
+     *   0 -  3  4 DMA cycles for memory refresh
+     *   4 -  6  3 DMA cycles for disk DMA
+     *   7 - 10  4 DMA cycles for audio DMA (2 bytes per channel)
+     *  11 - 26 16 DMA cycles for sprite DMA (2 words per channel)
+     *  27 - 107   80 DMA cycles for bitplane DMA (even- or odd-numbered slots
+     *            according to the display size used)
+     * 108 - 225  FFA
+     */
 
-                 BIT#  FUNCTION    DESCRIPTION
-                 ----  ---------   -----------------------------------
-                 15    SET/CLR     Set/clear control bit. Determines
-                                   if bits written with a 1 get set or
-                                   cleared.  Bits written with a zero
-                                   are unchanged.
-                 14    BBUSY       Blitter busy status bit (read only)
-                 13    BZERO       Blitter logic  zero status bit
-                                   (read only).
-                 12    X
-                 11    X
-                 10    BLTPRI      Blitter DMA priority
-                                   (over CPU micro) (also called
-                                   "blitter nasty") (disables /BLS
-                                   pin, preventing micro from
-                                   stealing any bus cycles while
-                                   blitter DMA is running).
-                 09    DMAEN       Enable all DMA below
-                 08    BPLEN       Bitplane DMA enable
-                 07    COPEN       Copper DMA enable
-                 06    BLTEN       Blitter DMA enable
-                 05    SPREN       Sprite DMA enable
-                 04    DSKEN       Disk DMA enable
-                 03    AUD3EN      Audio channel 3 DMA enable
-                 02    AUD2EN      Audio channel 2 DMA enable
-                 01    AUD1EN      Audio channel 1 DMA enable
-                 00    AUD0EN      Audio channel 0 DMA enable
- */
+    /**
+     * Possible owners of the cip memory
+     * bus.
+     */
     public enum Owner
     {
-        BITPLANE_DMA,
-        COPPER_DMA,
-        BLITTER_DMA,
-        SPRITE_DMA,
-        DISK_DMA,
-        AUDIO0_DMA,
-        AUDIO1_DMA,
-        AUDIO2_DMA,
-        AUDIO3_DMA,
-    }
+        CPU(1<<0),
+        BITPLANE_DMA(1<<1),
+        COPPER_DMA(1<<2),
+        BLITTER_DMA(1<<3),
+        SPRITE_DMA(1<<4),
+        DISK_DMA(1<<5),
+        AUDIO_DMA(1<<6),
+        MEMORY_REFRESH(1<<7);
 
-    private int cyclesOccupied;
-    private Owner owner;
+        public final int bitMask;
 
-    public Owner getOwner() {
-        return owner;
-    }
-
-    public boolean hasOwner(Owner o) {
-        return this.owner == o;
-    }
-
-    public boolean isFree() {
-        return owner == null;
-    }
-
-    public boolean isOccupied()
-    {
-        return owner != null;
-    }
-
-    public boolean occupy(Owner owner)
-    {
-        if ( this.owner == null || this.owner == owner )
-        {
-            this.owner = owner;
-            return true;
+        private Owner(int mask) {
+            this.bitMask = mask;
         }
-        return false;
+    }
+
+    private boolean blitterNice;
+    private int cpuWaitCount = 0;
+
+    private int applicantsMask; // bit mask
+    private Owner granted;
+    private int cyclePtr = 0;
+
+    public void beforeTick()
+    {
+        applicantsMask = 0;
+    }
+
+    public void applyForOwnership(Owner owner) {
+        applicantsMask |= owner.bitMask;
+    }
+
+    public void grantOwnership()
+    {
+        Owner newOwner = doGrantOwnership();
+
+        if ( blitterNice && ( applicantsMask & Owner.CPU.bitMask) != 0 && newOwner == Owner.BLITTER_DMA ) { // CPU wants a cycle but blitter got it
+            if ( cpuWaitCount == 3 )
+            {
+                cpuWaitCount = 0;
+                newOwner = Owner.CPU;
+            }
+        }
+        granted = newOwner;
+    }
+
+    public Owner doGrantOwnership()
+    {
+        /*
+         *   0 -  3  4 DMA cycles for memory refresh
+         *   4 -  6  3 DMA cycles for disk DMA
+         *   7 - 10  4 DMA cycles for audio DMA (2 bytes per channel)
+         *  11 - 26 16 DMA cycles for sprite DMA (2 words per channel)
+         *  27 - 107   80 DMA cycles for bitplane DMA (even- or odd-numbered slots
+         *            according to the display size used)
+         * 108 - 225  FFA
+         */
+        final int applicantsMask = this.applicantsMask;
+        switch( cyclePtr ) {
+            case 0: // Memory DMA
+            case 1:
+            case 2:
+            case 3:
+                return Owner.MEMORY_REFRESH;
+            case 4: // Disk DMA
+            case 5:
+            case 6:
+                if ( (applicantsMask & Owner.DISK_DMA.bitMask) != 0 )
+                {
+                    return Owner.DISK_DMA;
+                }
+                break;
+            case 7: // Audio DMA
+            case 8:
+            case 9:
+            case 10:
+                if ( (applicantsMask & Owner.AUDIO_DMA.bitMask) != 0 )
+                {
+                    return Owner.AUDIO_DMA;
+                }
+                break;
+                // Sprite DMA
+            case 11: case 12: case 13: case 14: case 15: case 16:
+            case 17: case 18: case 19: case 20: case 21: case 22:
+            case 23: case 24: case 25: case 26:
+        }
+        if ( (applicantsMask & Owner.BITPLANE_DMA.bitMask) != 0 )
+        {
+            return Owner.BITPLANE_DMA;
+        }
+        // DMA cycle is up for grabs, check who wants it
+        if ( (applicantsMask & Owner.COPPER_DMA.bitMask) != 0 )
+        {
+            return Owner.COPPER_DMA;
+        }
+        if ( (applicantsMask & Owner.BLITTER_DMA.bitMask) != 0 )
+        {
+            return Owner.BLITTER_DMA;
+        }
+        if ( (applicantsMask & Owner.CPU.bitMask) != 0 )
+        {
+            return Owner.CPU;
+        }
+        return null;
+    }
+
+    public boolean isGranted(Owner owner) {
+        return granted == owner;
     }
 
     public void tick()
     {
-        if (cyclesOccupied > 0 )
-        {
-            cyclesOccupied--;
-            if ( cyclesOccupied == 0 ) {
-                owner = null;
-            }
-        }
+        cyclePtr = (cyclePtr+1) % 226;
+    }
+
+    public void reset() {
+        cpuWaitCount = 0;
+        granted = null;
+        cyclePtr = 0;
+    }
+
+    public boolean isBlitterNice()
+    {
+        return blitterNice;
+    }
+
+    public void setBlitterNice(boolean blitterNice)
+    {
+        this.blitterNice = blitterNice;
     }
 }

@@ -3549,6 +3549,18 @@ D/A   |     |   |           |
         return set;
     }
 
+    /**
+     * Returns the total number of 16-bit memory accesses the
+     * execution of this instruction would take (excluding the fetch of the 16-bit instruction word itself).
+     *
+     * @param srcMode
+     * @param dstMode
+     * @return
+     */
+    public int getMemoryCycleCount(AddressingMode srcMode,AddressingMode dstMode) {
+        return 0;
+    }
+
     private static EncodingTableGenerator.IValueIterator sourceAddressingModes(CPUType cpuType,AddressingModeKind kind1,AddressingModeKind... kinds)
     {
         final Set<AddressingModeKind> set = toSet(kind1, kinds);

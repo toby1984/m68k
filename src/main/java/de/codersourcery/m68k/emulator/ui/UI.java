@@ -25,6 +25,7 @@ import java.util.function.Function;
 
 public class UI extends JFrame
 {
+    public static final File ROM_LISTING = new File("/home/tgierke/Downloads/exec_disassembly.txt");
     private static final String MAIN_WINDOW_KEY = "mainWindow";
 
     final JDesktopPane desktop = new JDesktopPane();
@@ -171,9 +172,7 @@ public class UI extends JFrame
         registerWindow( new MemoryViewWindow(this) );
         registerWindow( new BreakpointsWindow(this) );
 
-        // final File romListing = new File("/home/tgierke/Downloads/exec_disassembly.txt");
-        final File romListing = new File("/home/tobi/Downloads/kickrom_disassembly.txt");
-        registerWindow( new ROMListingViewer("ROM listing",romListing,this) );
+        registerWindow( new ROMListingViewer("ROM listing",ROM_LISTING,this) );
         setContentPane( desktop );
 
         // display main window
@@ -366,7 +365,10 @@ public class UI extends JFrame
            bps.set( emu.getBreakpoints().createCopy() );
         });
 
-        config.setBreakpoints(bps.get());
+        if ( bps.get() != null )
+        {
+            config.setBreakpoints( bps.get() );
+        }
 
         final File file = getConfigPath();
         System.out.println("*** Saving configuration to "+file);

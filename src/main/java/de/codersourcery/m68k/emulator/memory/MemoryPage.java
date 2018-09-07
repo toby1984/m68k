@@ -36,6 +36,12 @@ public abstract class MemoryPage
      */
     public abstract byte readByte(int offset);
 
+    public short readWord(int offset) {
+        int hi = readByte(offset);
+        int lo = readByte(offset+1);
+        return (short) ( (( hi & 0xff)<< 8) | (lo & 0xff) );
+    }
+
     /**
      * Reads a byte from this page without triggering any side-effects.
      *
@@ -54,4 +60,16 @@ public abstract class MemoryPage
      * @param value byte to write (only lower 8 bits are being used)
      */
     public abstract void writeByte(int offset,int value) throws MemoryAccessException;
+
+    /**
+     * Write a word to this page.
+     *
+     * @param offset offset inside this page. If offset+1 crosses the page boundary an exception will be thrown.
+     * @param value word to write (only lower 16 bits are being used)
+     */
+    public void writeWord(int offset,int value) throws MemoryAccessException
+    {
+        writeByte(offset,value>> 8); // hi
+        writeByte(offset,value); // lo
+    }
 }
