@@ -395,6 +395,7 @@ width 1008 pixels.
             blitterActive = false;
         }
 
+        final int factor = ascendingMode ? 1 : -1;
         switch( (con>>8) & 0b1111 )
         {
             //     ABCD
@@ -410,7 +411,10 @@ width 1008 pixels.
                 valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
                 if ( endOfLine )
                 {
-                    bltcptr += bltcmod;
+                    if ( ascendingMode )
+                    {
+                        bltcptr += factor*bltcmod;
+                    }
                 }
                 outputEnabled = false;
                 break;
@@ -420,7 +424,7 @@ width 1008 pixels.
                 valueC = bltcdat;
                 if ( endOfLine )
                 {
-                    bltbptr += bltbmod;
+                    bltbptr += factor*bltbmod;
                 }
                 outputEnabled = false;
                 break;
@@ -430,7 +434,7 @@ width 1008 pixels.
                 valueC = bltcdat;
                 if ( endOfLine )
                 {
-                    bltaptr += bltamod;
+                    bltaptr += factor*bltamod;
                 }
                 outputEnabled = false;
                 break;
@@ -440,8 +444,8 @@ width 1008 pixels.
                 valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
                 if ( endOfLine )
                 {
-                    bltaptr += bltamod;
-                    bltcptr += bltcmod;
+                    bltaptr += factor*bltamod;
+                    bltcptr += factor*bltcmod;
                 }
                 outputEnabled = false;
                 break;
@@ -451,8 +455,8 @@ width 1008 pixels.
                 valueC = bltcdat;
                 if ( endOfLine )
                 {
-                    bltaptr += bltamod;
-                    bltbptr += bltbmod;
+                    bltaptr += factor*bltamod;
+                    bltbptr += factor*bltbmod;
                 }
                 outputEnabled = false;
                 break;
@@ -462,8 +466,8 @@ width 1008 pixels.
                 valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
                 if ( endOfLine )
                 {
-                    bltbptr += bltbmod;
-                    bltcptr += bltcmod;
+                    bltbptr += factor*bltbmod;
+                    bltcptr += factor*bltcmod;
                 }
                 outputEnabled = false;
                 break;
@@ -480,7 +484,7 @@ width 1008 pixels.
                 valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
                 if ( endOfLine )
                 {
-                    bltcptr += bltcmod;
+                    bltcptr += factor*bltcmod;
                 }
                 outputEnabled = false;
                 break;
@@ -490,7 +494,7 @@ width 1008 pixels.
                 valueC = bltcdat;
                 if ( endOfLine )
                 {
-                    bltbptr += bltbmod;
+                    bltbptr += factor*bltbmod;
                 }
                 outputEnabled = false;
                 break;
@@ -500,7 +504,7 @@ width 1008 pixels.
                 valueC = bltcdat;
                 if ( endOfLine )
                 {
-                    bltaptr += bltamod;
+                    bltaptr += factor*bltamod;
                 }
                 outputEnabled = false;
                 break;
@@ -510,8 +514,8 @@ width 1008 pixels.
                 valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
                 if ( endOfLine )
                 {
-                    bltaptr += bltamod;
-                    bltcptr += bltcmod;
+                    bltaptr += factor*bltamod;
+                    bltcptr += factor*bltcmod;
                 }
                 outputEnabled = false;
                 break;
@@ -521,8 +525,8 @@ width 1008 pixels.
                 valueC = bltcdat;
                 if ( endOfLine )
                 {
-                    bltaptr += bltamod;
-                    bltbptr += bltbmod;
+                    bltaptr += factor*bltamod;
+                    bltbptr += factor*bltbmod;
                 }
                 outputEnabled = false;
                 break;
@@ -532,8 +536,8 @@ width 1008 pixels.
                 valueC = memory.readWord(bltcptr); if ( ascendingMode ) { bltcptr+=2; } else { bltcptr-=2; }
                 if ( endOfLine )
                 {
-                    bltbptr += bltbmod;
-                    bltcptr += bltcmod;
+                    bltbptr += factor*bltbmod;
+                    bltcptr += factor*bltcmod;
                 }
                 outputEnabled = false;
                 break;
@@ -544,25 +548,25 @@ width 1008 pixels.
         // apply masks
         if ( ascendingMode )
         {
-            if ( wordsToProcessThisRow == 1 ) {
-                // first word mask
-                valueA &= bltafwm;
+            if ( wordsToProcessThisRow == 0 ) {
+                // last word mask
+                valueA &= bltalwm;
             }
             if ( wordsToProcess == wordsToProcessThisRow )
             {
-                // last word mask
-                valueA &= bltalwm;
+                // first word mask
+                valueA &= bltafwm;
             }
         }
         else
         {
-            if ( wordsToProcessThisRow == 1 ) {
-                // last word mask
+            if ( wordsToProcessThisRow == 0 ) {
+                // first word mask
                 valueA &= bltalwm;
             }
             if ( wordsToProcess == wordsToProcessThisRow )
             {
-                // first word mask
+                // last word mask
                 valueA &= bltafwm;
             }
         }
@@ -637,7 +641,7 @@ width 1008 pixels.
             bltdptr += 2;
             if ( endOfLine )
             {
-                bltdptr += bltdmod;
+                bltdptr += factor*bltdmod;
             }
         }
     }

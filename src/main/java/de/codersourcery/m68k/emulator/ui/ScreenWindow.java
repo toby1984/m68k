@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.Emulator;
+import de.codersourcery.m68k.emulator.memory.Memory;
 
 public class ScreenWindow extends AppWindow implements ITickListener,
         Emulator.IEmulatorStateCallback
@@ -41,5 +42,7 @@ public class ScreenWindow extends AppWindow implements ITickListener,
     @Override
     public void tick(Emulator emulator)
     {
+        final Memory memory = emulator.memory;
+
     }
 }
