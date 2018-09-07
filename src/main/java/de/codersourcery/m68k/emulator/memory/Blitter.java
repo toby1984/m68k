@@ -127,6 +127,11 @@ $dff09c	INTREQ	Interrupt request bits (clear or set bits)
     private int shiftBMask; // AND mask to get all bits shifted out
     private int shiftBOut; // bits shifted out by the previous operation (ORed)
 
+    /*
+    The Zero flag is only valid after the blitter has completed its operation
+and can be read from bit (13) DMAF_BLTNZERO of the  DMACONR  register.
+     */
+    private int totalResult; // TODO: Part of DMACONR register
     private boolean ascendingMode;
 
 
@@ -184,6 +189,8 @@ width 1008 pixels.
             shiftB = (bltcon1>> 12) & 0b1111;
             shiftAOut = 0;
             shiftBOut = 0;
+
+            totalResult = 0;
 
             if ( ascendingMode ) {
                 if ( shiftA == 0 ) {
@@ -618,6 +625,8 @@ width 1008 pixels.
         if ( (bltcon0 & 1<<5) != 0 ) { valueD |=  valueA & ~valueB &  valueC; }
         if ( (bltcon0 & 1<<6) != 0 ) { valueD |=  valueA &  valueB & ~valueC; }
         if ( (bltcon0 & 1<<7) != 0 ) { valueD |=  valueA &  valueB &  valueC; }
+
+        totalResult |= valueD;
 
         // Write result
         if ( outputEnabled )
