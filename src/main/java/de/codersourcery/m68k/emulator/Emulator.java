@@ -447,16 +447,6 @@ public class Emulator
                 {
                     try
                     {
-                        if ( breakpoints.hasEnabledBreakpoints() )
-                        {
-                            if ( cpu.cycles == 1 && breakpoints.isBreakpointHit(Emulator.this ) )
-                            {
-                                mode = EmulatorMode.STOPPED;
-                                System.err.println("*** emulation stopped because of breakpoint ***");
-                                stateCallback.stopped(Emulator.this);
-                                continue;
-                            }
-                        }
                         tickCount++;
                         mmu.tick();
                         cpu.executeOneCycle();
@@ -472,6 +462,16 @@ public class Emulator
                         mode = EmulatorMode.STOPPED;
                         System.err.println("*** emulation stopped because of error ***");
                         stateCallback.stopped(Emulator.this);
+                    }
+                    if ( breakpoints.hasEnabledBreakpoints() )
+                    {
+                        if ( cpu.cycles == 1 && breakpoints.isBreakpointHit(Emulator.this ) )
+                        {
+                            mode = EmulatorMode.STOPPED;
+                            System.err.println("*** emulation stopped because of breakpoint ***");
+                            stateCallback.stopped(Emulator.this);
+                            continue;
+                        }
                     }
                 }
             }

@@ -37,7 +37,7 @@ public class ScreenWindow extends AppWindow implements ITickListener,
             {
                 image = new BufferedImage( amigaWidth,amigaHeight,BufferedImage.TYPE_INT_RGB );
                 previousWidth = amigaHeight;
-                previousWidth = amigaWidth;
+                previousHeight = amigaWidth;
             }
             return image;
         }
@@ -105,6 +105,7 @@ public class ScreenWindow extends AppWindow implements ITickListener,
             amigaWidth = width;
             if ( screenData.length != height*width )
             {
+                System.out.println("Screen resolution: "+width+"x"+height);
                 screenData = new int[height * width];
             }
             emulator.video.convertDisplayData( screenData, emulator.dmaController.isBitplaneDMAEnabled() );

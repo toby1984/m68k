@@ -414,7 +414,13 @@ These registers control the operation of the
 
         final int[] ptrs = Arrays.copyOf(bplPointers,6);
         final int[] colorIndex = new int[16];
-        final int bitplaneCount = (bplcon0 & 0b0111_0000_0000_0000) >>> 12;
+        int bitplaneCount = (bplcon0 & 0b0111_0000_0000_0000) >>> 12;
+        if ( ! dmaEnabled )
+        {
+            // TODO: Hack to "do the right thing"...need to find documentation about
+            //       behaviour when DMA is off and/or bitplaneCount == 0
+            bitplaneCount = 6;
+        }
 
         // convert 4-bit RGB into 8-bit
         final boolean isEHB = isEHB();
@@ -422,16 +428,16 @@ These registers control the operation of the
         for ( int i = 0 ; i < 32 ; i++)
         {
             final int color = colors[i];
-            final int r = ((color >> 8) & 0b1111);
+            final int r = ((color >> 8) & 0b1111); // 0..15
             final int g = ((color >> 4) & 0b1111);
             final int b = ((color     ) & 0b1111);
             if ( isEHB ) {
-                rgbColors[i]    = (r << 1) << 16 | (g << 1) << 8 | (b << 1);
-                rgbColors[16+i] =  r       << 16 |  g << 8       | b;
+                rgbColors[i]    = (r << 4) << 16 | (g << 4) << 8 | (b << 4);
+                rgbColors[16+i]    = (r << 2) << 16 | (g << 2) << 8 | (b << 2);
             }
             else
             {
-                rgbColors[i] = (r << 1) << 16 | (g << 1) << 8 | (b << 1);
+                rgbColors[i] = (r << 4) << 16 | (g << 4) << 8 | (b << 4);
             }
         }
 
@@ -464,23 +470,30 @@ These registers control the operation of the
                             colorIndex[col] |= 1;
                         }
                     }
-                    // now set 16 pixels in destination
-                    for ( int idx = 0 ; idx < 16 ; idx++ )
+                }
+                // now set 16 pixels in destination
+                for ( int idx = 0 ; idx < 16 ; idx++ )
+                {
+                    try
                     {
-                        destination[dstPtr++] = rgbColors[ colorIndex[idx]  ];
+                        destination[dstPtr++] = rgbColors[colorIndex[idx]];
+                    }
+                    catch(ArrayIndexOutOfBoundsException e)
+                    {
+                        throw e;
                     }
                 }
-                // add modulo to bitplane pointers
-                // to advance to the next line
-                for ( int i = 0 ; i < bitplaneCount ; i++ )
-                {
-                    if ( (i&1) == 0 ) {
-                        // even bitplane
-                        ptrs[i] += bpl2mod;
-                    } else {
-                        // odd bitplane
-                        ptrs[i] += bpl1mod;
-                    }
+            }
+            // add modulo to bitplane pointers
+            // to advance to the next line
+            for ( int i = 0 ; i < bitplaneCount ; i++ )
+            {
+                if ( (i&1) == 0 ) {
+                    // even bitplane
+                    ptrs[i] += bpl2mod;
+                } else {
+                    // odd bitplane
+                    ptrs[i] += bpl1mod;
                 }
             }
         }
@@ -517,14 +530,25 @@ These registers control the operation of the
          * 1x CPU cycle = 140ns = 8-bit transfer Memory Cycle
          *
          * 1 ns = 10^-9 s
-         *             1
-         * 1 cycle = ---------- = 1,4096*10-8s = 1,4 ns
-         *             7,09379
+         *                    1
+         * 1 CPU cycle = ---------- = 1,4096*10-7s = 140,9 ns
+         *                7,09379
+         *
+         * The video beam produces about 262 video lines from top to bottom, of which
+         * 200 normally are visible on the screen with an NTSC system.  With a PAL
+         * system, the beam produces 312 lines, of which 256 are normally visible.
+         *
+         * During the display time for a six bitplane display (low resolution, 320
+         * pixels wide), 160 time slots will be taken by bitplane DMA for each
+         * horizontal line.
+         *
+         * 1 DMA cycle = 2 CPU cycles => 320 CPU cycles per
          */
         final double pixelTimeNanos = isHiRes() ? 70:140;
-        final double screenTimeNanos = getDisplayWidth()*pixelTimeNanos*getDisplayHeight();
+        final int vlines = amiga.isPAL() ? 312 : 262;
+        final double screenTimeNanos = getDisplayWidth()*pixelTimeNanos*vlines;
         // TODO: Just a rough estimate, there's probably an invisible 'border area'
-        //       around the screen that is currently not being accounted for
+        //       left/right of the visible screen area that is currently not being accounted for
         return (int) (screenTimeNanos/140);
     }
 
