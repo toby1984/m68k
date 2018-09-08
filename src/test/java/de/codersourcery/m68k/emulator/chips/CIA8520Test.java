@@ -23,7 +23,8 @@ public class CIA8520Test extends TestCase
         final Blitter blitter = new Blitter(new DMAController());
         final Amiga amiga = Amiga.AMIGA_500;
         final Video video = new Video(amiga);
-        final MMU mmu = new MMU(new MMU.PageFaultHandler(amiga, blitter, video ));
+        final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler( amiga, blitter, video );
+        final MMU mmu = new MMU( faultHandler );
         final Memory memory = new Memory(mmu);
         blitter.setMemory( memory );
         video.setMemory( memory );
@@ -37,6 +38,7 @@ public class CIA8520Test extends TestCase
             }
         };
         blitter.setIRQController( irqController );
+        faultHandler.setIRQController( irqController );
         cia = new CIA8520(CIA8520.Name.CIAA, irqController);
     }
 

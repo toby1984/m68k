@@ -123,6 +123,7 @@ public class Emulator
         this.blitter.setMemory( this.memory );
         this.cpu = new CPU(amiga.getCPUType(), memory);
         this.irqController = new IRQController(this.cpu);
+        faultHandler.setIRQController( irqController );
         this.blitter.setIRQController( irqController );
         this.ciaa = new CIA8520(CIA8520.Name.CIAA, irqController);
         this.ciab = new CIA8520(CIA8520.Name.CIAB, irqController);

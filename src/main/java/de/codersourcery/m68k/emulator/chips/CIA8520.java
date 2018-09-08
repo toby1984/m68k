@@ -676,7 +676,6 @@ Register  Name          Function
 
     public void tick() {
 
-        System.out.println("--- TICK ---");
         cycle++;
 
         // event counter (counting TOD positive edges)

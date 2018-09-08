@@ -2,6 +2,7 @@ package de.codersourcery.m68k.emulator.memory;
 
 import de.codersourcery.m68k.emulator.Amiga;
 import de.codersourcery.m68k.emulator.chips.CIA8520;
+import de.codersourcery.m68k.emulator.chips.IRQController;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codersourcery.m68k.emulator.exceptions.PageNotMappedException;
 import de.codersourcery.m68k.utils.Misc;
@@ -22,9 +23,8 @@ public class MMU
 {
     private static final boolean DEBUG = false;
 
-    private static final int PAGE_SIZE_LEFT_SHIFT = 12;
+    private static final int PAGE_SIZE_RIGHT_SHIFT = 12;
     public  static final int PAGE_SIZE = 0x1000;
-    public  static final int PAGE_SIZE_MASK = PAGE_SIZE-1;
     private static final int PAGE_OFFSET_MASK = 0xfff;
 
     private final TIntObjectHashMap<MemoryPage> pageMap = new TIntObjectHashMap<>();
@@ -34,12 +34,12 @@ public class MMU
 
     public static class PageFaultHandler
     {
-        private static final int LAST_CHIPRAM_PAGENO = (0x07FFFF & PAGE_SIZE_MASK);
-        private static final int FIRST_CIA_PAGENO = (0xBF0000 & PAGE_SIZE_MASK);
-        private static final int LAST_CIA_PAGENO = (0xBFFFFF & PAGE_SIZE_MASK);
+        private static final int LAST_CHIPRAM_PAGENO = (0x07FFFF >>> PAGE_SIZE_RIGHT_SHIFT);
+        private static final int FIRST_CIA_PAGENO = (0xBF0000 >>> PAGE_SIZE_RIGHT_SHIFT);
+        private static final int LAST_CIA_PAGENO = (0xBFFFFF >>> PAGE_SIZE_RIGHT_SHIFT);
 
-        private static final int FIRST_CUSTOM_CHIP_PAGENO = (0xDF0000 & PAGE_SIZE_MASK);
-        private static final int LAST_CUSTOM_CHIP_PAGENO = (0xDFFFFF & PAGE_SIZE_MASK);
+        private static final int FIRST_CUSTOM_CHIP_PAGENO = (0xDF0000 >>> PAGE_SIZE_RIGHT_SHIFT);
+        private static final int LAST_CUSTOM_CHIP_PAGENO = (0xDFFFFF >>> PAGE_SIZE_RIGHT_SHIFT);
 
         private final int firstRomPageNo;
         private final int lastRomPageNo;
@@ -50,21 +50,29 @@ public class MMU
         private final Video video;
         private CIA8520 ciaa;
         private CIA8520 ciab;
+        private IRQController irqController;
 
         public PageFaultHandler(Amiga amiga,Blitter blitter,Video video)
         {
             this.amiga = amiga;
             this.blitter = blitter;
             this.video = video;
-            this.firstRomPageNo = amiga.getKickRomStartAddress() & PAGE_SIZE_MASK;
-            this.lastRomPageNo = (amiga.getKickRomEndAddress()-1) & PAGE_SIZE_MASK;
+            this.firstRomPageNo = amiga.getKickRomStartAddress() >>> PAGE_SIZE_RIGHT_SHIFT;
+            this.lastRomPageNo = (amiga.getKickRomEndAddress()-1) >>> PAGE_SIZE_RIGHT_SHIFT;
         }
 
-        public void reset() {
+        public void setIRQController(IRQController irqController)
+        {
+            this.irqController = irqController;
+        }
+
+        public void reset()
+        {
             ciaa.reset();
             ciab.reset();
             blitter.reset();
             video.reset();
+            irqController.reset();
         }
 
         public void tick()
@@ -86,6 +94,9 @@ public class MMU
         public MemoryPage getPage(int pageNo) throws MemoryAccessException
         {
             /*
+
+            DFF09A => page 3583
+
 Amiga 500
 
 000000-03FFFF 256 KB Chip RAM
@@ -131,7 +142,7 @@ FC0000-FFFFFF 256 KB -- Kickstart ROM
             }
             // custom chips
             if ( pageNo >= FIRST_CUSTOM_CHIP_PAGENO && pageNo <= LAST_CUSTOM_CHIP_PAGENO) {
-                return new CustomChipPage(pageNo*PAGE_SIZE, blitter, video);
+                return new CustomChipPage(pageNo*PAGE_SIZE, blitter, video, irqController);
             }
             return AbsentPage.SINGLETON;
         }
@@ -198,7 +209,7 @@ FC0000-FFFFFF 256 KB -- Kickstart ROM
 
     public int getPageNo(int address)
     {
-        return (address >>> PAGE_SIZE_LEFT_SHIFT);
+        return (address >>> PAGE_SIZE_RIGHT_SHIFT);
     }
 
     public int getOffsetInPage(int address) {

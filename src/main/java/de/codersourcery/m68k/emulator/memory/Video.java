@@ -3,11 +3,18 @@ package de.codersourcery.m68k.emulator.memory;
 import de.codersourcery.m68k.emulator.Amiga;
 import de.codersourcery.m68k.emulator.chips.IRQController;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
+import de.codersourcery.m68k.utils.Misc;
 
 import java.util.Arrays;
 
 public class Video extends MemoryPage
 {
+    /* Agnus's timings are measured in "color clocks" of 280 ns.
+     * This is equivalent to two low resolution (140 ns) pixels or
+     * four high resolution (70 ns) pixels.
+     * Like Denise, these timings were designed for display on household TVs, and can
+     * be synchronized to an external clock source.
+     */
     public static final int BPL1PTH = 0x0E0; //  W   A       Bitplane 1 pointer (high 3 bits)
     public static final int BPL1PTL = 0x0E2; //  W   A       Bitplane 1 pointer (low 15 bits)
     public static final int BPL2PTH = 0x0E4; //  W   A       Bitplane 2 pointer (high 3 bits)
@@ -183,6 +190,8 @@ These registers control the operation of the
 
     private int ticksUntilVBlank;
 
+    public int[] bpldat = new int[6];
+
     public int bplcon0;
     public int bplcon1;
     public int bplcon2;
@@ -200,15 +209,16 @@ These registers control the operation of the
     }
     public void reset()
     {
-        ticksUntilVBlank = amiga.isPAL() ? 0 : 0;
         bplcon0=0;
         bplcon1=0;
         bplcon2=0;
         bplcon3=0;
         Arrays.fill(bplPointers,0);
         Arrays.fill(colors,0);
+        Arrays.fill(bpldat,0);
         bpl1mod = 0;
         bpl2mod = 0;
+        ticksUntilVBlank = calcTicksUntilVBlank();
     }
 
     @Override
@@ -253,6 +263,16 @@ These registers control the operation of the
                     throw new RuntimeException("Unreachable code reached");
             }
         }
+        // bit plane data registers
+        if ( offset >= 0x110 && offset <= 0x11b ) {
+            final int idx = (offset-0x110)>>>1;
+            int value = bpldat[idx];
+            if ( (offset & 1 ) == 0 ) {
+                return hi(value);
+            }
+            return lo(value);
+        }
+        System.err.println("VIDEO: Unhandled read from offset "+offset);
         return 0;
     }
 
@@ -292,6 +312,17 @@ These registers control the operation of the
             }
             return;
         }
+        // bit plane data registers
+        if ( offset >= 0x110 && offset <= 0x11b ) {
+            final int idx = (offset-0x110)>>>1;
+            if ( (offset &1) == 0 ) {
+                bpldat[idx] = chghi(bpldat[idx],value);
+            } else {
+                bpldat[idx] = chglo(bpldat[idx],value);
+            }
+            return;
+        }
+        System.err.println("VIDEO: Unhandled write to offset "+offset);
     }
 
     @Override
@@ -322,6 +353,13 @@ These registers control the operation of the
             }
             return;
         }
+        // bit plane data registers
+        if ( offset >= 0x110 && offset <= 0x11b ) {
+            final int idx = (offset-0x110)>>>1;
+            bpldat[idx] = value;
+            return;
+        }
+        System.err.println("VIDEO: Word write access to unhandled register "+ Misc.hex(offset));
     }
 
     private static byte hi(int value) {
@@ -368,7 +406,7 @@ These registers control the operation of the
      *
      * @param destination
      */
-    public void convertDisplayData(int[] destination)
+    public void convertDisplayData(int[] destination,boolean dmaEnabled)
     {
         // TODO: Add HAM support
         // TODO: Add support for horizontal scrolling
@@ -409,7 +447,13 @@ These registers control the operation of the
                 for ( int i = 0 ; i < bitplaneCount ; i++ )
                 {
                     // read 16 bits (=pixels) from the current bit plane
-                    final int data = memory.readWord(ptrs[i]);
+                    final int data;
+                    if ( dmaEnabled )
+                    {
+                        data = memory.readWord( ptrs[i] );
+                    } else {
+                        data = bpldat[i];
+                    }
                     // advance to next word
                     ptrs[i] += 2;
                     // now shift-in color idx bits starting with the MSB (left-most) one
@@ -463,9 +507,25 @@ These registers control the operation of the
 
     private int calcTicksUntilVBlank()
     {
-        xxx calculate number of ticks based on resolution & clock frequency xxx
-        final double pixelTime = isHiRes() ? 70:140;
-        return 0;
+        /* Agnus's timings are measured in "color clocks" of 280 ns.
+         * This is equivalent to two low resolution (140 ns) pixels or
+         * four high resolution (70 ns) pixels.
+         *
+         * NTSC: 3,57954525 Mhz = 2,79365095329e-07 s = 279,3 ns
+         * PAL: 3,546895 Mhz = 2,81936736216e-07 s = 281,9 ns
+         *
+         * 1x CPU cycle = 140ns = 8-bit transfer Memory Cycle
+         *
+         * 1 ns = 10^-9 s
+         *             1
+         * 1 cycle = ---------- = 1,4096*10-8s = 1,4 ns
+         *             7,09379
+         */
+        final double pixelTimeNanos = isHiRes() ? 70:140;
+        final double screenTimeNanos = getDisplayWidth()*pixelTimeNanos*getDisplayHeight();
+        // TODO: Just a rough estimate, there's probably an invisible 'border area'
+        //       around the screen that is currently not being accounted for
+        return (int) (screenTimeNanos/140);
     }
 
 

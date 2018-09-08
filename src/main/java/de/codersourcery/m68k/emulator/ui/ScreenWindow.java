@@ -6,6 +6,7 @@ import de.codersourcery.m68k.emulator.memory.Memory;
 import javax.swing.JPanel;
 import java.awt.Graphics;
 import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.Panel;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
@@ -35,6 +36,8 @@ public class ScreenWindow extends AppWindow implements ITickListener,
             if ( image == null || previousHeight != amigaHeight || previousWidth != amigaWidth)
             {
                 image = new BufferedImage( amigaWidth,amigaHeight,BufferedImage.TYPE_INT_RGB );
+                previousWidth = amigaHeight;
+                previousWidth = amigaWidth;
             }
             return image;
         }
@@ -64,6 +67,7 @@ public class ScreenWindow extends AppWindow implements ITickListener,
         cnstrs.weightx=1;
         cnstrs.weighty=1;
         cnstrs.fill = GridBagConstraints.BOTH;
+        getContentPane().setLayout( new GridBagLayout() );
         getContentPane().add( panel, cnstrs );
     }
 
@@ -99,14 +103,11 @@ public class ScreenWindow extends AppWindow implements ITickListener,
             final int width = emulator.video.getDisplayWidth();
             amigaHeight = height;
             amigaWidth = width;
-            screenData = new int[ height * width];
-            if ( emulator.dmaController.isBitplaneDMAEnabled() )
+            if ( screenData.length != height*width )
             {
-                emulator.video.convertDisplayData( screenData );
+                screenData = new int[height * width];
             }
-            else {
-                Arrays.fill(screenData,0);
-            }
+            emulator.video.convertDisplayData( screenData, emulator.dmaController.isBitplaneDMAEnabled() );
         }
         repaint();
     }

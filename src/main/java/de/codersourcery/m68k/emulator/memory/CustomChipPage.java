@@ -1,6 +1,8 @@
 package de.codersourcery.m68k.emulator.memory;
 
+import de.codersourcery.m68k.emulator.chips.IRQController;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
+import de.codersourcery.m68k.utils.Misc;
 
 /**
  * Address range containing all custom-chip registers.
@@ -294,15 +296,29 @@ NAME        ADD  R/W  CHIP    FUNCTION
 [ ] DIWHIGH      1E4  W   AD( E ) Display window -  upper bits for start, stop
      */
     public final Video video;
+    private IRQController irqController;
 
-    public CustomChipPage(int startAddress,Blitter blitter,Video video) {
+    public CustomChipPage(int startAddress,Blitter blitter,Video video,IRQController irqController) {
         this.startAddress = startAddress;
         this.blitter = blitter;
         this.video = video;
+        this.irqController = irqController;
     }
 
     @Override
     public byte readByte(int offset)
+    {
+        return readByteNoSideEffects( offset );
+    }
+
+    /*
+    INTREQ     09C      W       P   Interrupt request bits (clear or set)
+    INTREQR    01E      R       P   Interrupt request bits (read)
+    INTENA     09A      W       P    Interrupt enable bits (clear or set bits)
+    INTENAR    01C      R       P    Interrupt enable bits (read)
+     */
+    @Override
+    public byte readByteNoSideEffects(int offset)
     {
         final int adr = (startAddress+offset) & 0x1ff;
         if ( adr >= 0x40 && adr <= 0x74 )
@@ -320,28 +336,19 @@ NAME        ADD  R/W  CHIP    FUNCTION
         if ( adr >= 0x0e0 && adr <= 0x1E5) {
             return video.readByte( adr );
         }
-        return 0;
-    }
-
-    @Override
-    public byte readByteNoSideEffects(int offset)
-    {
-        final int adr = (startAddress+offset) & 0x1ff;
-        if ( adr >= 0x40 && adr <= 0x74 )
-        {
-            final int regOffset = adr - 0x040;
-            return blitter.readByteNoSideEffects( regOffset );
+        if ( adr == 0x01c) { // INTENAR
+            return (byte) (irqController.irqEnabled >>> 8);
         }
-        if ( adr == 0x02 ) {
-            return (byte) (readDMACONR() >> 8);
+        if ( adr == 0x01d) { // INTENAR
+            return (byte) irqController.irqEnabled;
         }
-        if ( adr == 0x03 ) {
-            return (byte) readDMACONR();
+        if ( adr == 0x01e) { // INTREQR
+            return (byte) (irqController.irqRequests >>> 8);
         }
-        // 0x0E0...0x1e4 => video
-        if ( adr >= 0x0e0 && adr <= 0x1E5) {
-            return video.readByte( adr );
+        if ( adr == 0x01f) { // INTREQR
+            return (byte) irqController.irqRequests;
         }
+        System.err.println("CUSTOM CHIP AREA: Unhandled read at offset "+Misc.hex(offset));
         return 0;
     }
 
@@ -360,6 +367,7 @@ NAME        ADD  R/W  CHIP    FUNCTION
             video.writeByte( adr, value );
             return;
         }
+        System.err.println("CUSTOM CHIP: Unhandled byte write @ "+ Misc.hex(offset));
     }
 
     @Override
@@ -370,11 +378,17 @@ NAME        ADD  R/W  CHIP    FUNCTION
         {
             final int regOffset = adr - 0x040;
             blitter.writeWord( regOffset, value);
-        } else if ( adr == 0x02 ) {
+        } else if ( adr == 0x96 ) {
             writeDMACON( value );
         } else if ( adr >= 0x0e0 && adr <= 0x1E5) {
             // 0x0E0...0x1e4 => video
             video.writeWord( adr, value );
+        } else if ( adr == 0x09a) { // INTENA
+            irqController.writeIRQEnable( value );
+        } else if ( adr == 0x09c) { // INTREQR
+            irqController.writeIRQReq( value );
+        } else {
+            System.err.println("CHIPSET: Unhandled word write @ "+Misc.hex(offset));
         }
     }
 
@@ -390,6 +404,7 @@ NAME        ADD  R/W  CHIP    FUNCTION
             current &= (value & ~(1<<15) );
         }
         blitter.dmaController.flags=current;
+        System.out.println(blitter.dmaController);
     }
 
     private int readDMACONR() {

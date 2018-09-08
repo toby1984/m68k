@@ -278,7 +278,8 @@ width 1008 pixels.
             case 0x34: return hi(bltadat);
             case 0x35: return lo(bltadat);
         }
-        throw new RuntimeException( "Unhandled address: "+offset );
+        System.err.println( "BLITTER: Unhandled read from offset: "+offset );
+        return 0;
     }
 
     @Override
@@ -338,9 +339,8 @@ width 1008 pixels.
             case 0x33: bltbdat =setlo(bltbdat, value); break;
             case 0x34: bltadat =sethi(bltadat, value); break;
             case 0x35: bltadat =setlo(bltadat, value); break;
-            default:
-                throw new RuntimeException( "Unhandled address: "+offset );
         }
+        System.err.println( "BLITTER: Unhandled write to offset: "+offset );
     }
 
     private static int setlo(int register,int value) {

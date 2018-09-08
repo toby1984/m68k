@@ -25,7 +25,7 @@ import java.util.function.Function;
 
 public class UI extends JFrame
 {
-    public static final File ROM_LISTING = new File("/home/tgierke/Downloads/exec_disassembly.txt");
+    public static final File ROM_LISTING = new File("/home/tobi/Downloads/exec_disassembly.txt");
     private static final String MAIN_WINDOW_KEY = "mainWindow";
 
     final JDesktopPane desktop = new JDesktopPane();
