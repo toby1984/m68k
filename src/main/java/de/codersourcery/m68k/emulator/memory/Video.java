@@ -474,27 +474,21 @@ These registers control the operation of the
                 // now set 16 pixels in destination
                 for ( int idx = 0 ; idx < 16 ; idx++ )
                 {
-                    try
-                    {
-                        destination[dstPtr++] = rgbColors[colorIndex[idx]];
-                    }
-                    catch(ArrayIndexOutOfBoundsException e)
-                    {
-                        throw e;
-                    }
+                    destination[dstPtr++] = rgbColors[colorIndex[idx]];
                 }
             }
             // add modulo to bitplane pointers
             // to advance to the next line
-            for ( int i = 0 ; i < bitplaneCount ; i++ )
+            final int evenMod = bpl2mod;
+            final int oddMod = bpl1mod;
+            if ( evenMod != 0 || oddMod != 0 )
             {
-                if ( (i&1) == 0 ) {
-                    // even bitplane
-                    ptrs[i] += bpl2mod;
-                } else {
-                    // odd bitplane
-                    ptrs[i] += bpl1mod;
-                }
+                ptrs[0] += evenMod; // even bitplane
+                ptrs[1] += oddMod;  // odd bitplane
+                ptrs[2] += evenMod; // even bitplane
+                ptrs[3] += oddMod;  // odd bitplane
+                ptrs[4] += evenMod; // even bitplane
+                ptrs[5] += oddMod;  // odd bitplane
             }
         }
     }
