@@ -1,5 +1,7 @@
 package de.codersourcery.m68k.emulator.memory;
 
+import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.chips.IRQController;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 
 import java.util.Arrays;
@@ -176,8 +178,10 @@ These registers control the operation of the
      */
 
     public Memory memory;
+    public IRQController irqController;
+    public final Amiga amiga;
 
-    private boolean isPAL = true; // TODO: Make this configurable ?
+    private int ticksUntilVBlank;
 
     public int bplcon0;
     public int bplcon1;
@@ -190,9 +194,13 @@ These registers control the operation of the
     public int bpl1mod; // modulo for odd bitplanes
     public int bpl2mod; // modulo for even bitplanes
 
+    public Video(Amiga amiga) {
+        this.amiga = amiga;
+        reset();
+    }
     public void reset()
     {
-        isPAL = true;
+        ticksUntilVBlank = amiga.isPAL() ? 0 : 0;
         bplcon0=0;
         bplcon1=0;
         bplcon2=0;
@@ -440,11 +448,26 @@ These registers control the operation of the
      */
     public int getDisplayHeight()
     {
-        if ( isPAL ) {
+        if ( amiga.isPAL() ) {
             return isInterlaced() ? 512 : 256;
         }
         return isInterlaced() ? 400 : 200;
     }
+
+    public void tick() {
+
+        if ( --ticksUntilVBlank < 0 ) {
+            ticksUntilVBlank = calcTicksUntilVBlank();
+        }
+    }
+
+    private int calcTicksUntilVBlank()
+    {
+        xxx calculate number of ticks based on resolution & clock frequency xxx
+        final double pixelTime = isHiRes() ? 70:140;
+        return 0;
+    }
+
 
     public boolean isHiRes() {
         return (bplcon0 & 1<<15) != 0;
@@ -465,5 +488,10 @@ These registers control the operation of the
     public void setMemory(Memory memory)
     {
         this.memory = memory;
+    }
+
+    public void setIRQController(IRQController irqController)
+    {
+        this.irqController = irqController;
     }
 }

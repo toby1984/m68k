@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.emulator.memory;
 
+import de.codersourcery.m68k.emulator.chips.IRQController;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 
 public class Blitter extends MemoryPage
@@ -65,6 +66,8 @@ $dff09c	INTREQ	Interrupt request bits (clear or set bits)
     public static final int BLTADAT  = 0x34; //  0xdff074	Blitter source A data reg
 
     public final DMAController dmaController;
+    public IRQController irqController;
+
     public int bltcon0;
     public int bltcon1;
     private int bltcon0l;
@@ -393,6 +396,7 @@ width 1008 pixels.
         {
             blitterDone = true;
             blitterActive = false;
+            irqController.triggerIRQ( IRQController.IRQSource.BLITTER_FINISHED );
         }
 
         final int factor = ascendingMode ? 1 : -1;
@@ -815,5 +819,10 @@ width 1008 pixels.
         blitterNasty = false;
         blitterDone = false;
         blitterActive = false;
+    }
+
+    public void setIRQController(IRQController irqController)
+    {
+        this.irqController = irqController;
     }
 }

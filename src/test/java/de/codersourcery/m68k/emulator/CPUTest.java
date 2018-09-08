@@ -54,9 +54,10 @@ public class CPUTest extends TestCase
     protected void setUp() throws Exception
     {
         super.setUp();
+        final Amiga amiga = Amiga.AMIGA_500;
         final Blitter blitter = new Blitter(new DMAController());
-        final Video video = new Video();
-        mmu = new MMU( new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter, video ) );
+        final Video video = new Video(amiga);
+        mmu = new MMU( new MMU.PageFaultHandler(amiga,blitter, video ) );
         memory = new Memory(mmu);
         blitter.setMemory( memory );
         video.setMemory( memory );

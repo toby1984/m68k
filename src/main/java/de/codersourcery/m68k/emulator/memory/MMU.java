@@ -67,6 +67,14 @@ public class MMU
             video.reset();
         }
 
+        public void tick()
+        {
+            ciaa.tick();
+            ciab.tick();
+            blitter.tick();
+            video.tick();
+        }
+
         public void setCIAA(CIA8520 cia) {
             this.ciaa = cia;
         }
@@ -224,5 +232,10 @@ FC0000-FFFFFF 256 KB -- Kickstart ROM
         pageMap.clear();
         faultHandler.reset();
         faultCount = 0;
+    }
+
+    public void tick()
+    {
+        faultHandler.tick();
     }
 }

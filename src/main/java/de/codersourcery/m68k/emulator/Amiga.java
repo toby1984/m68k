@@ -35,6 +35,18 @@ public enum Amiga
         {
             return CPUType.M68000;
         }
+
+        @Override
+        public boolean isPAL()
+        {
+            return true;
+        }
+
+        @Override
+        public float getCPUClock()
+        {
+            return isPAL() ? PAL_CPU_CLOCK_MHZ : NTSC_CPU_CLOCK_MHZ;
+        }
     };
 
     public abstract int getChipRAMSize();
@@ -42,5 +54,15 @@ public enum Amiga
     public abstract int getKickRomEndAddress();
     public abstract int getKickRomSize();
     public abstract CPUType getCPUType();
+    public abstract boolean isPAL();
 
+    /**
+     * Returns the CPU clock in MHz.
+     *
+     * @return
+     */
+    public abstract float getCPUClock();
+
+    public static final float NTSC_CPU_CLOCK_MHZ = 7.15909f;
+    public static final float PAL_CPU_CLOCK_MHZ  = 7.09379f;
 }

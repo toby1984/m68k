@@ -115,7 +115,7 @@ public class Emulator
         }
         this.dmaController = new DMAController();
         this.blitter = new Blitter(this.dmaController);
-        this.video = new Video();
+        this.video = new Video(amiga);
         final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler(amiga,blitter,video);
         this.mmu = new MMU(faultHandler);
         this.memory = new Memory(this.mmu);
@@ -123,6 +123,7 @@ public class Emulator
         this.blitter.setMemory( this.memory );
         this.cpu = new CPU(amiga.getCPUType(), memory);
         this.irqController = new IRQController(this.cpu);
+        this.blitter.setIRQController( irqController );
         this.ciaa = new CIA8520(CIA8520.Name.CIAA, irqController);
         this.ciab = new CIA8520(CIA8520.Name.CIAB, irqController);
         faultHandler.setCIAA(this.ciaa);
@@ -419,6 +420,7 @@ public class Emulator
                             try
                             {
                                 tickCount++;
+                                mmu.tick();
                                 cpu.executeOneInstruction();
                             }
                             catch (Exception e)
@@ -455,6 +457,7 @@ public class Emulator
                             }
                         }
                         tickCount++;
+                        mmu.tick();
                         cpu.executeOneCycle();
                         if ((tickCount % callbackInvocationTicks) == 0)
                         {

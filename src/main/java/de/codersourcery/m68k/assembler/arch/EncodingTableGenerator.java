@@ -898,9 +898,10 @@ public class EncodingTableGenerator
 
     private static void sanityCheck(Instruction insn,int opcode) {
 
+        final Amiga amiga = Amiga.AMIGA_500;
         final Blitter blitter = new Blitter(new DMAController());
-        Video video=new Video();
-        final MMU mmu = new MMU(new MMU.PageFaultHandler(Amiga.AMIGA_500,blitter,video));
+        Video video=new Video(amiga);
+        final MMU mmu = new MMU(new MMU.PageFaultHandler(amiga,blitter,video));
         final Memory memory = new Memory(mmu);
         blitter.setMemory( memory );
         video.setMemory( memory );
