@@ -410,7 +410,7 @@ These registers control the operation of the
     {
         // TODO: Add HAM support
         // TODO: Add support for horizontal scrolling
-        // TODO: Add support for dual playfields / playfield priorities
+        // TODO: Add support for dual playfields / playfield priorities / transparency
 
         final int[] ptrs = Arrays.copyOf(bplPointers,6);
         final int[] colorIndex = new int[16];
@@ -431,13 +431,9 @@ These registers control the operation of the
             final int r = ((color >> 8) & 0b1111); // 0..15
             final int g = ((color >> 4) & 0b1111);
             final int b = ((color     ) & 0b1111);
+            rgbColors[i]    = (r << 4) << 16 | (g << 4) << 8 | (b << 4);
             if ( isEHB ) {
-                rgbColors[i]    = (r << 4) << 16 | (g << 4) << 8 | (b << 4);
-                rgbColors[16+i]    = (r << 2) << 16 | (g << 2) << 8 | (b << 2);
-            }
-            else
-            {
-                rgbColors[i] = (r << 4) << 16 | (g << 4) << 8 | (b << 4);
+                rgbColors[16+i] = (r << 2) << 16 | (g << 2) << 8 | (b << 2);
             }
         }
 
@@ -453,13 +449,8 @@ These registers control the operation of the
                 for ( int i = 0 ; i < bitplaneCount ; i++ )
                 {
                     // read 16 bits (=pixels) from the current bit plane
-                    final int data;
-                    if ( dmaEnabled )
-                    {
-                        data = memory.readWord( ptrs[i] );
-                    } else {
-                        data = bpldat[i];
-                    }
+                    final int data = dmaEnabled ? memory.readWord(ptrs[i]) : bpldat[i];
+
                     // advance to next word
                     ptrs[i] += 2;
                     // now shift-in color idx bits starting with the MSB (left-most) one

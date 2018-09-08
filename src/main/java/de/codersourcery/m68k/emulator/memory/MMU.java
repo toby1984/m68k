@@ -34,9 +34,18 @@ public class MMU
 
     public static class PageFaultHandler
     {
-        private static final int LAST_CHIPRAM_PAGENO = (0x07FFFF >>> PAGE_SIZE_RIGHT_SHIFT);
         private static final int FIRST_CIA_PAGENO = (0xBF0000 >>> PAGE_SIZE_RIGHT_SHIFT);
         private static final int LAST_CIA_PAGENO = (0xBFFFFF >>> PAGE_SIZE_RIGHT_SHIFT);
+
+        /*
+C0 0000 - DF EFFF       Reserved.  Do not use.
+   |
+   | C00000 - D7FFFF  Internal expansion (slow) memory (on some systems).
+   |
+   | D80000 - DBFFFF  Reserved.  Do not use.
+         */
+        private static final int CHIP_RAM_EXPANSION_START_PAGENO = (0xC00000 >>> PAGE_SIZE_RIGHT_SHIFT);
+        private static final int CHIP_RAM_EXPANSION_END_PAGENO   = (0xD7FFFF >>> PAGE_SIZE_RIGHT_SHIFT);
 
         private static final int FIRST_CUSTOM_CHIP_PAGENO = (0xDF0000 >>> PAGE_SIZE_RIGHT_SHIFT);
         private static final int LAST_CUSTOM_CHIP_PAGENO = (0xDFFFFF >>> PAGE_SIZE_RIGHT_SHIFT);
@@ -129,9 +138,20 @@ FC0000-FFFFFF 256 KB -- Kickstart ROM
              */
 
             // Chip RAM
-            if ( pageNo <= LAST_CHIPRAM_PAGENO) {
+            final int lastChipRamPageNo = amiga.getChipRAMSize() / MMU.PAGE_SIZE;
+            if ( pageNo < lastChipRamPageNo) {
                 return new RegularPage(PAGE_SIZE);
             }
+            // chip ram expansion area 0xc00000-D7FFFF
+            if ( pageNo >= CHIP_RAM_EXPANSION_START_PAGENO && pageNo <= CHIP_RAM_EXPANSION_END_PAGENO) {
+
+                // no (more) additional chip ram, fake incomplete address decoding
+                // so kickrom RAM check works
+                final int delta =
+                    (pageNo - CHIP_RAM_EXPANSION_START_PAGENO)%(LAST_CUSTOM_CHIP_PAGENO-FIRST_CUSTOM_CHIP_PAGENO);
+                pageNo = FIRST_CUSTOM_CHIP_PAGENO + delta;
+            }
+
             // CIA address range
             if ( pageNo >= FIRST_CIA_PAGENO && pageNo <= LAST_CIA_PAGENO ) {
                 return new CIAPage(pageNo*PAGE_SIZE,ciaa,ciab);
@@ -192,7 +212,7 @@ FC0000-FFFFFF 256 KB -- Kickstart ROM
     {
         int firstPage = getPageNo(startaddress );
         int lastPage = getPageNo(startaddress+count);
-        for ( int pageNo = firstPage ; pageNo <= lastPage ; pageNo++) {
+        for ( int pageNo = firstPage ; pageNo < lastPage ; pageNo++) {
             getPage(pageNo).flags |= flags;
         }
     }
@@ -202,7 +222,7 @@ FC0000-FFFFFF 256 KB -- Kickstart ROM
         final byte negated = (byte) ~flags;
         int firstPage = getPageNo(startaddress );
         int lastPage = getPageNo(startaddress+count);
-        for ( int pageNo = firstPage ; pageNo <= lastPage ; pageNo++) {
+        for ( int pageNo = firstPage ; pageNo < lastPage ; pageNo++) {
             getPage(pageNo).flags &= negated;
         }
     }

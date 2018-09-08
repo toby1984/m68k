@@ -783,12 +783,15 @@ public class Disassembler
                 return;
             case ADDA:
                 appendln("adda");
+                final int opSize;
                 if ((insnWord&1<<8) == 0 ) {
                     append(".w ");
+                    opSize = 2;
                 } else {
                     append(".l ");
+                    opSize = 4;
                 }
-                decodeOperand(2, (insnWord&0b111000)>>3, insnWord&0b111);
+                decodeOperand(opSize, (insnWord&0b111000)>>3, insnWord&0b111);
                 regNum = (insnWord&0b111000000000) >> 9;
                 append(",").appendAddressRegister(regNum);
                 return;
