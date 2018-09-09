@@ -19,7 +19,7 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     private final Object LOCK = new Object();
 
     // @GuardedBy( LOCK )
-    private boolean followPC = false;
+    private boolean followPC = true;
 
     // @GuardedBy( LOCK )
     private int addressToDisplay = 0xFC0000;
@@ -212,7 +212,6 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
                             currentHighlight.clear();
                             currentHighlight = null;
                         }
-                        System.out.println("HIGHLIGHT: "+textOffset+" -> "+end);
                         currentHighlight = new Highlight( textOffset,end-textOffset );
                         currentHighlight.highlight();
                     }

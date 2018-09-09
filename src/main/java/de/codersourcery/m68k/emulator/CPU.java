@@ -469,7 +469,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             case 0b101:
                 // ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
                 int offset = memLoadWord(pc);
-                pc += 2; // skip displacement
+                if ( advancePC )
+                {
+                    pc += 2; // skip displacement
+                }
                 cycles += operandSize == 4 ? 12 : 8;
                 ea = addressRegisters[ eaRegister ] + offset; // hint: memLoad() performs sign-extension to 32 bits
                 return;
@@ -480,7 +483,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 // MEMORY_INDIRECT_PREINDEXED
 
                 int extensionWord = memory.readWordNoCheck(pc);
-                pc += 2; // skip extension word
+                if ( advancePC )
+                {
+                    pc += 2; // skip extension word
+                }
 
                 int baseRegisterValue = 0;
                 int baseDisplacement;
@@ -517,13 +523,19 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             return;
                         case 0b0010: // Indirect Preindexed with Word Outer Displacement
                             outerDisplacement = memLoadWord(pc);
-                            pc += 2;
+                            if ( advancePC )
+                            {
+                                pc += 2;
+                            }
                             int intermediateAddress = baseRegisterValue + baseDisplacement + decodeIndexRegisterValue(extensionWord );
                             ea = memLoadLongWithCheck(intermediateAddress)+outerDisplacement;
                             return;
                         case 0b0011: // Indirect Preindexed with Long Outer Displacement
                             outerDisplacement = memLoadLong(pc);
-                            pc += 4;
+                            if ( advancePC )
+                            {
+                                pc += 4;
+                            }
                             intermediateAddress = baseRegisterValue + baseDisplacement + decodeIndexRegisterValue(extensionWord );
                             ea = memLoadLongWithCheck(intermediateAddress) + outerDisplacement;
                             return;
@@ -535,13 +547,19 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             return;
                         case 0b0110: // Indirect Postindexed with Word Outer Displacement
                             outerDisplacement = memLoadWord(pc);
-                            pc += 2;
+                            if ( advancePC )
+                            {
+                                pc += 2;
+                            }
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress) + decodeIndexRegisterValue(extensionWord ) + outerDisplacement;
                             return;
                         case 0b0111: // Indirect Postindexed with Long Outer Displacement
                             outerDisplacement = memLoadLong(pc);
-                            pc += 4;
+                            if ( advancePC )
+                            {
+                                pc += 4;
+                            }
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress) + decodeIndexRegisterValue(extensionWord ) + outerDisplacement;
                             return;
@@ -554,13 +572,19 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                             return;
                         case 0b1010: // Memory Indirect with Word Outer Displacement, Index suppressed
                             outerDisplacement = memLoadWord(pc);
-                            pc += 2;
+                            if ( advancePC )
+                            {
+                                pc += 2;
+                            }
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress) + outerDisplacement;
                             return;
                         case 0b1011: // Memory Indirect with Long Outer Displacement, Index suppressed
                             outerDisplacement = memLoadLong(pc);
-                            pc += 4;
+                            if ( advancePC )
+                            {
+                                pc += 4;
+                            }
                             intermediateAddress = baseRegisterValue + baseDisplacement;
                             ea = memLoadLongWithCheck(intermediateAddress) + outerDisplacement;
                             return;
@@ -597,7 +621,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         baseDisplacement = memory.readWordNoCheck(pc);
                         ea = baseDisplacement + pc;
                         cycles += operandSize == 4 ? 12 : 8;
-                        pc += 2;
+                        if ( advancePC )
+                        {
+                            pc += 2;
+                        }
                         return;
                     case 0b011:
                      /*
@@ -611,7 +638,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                       */
                         int origPc = pc;
                         extensionWord = memory.readWordNoCheck(pc);
-                        pc += 2;
+                        if ( advancePC )
+                        {
+                            pc += 2;
+                        }
                         if ( (extensionWord & 1<<8) == 0 ) { // 8-bit displacement
                             baseDisplacement = ((extensionWord & 0xff) << 24) >> 24;
                         } else {
@@ -639,7 +669,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          */
                         ea = memLoadWord(pc);
                         cycles += operandSize == 4 ? 12 : 8;
-                        pc += 2;
+                        if ( advancePC )
+                        {
+                            pc += 2;
+                        }
                         return;
                     case 0b001:
                         /*
@@ -648,7 +681,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          */
                         ea = memLoadLong(pc);
                         cycles += operandSize == 4 ? 12 : 8;
-                        pc += 4;
+                        if ( advancePC )
+                        {
+                            pc += 4;
+                        }
                         return;
                     case 0b100:
                         /*
@@ -658,7 +694,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                          */
                         ea = pc;
                         cycles += operandSize == 4 ? 8 : 4;
-                        pc += operandSize;
+                        if ( advancePC )
+                        {
+                            pc += operandSize;
+                        }
                         return;
                 }
         }
@@ -1366,7 +1405,8 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 }
                 // $$FALL-THROUGH$$
             default:
-                calculateEffectiveAddress(operandSizeInBytes, eaMode, eaRegister,advancePC);
+                // calculateEffectiveAddress(operandSizeInBytes, eaMode, eaRegister,advancePC)
+                calculateEffectiveAddress(operandSizeInBytes, eaMode, eaRegister,advancePC,advancePC);
                 if ( ! calculateAddressOnly )
                 {
                     value = memLoad( ea, operandSizeInBytes );

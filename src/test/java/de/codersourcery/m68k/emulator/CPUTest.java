@@ -2943,6 +2943,18 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 .zero().notSupervisor();
     }
 
+    public void testBSETImmediate()
+    {
+        final int adr = PROGRAM_START_ADDRESS+128;
+        execute(cpu -> {} ,
+                "move.l #0,"+adr,
+                "bset #1,"+adr,
+                "nop")
+                .dumpMemory( adr ,4 )
+                .expectMemoryByte( adr ,2 )
+                .notSupervisor();
+    }
+
     public void testBSET()
     {
         execute(cpu -> {} ,

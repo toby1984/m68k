@@ -102,7 +102,6 @@ public class DisassemblyWindow extends AppWindow
                                 } else {
                                     emBp.remove(existing);
                                 }
-                                System.out.println("BREAKPOINTS: "+emBp);
                                 emulator.invokeTickCallback();
                             });
                         }
@@ -121,11 +120,7 @@ public class DisassemblyWindow extends AppWindow
 
             synchronized ( LOCK )
             {
-                System.out.println("Disassembly paint(): Rendering "+lines.size()+" lines");
                 updateMaxLines();
-                if ( lines.size() > 0 ) {
-                    System.out.println("First line starts at "+Misc.hex(lines.get(0).pc));
-                }
 
                 final Rectangle rect = new Rectangle();
                 rect.x = 1;
@@ -176,7 +171,6 @@ public class DisassemblyWindow extends AppWindow
         synchronized ( LOCK )
         {
             maxLines = getHeight() / lineHeight;
-            System.out.println("maxLines : "+maxLines);
         }
     }
 
@@ -243,7 +237,6 @@ public class DisassemblyWindow extends AppWindow
             try
             {
                 final int toDisplay = parseNumber(addressTextfield.getText());
-                System.out.println("No longer following PC, disassembling @ "+Misc.hex(toDisplay) );
                 synchronized(LOCK)
                 {
                     followProgramCounter = false;
@@ -289,7 +282,6 @@ public class DisassemblyWindow extends AppWindow
             if (followProgramCounter)
             {
                 start = emulator.cpu.pc;
-                System.out.println("Disassembly tick: Following PC @ "+Misc.hex(start));
                 addressToDisplay = start;
             }
             else
@@ -298,7 +290,6 @@ public class DisassemblyWindow extends AppWindow
             }
             // make sure we always start with an even address,otherwise memory.readWord()/readLong() would crash
             start = start & 0xfffffffe;
-            start = start - maxLines * 2;
         }
         final List<Disassembler.Line> result = new ArrayList<>();
         final Disassembler.LineConsumer lineConsumer = new Disassembler.LineConsumer()
@@ -315,7 +306,6 @@ public class DisassemblyWindow extends AppWindow
                 result.add(line.createCopy());
             }
         };
-        System.out.println("Starting to disassemble @ "+Misc.hex(start));
         disasm.disassemble(start, lineConsumer);
         synchronized( LOCK )
         {
@@ -352,7 +342,6 @@ public class DisassemblyWindow extends AppWindow
     public void singleStepFinished(Emulator emulator)
     {
         synchronized (LOCK) {
-            System.out.println("Single step finished @ "+Misc.hex(emulator.cpu.pc));
             followProgramCounter=true;
         }
         tick(emulator);

@@ -33,14 +33,17 @@ public enum AddressingModeKind
                 return DATA.bits | MEMORY.bits | CONTROL.bits | ALTERABLE.bits;
             case 0b111:
                 switch( eaRegister ) {
-                    case 0b010:
-                    case 0b011:
                     case 0b000:
+                    case 0b001:
+                    case 0b010:
                         return DATA.bits | MEMORY.bits | CONTROL.bits;
+                    case 0b011:
+                        return DATA.bits | MEMORY.bits | CONTROL.bits | ALTERABLE.bits;
                     case 0b100:
                         return DATA.bits | MEMORY.bits;
                 }
         }
-        throw new RuntimeException("Unreachable code. eaMode="+eaMode+",eaRegister="+eaRegister);
+        throw new RuntimeException("Unreachable code. eaMode=%"+Integer.toBinaryString( eaMode)+
+                ",eaRegister=%"+Integer.toBinaryString(eaRegister));
     }
 }

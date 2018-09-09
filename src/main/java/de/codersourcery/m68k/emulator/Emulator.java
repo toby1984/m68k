@@ -189,7 +189,6 @@ public class Emulator
                 if ( cmd.type == CommandType.DESTROY ) {
                     return;
                 }
-                System.out.println("Starting emulator thread");
                 emulatorThread = new EmulatorThread();
                 emulatorThread.start();
             }
@@ -244,11 +243,9 @@ public class Emulator
                     if ( commandQueue.peek() != null ) {
                         return;
                     }
-                    System.out.println("Emulator is going to sleep");
                     try
                     {
                         CMD_QUEUE_LOCK.wait();
-                        System.out.println("Emulator thread woke up.");
                     }
                     catch (InterruptedException e)
                     {
@@ -271,8 +268,6 @@ public class Emulator
 
             // copy first 1 KB from ROM to IRQ vectors starting at 0x00
             memory.bulkWrite(0x000000, kickstartRom, 0, 1024);
-
-            // System.out.println( memory.hexdump(amiga.getKickRomStartAddress(),1024));
 
             cpu.reset();
 

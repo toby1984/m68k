@@ -64,9 +64,7 @@ public class Breakpoints
     }
 
     public boolean isDifferent(Breakpoints other) {
-        boolean result = this.hashcode != other.hashcode;
-        System.out.println("THIS: "+this.hashcode+" <-> OTHER: "+other.hashcode);
-        return result;
+        return this.hashcode != other.hashcode;
     }
 
     private void updateHashCode()
