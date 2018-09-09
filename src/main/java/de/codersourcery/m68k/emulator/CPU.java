@@ -2123,7 +2123,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         final int modeFlags = AddressingModeKind.bitsToFlags( eaMode,eaRegister );
         final boolean isMemory = (modeFlags & AddressingModeKind.MEMORY.bits) != 0;
         final int operandSize= isMemory ? 1 : 4;
-        decodeSourceOperand( instruction,operandSize, false );
+        decodeSourceOperand( instruction,operandSize, false , op == BitOp.TEST);
         if ( ( value & 1<<bitNum) == 0 ) {
             statusRegister |= FLAG_ZERO;
         } else {

@@ -2000,22 +2000,26 @@ public enum Instruction
                 return CLR_ENCODING.append(extraInsnWords);
             case BCHG:
                 if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
-                    return BCHG_STATIC_ENCODING;
+                    extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                    return BCHG_STATIC_ENCODING.append(extraInsnWords);
                 }
                 return BCHG_DYNAMIC_ENCODING;
             case BSET:
                 if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
-                    return BSET_STATIC_ENCODING;
+                    extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                    return BSET_STATIC_ENCODING.append(extraInsnWords);
                 }
                 return BSET_DYNAMIC_ENCODING;
             case BCLR:
                 if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
-                    return BCLR_STATIC_ENCODING;
+                    extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                    return BCLR_STATIC_ENCODING.append( extraInsnWords );
                 }
                 return BCLR_DYNAMIC_ENCODING;
             case BTST:
                 if ( insn.source().hasAddressingMode( AddressingMode.IMMEDIATE_VALUE ) ) {
-                    return BTST_STATIC_ENCODING;
+                    extraInsnWords = getExtraWordPatterns(insn.destination(), Operand.DESTINATION, insn,context);
+                    return BTST_STATIC_ENCODING.append(extraInsnWords);
                 }
                 return BTST_DYNAMIC_ENCODING;
             case EXT:
