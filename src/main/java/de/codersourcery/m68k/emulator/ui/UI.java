@@ -25,7 +25,6 @@ import java.util.function.Function;
 
 public class UI extends JFrame
 {
-    public static final File ROM_LISTING = new File("/home/tobi/Downloads/exec_disassembly.txt");
     private static final String MAIN_WINDOW_KEY = "mainWindow";
 
     final JDesktopPane desktop = new JDesktopPane();
@@ -35,6 +34,7 @@ public class UI extends JFrame
     private final List<ITickListener> tickListeners = new ArrayList<>();
     private final List<Emulator.IEmulatorStateCallback> stateChangeListeners = new ArrayList<>();
     private final List<AppWindow> windows = new ArrayList<>();
+    private ROMListingViewer romListing;
 
     private UIConfig uiConfig;
 
@@ -79,6 +79,7 @@ public class UI extends JFrame
         }
 
         System.out.println("Setting up new emulator instance for "+Amiga.AMIGA_500);
+        System.out.println("Using kickstart ROM "+loadConfig().getKickRomLocation());
 
         emulator = new Emulator(Amiga.AMIGA_500,loadKickstartRom());
         emulator.getBreakpoints().populateFrom( loadConfig().getBreakpoints() );
@@ -136,7 +137,7 @@ public class UI extends JFrame
         return Optional.ofNullable( result == JFileChooser.APPROVE_OPTION ? fileChooser.getSelectedFile() : null );
     }
 
-    private void registerWindow(AppWindow window)
+    private <T extends AppWindow> T registerWindow(T window)
     {
         windows.add(window);
         desktop.add(window);
@@ -158,6 +159,7 @@ public class UI extends JFrame
         if ( window instanceof Emulator.IEmulatorStateCallback) {
             stateChangeListeners.add( (Emulator.IEmulatorStateCallback) window);
         }
+        return window;
     }
 
     public void run()
@@ -172,7 +174,7 @@ public class UI extends JFrame
         registerWindow( new MemoryViewWindow(this) );
         registerWindow( new BreakpointsWindow(this) );
         registerWindow( new ScreenWindow("Screen", this) );
-        registerWindow( new ROMListingViewer("ROM listing",ROM_LISTING,this) );
+        romListing = registerWindow( new ROMListingViewer( "ROM listing", this ) );
         setContentPane( desktop );
 
         // display main window
@@ -187,7 +189,13 @@ public class UI extends JFrame
             setBounds(s.getLocationAndSize());
         });
 
-        if ( loadConfig().getKickRomLocation() != null && loadConfig().getKickRomLocation().exists() ) {
+        final UIConfig config = loadConfig();
+        if ( config.getKickRomDisassemblyLocation() != null ) {
+            romListing.setKickRomDisasm( config.getKickRomDisassemblyLocation() );
+        }
+
+        if ( config.getKickRomLocation() != null && config.getKickRomLocation().exists() )
+        {
             try
             {
                 setupEmulator();
@@ -213,7 +221,8 @@ public class UI extends JFrame
                 @Override
                 public boolean accept(File f)
                 {
-                    return f.isDirectory() || f.getName().toLowerCase().contains("kick");
+                    return f.isDirectory() || f.getName().toLowerCase().contains("kick") ||
+                            f.getName().toLowerCase().contains("rom");
                 }
 
                 @Override
@@ -230,6 +239,33 @@ public class UI extends JFrame
                 setupEmulator();
             }
         }));
+
+        menu1.add( menuItem("Load kickstart ROM disassembly", () ->
+        {
+            final FileFilter filter = new FileFilter()
+            {
+                @Override
+                public boolean accept(File f)
+                {
+                    return f.isDirectory() || f.getName().toLowerCase().contains("kick") ||
+                            f.getName().toLowerCase().contains("rom");
+                }
+
+                @Override
+                public String getDescription()
+                {
+                    return "Kickstart ROM disassembly";
+                }
+            };
+
+            final Optional<File> selection = selectFile(loadConfig().getKickRomDisassemblyLocation(),filter);
+            if ( selection.isPresent() )
+            {
+                romListing.setKickRomDisasm( selection.get() );
+                loadConfig().setKickRomDisassemblyLocation( selection.get() );
+            }
+        }));
+
         menu1.add( menuItem("Quit", () ->
         {
             saveConfig();

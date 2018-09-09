@@ -19,9 +19,9 @@ public class ScreenWindow extends AppWindow implements ITickListener,
     private final Object LOCK = new Object();
 
     // @GuaredBy(LOCK)
-    private int amigaWidth;
+    private int amigaWidth=1;
     // @GuaredBy(LOCK)
-    private int amigaHeight;
+    private int amigaHeight=1;
     // @GuaredBy(LOCK)
     private int[] screenData = new int[0];
 

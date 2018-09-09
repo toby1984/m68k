@@ -60,30 +60,10 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
         return (StyledDocument) textfield.getStyledDocument();
     }
 
-    public ROMListingViewer(String title, File romListing, UI ui)
+    public ROMListingViewer(String title, UI ui)
     {
         super( title, ui );
 
-        final StringBuilder buffer = new StringBuilder();
-        try ( BufferedReader reader = new BufferedReader( new FileReader(romListing ) ) )
-        {
-            String line = null;
-            while ( ( line = reader.readLine() ) != null )
-            {
-                String hex = getHexNumber( line );
-                if ( hex != null )
-                {
-                    linesByAddress.put( Integer.parseInt( hex, 16 ), buffer.length() );
-                }
-                buffer.append( line ).append( "\n" );
-            }
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException("Failed to load rom listing "+romListing.getAbsolutePath(),e);
-        }
-
-        this.textfield.setText( buffer.toString() );
         this.textfield.setEditable( false );
         getContentPane().setLayout( new GridBagLayout() );
         addressTextfield.setColumns(8);
@@ -113,6 +93,35 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
         highlightStyle = document().addStyle( "highlightstyle", null );
         StyleConstants.setBackground(highlightStyle,Color.RED);
         defaultStyle = document().addStyle( "defaultstyle", null );
+    }
+
+    public void setKickRomDisasm(File file)
+    {
+        final StringBuilder buffer = new StringBuilder();
+        try ( BufferedReader reader = new BufferedReader( new FileReader(file) ) )
+        {
+            final TreeMap<Integer,Integer> tmp =new TreeMap<>();
+            String line = null;
+            while ( ( line = reader.readLine() ) != null )
+            {
+                String hex = getHexNumber( line );
+                if ( hex != null )
+                {
+                    tmp.put( Integer.parseInt( hex, 16 ), buffer.length() );
+                }
+                buffer.append( line ).append( "\n" );
+            }
+            synchronized( LOCK )
+            {
+                this.linesByAddress.clear();
+                this.linesByAddress.putAll(tmp);
+            }
+            this.textfield.setText(buffer.toString());
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Failed to load rom listing "+file.getAbsolutePath(),e);
+        }
     }
 
     private int getEndOfLine(int start)

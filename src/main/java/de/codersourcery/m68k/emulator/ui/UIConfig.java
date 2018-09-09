@@ -18,12 +18,14 @@ import java.util.stream.Collectors;
 public class UIConfig
 {
     private static final String KEY_KICKROM_LOCATION = "kickRomLocation";
+    private static final String KEY_KICKROM_DISASM_LOCATION = "kickRomDisasmLocation";
 
     private final Map<String,WindowState> windowStates=
             new HashMap<>();
 
     private Breakpoints breakpoints = new Breakpoints();
 
+    private File kickRomDisassemblyLocation;
     private File kickRomLocation;
 
     public List<WindowState> getWindowStates()
@@ -62,6 +64,9 @@ public class UIConfig
         if ( kickRomLocation != null ) {
             props.put( KEY_KICKROM_LOCATION, kickRomLocation.getAbsolutePath() );
         }
+        if ( kickRomDisassemblyLocation != null ) {
+            props.put( KEY_KICKROM_DISASM_LOCATION, kickRomDisassemblyLocation.getAbsolutePath() );
+        }
         final Map<String, String> tmp = new HashMap<>();
         breakpoints.save(tmp);
         props.putAll(tmp);
@@ -75,14 +80,9 @@ public class UIConfig
         final Properties props = new Properties();
         props.load(in);
 
-        // kickrom location
-        final String location = props.getProperty(KEY_KICKROM_LOCATION);
-        if ( location != null ) {
-            final File file = new File(location);
-            if ( file.exists() && file.isFile() && file.canRead() ) {
-                result.kickRomLocation = file;
-            }
-        }
+        result.kickRomLocation = getFile(props,KEY_KICKROM_LOCATION);
+        result.kickRomDisassemblyLocation = getFile(props,KEY_KICKROM_DISASM_LOCATION);
+
         final Map<String,String> map = new HashMap<>();
         for ( String key : props.stringPropertyNames() ) {
             map.put( key, props.getProperty( key ) );
@@ -94,6 +94,16 @@ public class UIConfig
         return result;
     }
 
+    private static File getFile(Properties props,String key) {
+        String location = props.getProperty(key);
+        if ( location != null ) {
+            final File file = new File(location);
+            if ( file.exists() && file.isFile() && file.canRead() ) {
+                return file;
+            }
+        }
+        return null;
+    }
     public Breakpoints getBreakpoints()
     {
         return breakpoints;
@@ -103,5 +113,15 @@ public class UIConfig
     {
         Validate.notNull(breakpoints, "breakpoints must not be null");
         this.breakpoints = breakpoints;
+    }
+
+    public File getKickRomDisassemblyLocation()
+    {
+        return kickRomDisassemblyLocation;
+    }
+
+    public void setKickRomDisassemblyLocation(File kickRomDisassemblyLocation)
+    {
+        this.kickRomDisassemblyLocation = kickRomDisassemblyLocation;
     }
 }
