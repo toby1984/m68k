@@ -44,8 +44,10 @@ C0 0000 - DF EFFF       Reserved.  Do not use.
    |
    | D80000 - DBFFFF  Reserved.  Do not use.
          */
-        private static final int CHIP_RAM_EXPANSION_START_PAGENO = (0xC00000 >>> PAGE_SIZE_RIGHT_SHIFT);
-        private static final int CHIP_RAM_EXPANSION_END_PAGENO   = (0xD7FFFF >>> PAGE_SIZE_RIGHT_SHIFT);
+        private static final int SLOW_RAM_EXPANSION_START_PAGENO = (0xC00000 >>> PAGE_SIZE_RIGHT_SHIFT);
+        private static final int SLOW_RAM_EXPANSION_END_PAGENO = (0xD7FFFF >>> PAGE_SIZE_RIGHT_SHIFT);
+
+        private static final int CHIPRAM_AREA_END_PAGENO = (0x1FFFFF >>> PAGE_SIZE_RIGHT_SHIFT);
 
         private static final int FIRST_CUSTOM_CHIP_PAGENO = (0xDF0000 >>> PAGE_SIZE_RIGHT_SHIFT);
         private static final int LAST_CUSTOM_CHIP_PAGENO = (0xDFFFFF >>> PAGE_SIZE_RIGHT_SHIFT);
@@ -60,6 +62,10 @@ C0 0000 - DF EFFF       Reserved.  Do not use.
         private CIA8520 ciaa;
         private CIA8520 ciab;
         private IRQController irqController;
+
+        // First ChipRAM page, used as wrap-around page
+        // when code tries to access non-existant chip RAM
+        private final MemoryPage firstChipRamPage = new RegularPage(PAGE_SIZE);
 
         public PageFaultHandler(Amiga amiga,Blitter blitter,Video video)
         {
@@ -139,16 +145,24 @@ FC0000-FFFFFF 256 KB -- Kickstart ROM
 
             // Chip RAM
             final int lastChipRamPageNo = amiga.getChipRAMSize() / MMU.PAGE_SIZE;
-            if ( pageNo < lastChipRamPageNo) {
-                return new RegularPage(PAGE_SIZE);
+            if ( pageNo < lastChipRamPageNo)
+            {
+                return pageNo == 0 ? firstChipRamPage : new RegularPage( PAGE_SIZE );
             }
+
+            if ( pageNo <= CHIPRAM_AREA_END_PAGENO ) {
+                // code is trying to access non-existant chip RAM, fake
+                // wrap-around so kickrom chip RAM detection works properly
+                return firstChipRamPage;
+            }
+
             // chip ram expansion area 0xc00000-D7FFFF
-            if ( pageNo >= CHIP_RAM_EXPANSION_START_PAGENO && pageNo <= CHIP_RAM_EXPANSION_END_PAGENO) {
+            if ( pageNo >= SLOW_RAM_EXPANSION_START_PAGENO && pageNo <= SLOW_RAM_EXPANSION_END_PAGENO ) {
 
                 // no (more) additional chip ram, fake incomplete address decoding
-                // so kickrom RAM check works
+                // and return chip ram page instead so kickrom RAM detection works properly
                 final int delta =
-                    (pageNo - CHIP_RAM_EXPANSION_START_PAGENO)%(LAST_CUSTOM_CHIP_PAGENO-FIRST_CUSTOM_CHIP_PAGENO);
+                    (pageNo - SLOW_RAM_EXPANSION_START_PAGENO)%(LAST_CUSTOM_CHIP_PAGENO-FIRST_CUSTOM_CHIP_PAGENO);
                 pageNo = FIRST_CUSTOM_CHIP_PAGENO + delta;
             }
 

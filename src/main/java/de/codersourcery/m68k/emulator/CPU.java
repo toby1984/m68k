@@ -3299,7 +3299,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         // MOVEQ
        value = instruction & 0xff;
        value = (value<<24)>>24; // sign-extend
-       int register = (instruction & 0b0111_0000_0000) >> 8;
+       int register = (instruction & 0b1110_0000_0000) >> 9;
        dataRegisters[register] = value;
        updateFlagsAfterMove(1);
        cycles = 4;

@@ -242,7 +242,7 @@ public class DisassemblyWindow extends AppWindow
 
             try
             {
-                final int toDisplay = Integer.parseInt(addressTextfield.getText().toLowerCase(), 16);
+                final int toDisplay = parseNumber(addressTextfield.getText());
                 System.out.println("No longer following PC, disassembling @ "+Misc.hex(toDisplay) );
                 synchronized(LOCK)
                 {
