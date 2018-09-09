@@ -1,10 +1,19 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.Emulator;
+import org.apache.commons.lang3.Validate;
 
 import javax.swing.*;
-import java.awt.*;
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.Insets;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 /**
  * Abstract base class for application windows.
@@ -20,6 +29,27 @@ import java.util.function.Consumer;
  */
 public abstract class AppWindow extends JInternalFrame
 {
+    private static final Pattern HEX_DIGITS= Pattern.compile("[a-f]+",Pattern.CASE_INSENSITIVE);
+
+    private static final List<Consumer<KeyEvent>> keyReleasedListener =
+            new ArrayList<>();
+
+    private static final KeyAdapter KEY_ADAPTER =
+            new KeyAdapter() {
+                @Override
+                public void keyReleased(KeyEvent event)
+                {
+                    for (Consumer<KeyEvent> e : keyReleasedListener )
+                    {
+                        try {
+                            e.accept( event );
+                        } catch(Exception ex) {
+                            ex.printStackTrace();;
+                        }
+                    }
+                }
+            };
+
     protected final UI ui;
 
     public AppWindow(String title,UI ui)
@@ -30,9 +60,21 @@ public abstract class AppWindow extends JInternalFrame
         setResizable(true);
         setMaximizable(true);
         setFocusable(true);
+        addKeyListener( KEY_ADAPTER );
     }
 
-    protected final GridBagConstraints cnstrs(int x,int y)
+    protected static KeyAdapter getKeyAdapter()
+    {
+        return KEY_ADAPTER;
+    }
+
+    protected static void registerKeyReleasedListener(Consumer<KeyEvent> l)
+    {
+        Validate.notNull( l, "l must not be null" );
+        keyReleasedListener.add(l);
+    }
+
+    protected final GridBagConstraints cnstrs(int x, int y)
     {
         final GridBagConstraints result = new GridBagConstraints();
         result.gridx = x; result.gridy = y;
@@ -90,10 +132,11 @@ public abstract class AppWindow extends JInternalFrame
 
     protected static int parseNumber(String value)
     {
-        value = value.trim();
-        if ( value.startsWith("$" ) ) {
+        value = value.trim().toLowerCase();
+        if ( value.startsWith("$" ) )
+        {
             return Integer.parseInt( value.substring(1),16 );
         }
-        return Integer.parseInt( value );
+        return Integer.parseInt( value,16 );
     }
 }

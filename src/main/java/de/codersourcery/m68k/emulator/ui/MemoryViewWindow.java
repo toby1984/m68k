@@ -23,7 +23,8 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
 {
     private static final int BYTES_PER_ROW = 16; // TODO: Hard-coded in Memory#hexdump
 
-    private static final Pattern ADR_PATTERN = Pattern.compile("a([0-7]{1})",Pattern.CASE_INSENSITIVE);
+    private static final Pattern ADR_REGISTER_PATTERN = Pattern.compile("a([0-7]{1})",Pattern.CASE_INSENSITIVE);
+
     private final KeyListener keyAdapter = new KeyAdapter() {
         @Override
         public void keyReleased(KeyEvent e)
@@ -98,7 +99,7 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
 
         hexdump.setFont( new Font(Font.MONOSPACED,Font.PLAIN,12 ) );
 
-        expression.setText( "00000000" );
+        expression.setText( "$00000000" );
         expression.addActionListener( ev -> parseExpression( expression.getText() ) );
 
         addKeyListener( keyAdapter );
@@ -147,7 +148,7 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
     {
         if ( ! StringUtils.isBlank(value) )
         {
-            final Matcher matcher = ADR_PATTERN.matcher( value.trim() );
+            final Matcher matcher = ADR_REGISTER_PATTERN.matcher( value.trim() );
 
             if ( matcher.matches() )
             {

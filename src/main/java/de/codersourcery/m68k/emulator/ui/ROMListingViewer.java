@@ -191,33 +191,30 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
             {
                 synchronized(LOCK)
                 {
-                    if ( followPC )
+                    Integer textOffset = linesByAddress.get( addressToDisplay );
+                    if ( textOffset == null )
                     {
-                        Integer textOffset = linesByAddress.get( addressToDisplay );
-                        if ( textOffset == null )
+                        Integer previous = null;
+                        for ( var entry : linesByAddress.entrySet() )
                         {
-                            Integer previous = null;
-                            for ( var entry : linesByAddress.entrySet() )
-                            {
-                                if ( entry.getKey() >= addressToDisplay ) {
-                                    break;
-                                }
-                                previous = entry.getValue();
+                            if ( entry.getKey() >= addressToDisplay ) {
+                                break;
                             }
-                            textOffset = previous;
+                            previous = entry.getValue();
                         }
-                        if ( textOffset != null )
-                        {
-                            textfield.setCaretPosition(textOffset);
-                            final int end = getEndOfLine( textOffset );
-                            if ( currentHighlight != null ) {
-                                currentHighlight.clear();
-                                currentHighlight = null;
-                            }
-                            System.out.println("HIGHLIGHT: "+textOffset+" -> "+end);
-                            currentHighlight = new Highlight( textOffset,end-textOffset );
-                            currentHighlight.highlight();
+                        textOffset = previous;
+                    }
+                    if ( followPC && textOffset != null )
+                    {
+                        textfield.setCaretPosition(textOffset);
+                        final int end = getEndOfLine( textOffset );
+                        if ( currentHighlight != null ) {
+                            currentHighlight.clear();
+                            currentHighlight = null;
                         }
+                        System.out.println("HIGHLIGHT: "+textOffset+" -> "+end);
+                        currentHighlight = new Highlight( textOffset,end-textOffset );
+                        currentHighlight.highlight();
                     }
                 }
             });

@@ -40,9 +40,7 @@ public class UI extends JFrame
 
     public static void main(String[] args) throws Exception {
 
-        SwingUtilities.invokeAndWait(() -> {
-            new UI().run();
-        });
+        SwingUtilities.invokeAndWait( () -> new UI().run() );
     }
 
     public UI()
@@ -266,6 +264,12 @@ public class UI extends JFrame
             }
         }));
 
+        menu1.add( menuItem("Save configuration", () ->
+        {
+            saveConfig();
+            info( "Configuration saved." );
+        }));
+
         menu1.add( menuItem("Quit", () ->
         {
             saveConfig();
@@ -306,6 +310,10 @@ public class UI extends JFrame
             e.printStackTrace(writer);
         }
         JOptionPane.showMessageDialog(UI.this, new String(bos.toByteArray()),"An error occurred",JOptionPane.ERROR_MESSAGE);
+    }
+
+    public void info(String message) {
+        JOptionPane.showMessageDialog(UI.this, message,"Information",JOptionPane.INFORMATION_MESSAGE);
     }
 
     public Emulator getEmulator() {

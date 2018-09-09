@@ -4,6 +4,7 @@ import de.codersourcery.m68k.emulator.Emulator;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.KeyEvent;
 
 public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulatorStateCallback
 {
@@ -31,6 +32,17 @@ public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulator
             ui.doWithEmulator( emu -> emu.reset() );
         });
         stopButton.setEnabled(false);
+
+        registerKeyReleasedListener( event ->
+        {
+            if ( event.getKeyCode() == KeyEvent.VK_F7 ) {
+                ui.doWithEmulator( emu -> emu.singleStep() );
+            }
+            else if ( event.getKeyCode() == KeyEvent.VK_F9 )
+            {
+                ui.doWithEmulator( emu -> emu.start() );
+            }
+        });
     }
 
     @Override

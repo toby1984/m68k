@@ -337,7 +337,7 @@ public class DisassemblyWindow extends AppWindow
             }
             if ( updateTextField )
             {
-                addressTextfield.setText( Integer.toHexString(address) );
+                addressTextfield.setText( "$"+Integer.toHexString(address) );
             }
         });
     }
