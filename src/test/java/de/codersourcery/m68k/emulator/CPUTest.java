@@ -2955,6 +2955,30 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 .notSupervisor();
     }
 
+    public void testLEAWithOffsetAndIndexRegister() {
+
+        /*
+   0:   4df9 0001 0000  lea 0x10000,%fp
+   6:   223c 0000 0100  movel #256,%d1
+   c:   41f6 1800       lea %fp@(0000000000000000,%d1:l),%a0
+
+   ACTUAL:
+
+1000: 4d f9 00 01 00 00
+1006: 22 3c 00 00 01 00
+100c: 41 f6 00 00 M....."<....A...
+1010: 00 06 ..
+         */
+        execute(cpu -> {} ,
+                "lea $10000,a6",
+                "move.l #$100,d1",
+                "lea (a6,d1),a0")
+                .expectA0(0x10100)
+                .expectA6(0x10000)
+                .expectD1(0x00100)
+                .notSupervisor();
+    }
+
     public void testBSET()
     {
         execute(cpu -> {} ,

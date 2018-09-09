@@ -753,7 +753,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
             idxRegisterValue = (idxRegisterValue<<16)>>16; // sign extend
         }
         int scale = (extensionWord & 0b0000_0110_0000_0000) >> 9;
-        return idxRegisterValue * scale;
+        return idxRegisterValue * (1<<scale);
     }
 
     /**

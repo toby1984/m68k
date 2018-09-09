@@ -638,7 +638,7 @@ public class EncodingTableGenerator
             Instruction.MOVE_AX_TO_USP_ENCODING,
             Instruction.MOVE_USP_TO_AX_ENCODING));
             
-        allEncodings.put(Instruction.LEA,Arrays.asList(Instruction.LEA_WORD_ENCODING)); // only one encoding needed (differ only in bits 16+)
+        allEncodings.put(Instruction.LEA,Arrays.asList(Instruction.LEA_ENCODING));
 
         final Map<Integer, EncodingEntry> mappings = new HashMap<>();
 

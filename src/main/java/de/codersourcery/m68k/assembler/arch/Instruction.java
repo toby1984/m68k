@@ -2323,10 +2323,8 @@ destination Dn mode, not the destination < ea > mode.
             case MOVEQ:
                 return MOVEQ_ENCODING;
             case LEA:
-                if ( insn.source().hasAddressingMode( ABSOLUTE_SHORT_ADDRESSING ) ) {
-                    return LEA_WORD_ENCODING;
-                }
-                return LEA_LONG_ENCODING;
+                extraInsnWords = getExtraWordPatterns(insn.source(), Operand.SOURCE, insn,context);
+                return LEA_ENCODING.append(extraInsnWords);
             case MOVEA:
             case MOVE:
                 // check for MOVE USP
@@ -2453,7 +2451,8 @@ destination Dn mode, not the destination < ea > mode.
 
     // returns any InstructionEncoding patterns
     // needed to accommodate all operand values
-    private static String[] getExtraWordPatterns(OperandNode op, Operand operandKind,
+    private static String[] getExtraWordPatterns(OperandNode op,
+                                                 Operand operandKind,
                                                  InstructionNode insn,
                                                  ICompilationContext ctx)
     {
@@ -2474,11 +2473,16 @@ destination Dn mode, not the destination < ea > mode.
                 Field field = operandKind == Operand.SOURCE ? Field.SRC_BASE_DISPLACEMENT : Field.DST_BASE_DISPLACEMENT;
                 return new String[] { StringUtils.repeat(field.c,16) };
             case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
-                // FIXME: 1 extra word
-                break;
+                checkOperandSizeSigned( op.getBaseDisplacement(),8,ctx );
+                field = operandKind == Operand.SOURCE ? Field.SRC_BASE_DISPLACEMENT : Field.DST_BASE_DISPLACEMENT;
+                return new String[] { operandKind == Operand.SOURCE ? SRC_BRIEF_EXTENSION_WORD : DST_BRIEF_EXTENSION_WORD};
             case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
-                // FIXME: 1-3 extra words
-                break;
+                // TODO: Parser currently sets addressing mode to
+                // blabla_INDEX_WITH_INDEX_DISPLACEMENT,
+                // I'm currently NOT handling the case with >8bit displacements correctly...
+                checkOperandSizeSigned( op.getBaseDisplacement(),8,ctx );
+                field = operandKind == Operand.SOURCE ? Field.SRC_BASE_DISPLACEMENT : Field.DST_BASE_DISPLACEMENT;
+                return new String[] { operandKind == Operand.SOURCE ? SRC_BRIEF_EXTENSION_WORD : DST_BRIEF_EXTENSION_WORD};
             case MEMORY_INDIRECT_POSTINDEXED:
                 // FIXME: 1-5 extra words
                 break;
@@ -2491,7 +2495,7 @@ destination Dn mode, not the destination < ea > mode.
             case PC_INDIRECT_WITH_INDEX_8_BIT_DISPLACEMENT:
 
                 /*
-                    DST_REGISTER_KIND('R'), // (bd,br,{Rx},od) D or A
+    DST_REGISTER_KIND('R'), // (bd,br,{Rx},od) D or A
     DST_INDEX_SIZE('Q'), // (bd,br,Rx{.w|.l},od)
     DST_SCALE('E'), // (bd,br,Rx.w{*4},od)
     DST_8_BIT_DISPLACEMENT('W'), // (bd,br,Rx,{od}
@@ -2503,7 +2507,8 @@ D/A   |     |   |           |
     REGISTER|  SCALE      DISPLACEMENT
             W/L
                  */
-                field = operandKind == Operand.SOURCE ? Field.SRC_BASE_DISPLACEMENT: Field.DST_BASE_DISPLACEMENT;
+                checkOperandSizeSigned( op.getBaseDisplacement(),8,ctx );
+                field = operandKind == Operand.SOURCE ? Field.SRC_BASE_DISPLACEMENT : Field.DST_BASE_DISPLACEMENT;
                 return new String[] { operandKind == Operand.SOURCE ? SRC_BRIEF_EXTENSION_WORD : DST_BRIEF_EXTENSION_WORD};
             case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
                 // FIXME: 1-3 extra words
@@ -2566,6 +2571,9 @@ D/A   |     |   |           |
 
     private static void checkOperandSizeSigned(IValueNode value, int maxSizeInBits, ICompilationContext ctx)
     {
+        if ( value == null ) {
+            return;
+        }
         Integer nodeValue = value.getBits(ctx);
         if ( nodeValue == null ) {
             return;
@@ -2771,17 +2779,21 @@ D/A   |     |   |           |
             case SRC_INDEX_SIZE:
                 return getIndexRegisterSizeBit( insn.source().getIndexRegister() );
             case SRC_SCALE:
-                return insn.source().getIndexRegister().scaling.bits;
+                Scaling scaling = insn.source().getIndexRegister().scaling;
+                return scaling == null ? Scaling.IDENTITY.bits : scaling.bits;
             case SRC_8_BIT_DISPLACEMENT:
-                return insn.source().getBaseDisplacement().getBits(ctx);
+                IValueNode baseDisplacement = insn.source().getBaseDisplacement();
+                return baseDisplacement == null ? 0 : baseDisplacement.getBits(ctx);
             case DST_REGISTER_KIND:
                 return insn.destination().getIndexRegister().isDataRegister() ? 0 : 1;
             case DST_INDEX_SIZE:
                 return getIndexRegisterSizeBit( insn.destination().getIndexRegister() );
             case DST_SCALE:
-                return insn.destination().getIndexRegister().scaling.bits;
+                scaling = insn.destination().getIndexRegister().scaling;
+                return scaling == null ? Scaling.IDENTITY.bits : scaling.bits;
             case DST_8_BIT_DISPLACEMENT:
-                return insn.destination().getBaseDisplacement().getBits(ctx);
+                baseDisplacement = insn.destination().getBaseDisplacement();
+                return baseDisplacement == null ? 0 : baseDisplacement.getBits(ctx);
             case OP_CODE:
                 return insn.getInstructionType().getOperationCode(insn);
             case SRC_VALUE:
@@ -3094,8 +3106,7 @@ D/A   |     |   |           |
 
     public static final InstructionEncoding MOVEQ_ENCODING = InstructionEncoding.of("0111DDD0vvvvvvvv");
 
-    public static final InstructionEncoding LEA_LONG_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv_vvvvvvvv_vvvvvvvv");
-    public static final InstructionEncoding LEA_WORD_ENCODING = InstructionEncoding.of("0100DDD111mmmsss", "vvvvvvvv_vvvvvvvv");
+    public static final InstructionEncoding LEA_ENCODING = InstructionEncoding.of("0100DDD111mmmsss");
 
     public static final InstructionEncoding ILLEGAL_ENCODING = InstructionEncoding.of( "0100101011111100");
 
@@ -3341,8 +3352,7 @@ D/A   |     |   |           |
         put(MOVEP_WORD_TO_MEMORY_ENCODING,MOVEP);
         put(MOVEP_LONG_TO_MEMORY_ENCODING,MOVEP);
 
-        put(LEA_LONG_ENCODING,LEA);
-        put(LEA_WORD_ENCODING,LEA);
+        put(LEA_ENCODING,LEA);
 
         put(ILLEGAL_ENCODING,ILLEGAL);
 

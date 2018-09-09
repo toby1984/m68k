@@ -89,7 +89,8 @@ public class ValidationPhase implements ICompilationPhase
 
     private void assertFitsSigned(OperandNode op,int maxBits,ICompilationContext ctx)
     {
-        Integer value = op.getBaseDisplacement().getBits(ctx);
+        final IValueNode baseDisplacement = op.getBaseDisplacement();
+        Integer value = baseDisplacement == null ? Integer.valueOf(0): baseDisplacement.getBits(ctx);
         if ( value == null )
         {
             if ( op.getValue() == null || op.getValue().isRegister() )

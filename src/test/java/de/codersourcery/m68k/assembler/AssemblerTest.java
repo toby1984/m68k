@@ -22,6 +22,13 @@ public class AssemblerTest extends TestCase
         asm.getOptions().cpuType=CPUType.M68020;
     }
 
+    public void testLEA() {
+        /*
+   c:   41f6 1800       lea %fp@(0000000000000000,%d1:l),%a0
+         */
+        assertArrayEquals(compile("lea (a6,d1),a0"),0x41,0xf6,0x10,0x00);
+    }
+
     public void testORIToSR()
     {
         assertArrayEquals(compile("ori.w #$1234,sr"),0x00,0x7c,0x12,0x34);

@@ -60,7 +60,7 @@ public class FixAddressingModesPhase implements ICompilationPhase
                     break;
                 case ADDRESS_REGISTER_INDIRECT_WITH_INDEX_DISPLACEMENT:
                 case PC_INDIRECT_WITH_INDEX_DISPLACEMENT:
-                    value = op.getBaseDisplacement().getBits(ctx );
+                    value = op.getBaseDisplacement() != null ? op.getBaseDisplacement().getBits(ctx ) : 0;
                     sizeInBits = NumberNode.getSizeInBitsSigned( value );
                     break;
                 default:
