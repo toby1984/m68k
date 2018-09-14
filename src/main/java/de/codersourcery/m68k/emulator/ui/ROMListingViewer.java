@@ -24,6 +24,9 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     // @GuardedBy( LOCK )
     private int addressToDisplay = 0xFC0000;
 
+    // @GuardedBy( LOCK )
+    private boolean addressChanged = false;
+
     private final TreeMap<Integer,Integer> linesByAddress=new TreeMap<>();
 
     private final JTextPane textfield = new JTextPane();
@@ -31,7 +34,7 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     private final Style highlightStyle;
     private final Style defaultStyle;
 
-    private final JTextField addressTextfield = new JTextField("$fc0000");
+    private final JTextField addressTextfield = new JTextField("fc0000");
 
     private Highlight currentHighlight;
 
@@ -69,17 +72,23 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
         addressTextfield.setColumns(8);
         addressTextfield.addActionListener( ev ->
         {
-            final String text = addressTextfield.getText();
-            if (StringUtils.isNotBlank(text) )
+            final int adr;
+            try
             {
-                final int adr = parseNumber(text);
-                synchronized (LOCK)
-                {
-                    followPC = false;
-                    addressToDisplay = adr;
-                }
-                ui.doWithEmulator(this::tick );
+                adr = parseNumber( addressTextfield.getText().trim() );
             }
+            catch(Exception e) {
+                error(e);
+                return;
+            }
+            synchronized (LOCK)
+            {
+                followPC = false;
+                addressToDisplay = adr;
+                addressChanged = true;
+                System.out.println("Now displaying: "+adr);
+            }
+            ui.doWithEmulator(this::tick);
         });
         GridBagConstraints cnstrs = cnstrs(0, 0);
         cnstrs.fill=GridBagConstraints.HORIZONTAL;
@@ -180,43 +189,53 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     @Override
     public void tick(Emulator emulator)
     {
+        final boolean needsUpdate;
         synchronized(LOCK)
         {
             if ( followPC ) {
                 addressToDisplay = emulator.cpu.pc;
+                addressChanged = true;
             }
+            needsUpdate = addressChanged;
         }
-        if ( followPC ) {
+        if ( needsUpdate)
+        {
             runOnEDT( () ->
             {
-                synchronized(LOCK)
+                synchronized (LOCK)
                 {
                     Integer textOffset = linesByAddress.get( addressToDisplay );
                     if ( textOffset == null )
                     {
                         Integer previous = null;
-                        for ( var entry : linesByAddress.entrySet() )
+                        for (var entry : linesByAddress.entrySet())
                         {
-                            if ( entry.getKey() >= addressToDisplay ) {
+                            if ( entry.getKey() >= addressToDisplay )
+                            {
                                 break;
                             }
                             previous = entry.getValue();
                         }
                         textOffset = previous;
                     }
-                    if ( followPC && textOffset != null )
+                    if ( textOffset != null )
                     {
-                        textfield.setCaretPosition(textOffset);
-                        final int end = getEndOfLine( textOffset );
-                        if ( currentHighlight != null ) {
-                            currentHighlight.clear();
-                            currentHighlight = null;
+                        textfield.setCaretPosition( textOffset );
+                        if ( followPC )
+                        {
+                            final int end = getEndOfLine( textOffset );
+                            if ( currentHighlight != null )
+                            {
+                                currentHighlight.clear();
+                                currentHighlight = null;
+                            }
+                            currentHighlight = new Highlight( textOffset, end - textOffset );
+                            currentHighlight.highlight();
                         }
-                        currentHighlight = new Highlight( textOffset,end-textOffset );
-                        currentHighlight.highlight();
                     }
+                    addressChanged = false;
                 }
-            });
+            } );
         }
     }
 }

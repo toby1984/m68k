@@ -8,6 +8,7 @@ import de.codersourcery.m68k.utils.Misc;
 
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -18,12 +19,11 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class BreakpointsWindow extends AppWindow implements ITickListener,
         Emulator.IEmulatorStateCallback
@@ -37,7 +37,9 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
 
     private final MyAbstractTableModel tableModel = new MyAbstractTableModel();
 
-    private JTable table = new JTable(tableModel);
+    private final JTextField newBpAddress = new JTextField();
+
+    private final JTable table = new JTable(tableModel);
 
     @Override
     public void stopped(Emulator emulator)
@@ -291,13 +293,47 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
                 }
             }
         });
-        final JScrollPane pane = new JScrollPane(table);
+        final JScrollPane scrollPane = new JScrollPane(table);
 
-        final GridBagConstraints cnstrs =
-            cnstrs(0, 0);
-        cnstrs.fill = GridBagConstraints.BOTH;
+        newBpAddress.addActionListener(  ev ->
+        {
+            final int address;
+            try
+            {
+                address = parseNumber( newBpAddress.getText().trim() );
+            }
+            catch(Exception e) {
+                error( e );
+                return;
+            }
+            final AtomicBoolean existsAlready = new AtomicBoolean();
+            runOnEmulator( emu -> {
+                existsAlready.set( emu.getBreakpoints().getBreakpoint( address ) != null );
+            });
+            if ( ! existsAlready.get() )
+            {
+                runOnEmulator( emu ->
+                {
+                    final Breakpoint breakpoint = new Breakpoint( address, IBreakpointCondition.TRUE );
+                    emu.getBreakpoints().add( breakpoint );
+                    emu.invokeTickCallback();
+                });
+            }
+        });
+
+        newBpAddress.setColumns( 15 );
+
         getContentPane().setLayout(new GridBagLayout());
-        getContentPane().add(pane,cnstrs);
+
+        GridBagConstraints cnstrs = cnstrs(0, 0);
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
+        cnstrs.weightx=1;cnstrs.weighty = 0;
+        getContentPane().add(newBpAddress,cnstrs);
+
+        cnstrs = cnstrs(0, 1);
+        cnstrs.fill = GridBagConstraints.BOTH;
+        cnstrs.weightx=1;cnstrs.weighty = 1;
+        getContentPane().add(scrollPane,cnstrs);
     }
 
     @Override
