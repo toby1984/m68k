@@ -2,7 +2,9 @@ package de.codersourcery.m68k.emulator;
 
 import de.codersourcery.m68k.emulator.ui.ConditionalBreakpointExpressionParser;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,6 +19,7 @@ public class Breakpoints
 {
     private Breakpoint[] enabledBreakpoints = new Breakpoint[0];
     private Breakpoint[] disabledBreakpoints = new Breakpoint[0];
+
 
     private int hashcode;
 
@@ -182,6 +185,14 @@ public class Breakpoints
         return null;
     }
 
+    /**
+     * Checks whether any breakpoint is hit by the current emulator state.
+     *
+     * If a temporary breakpoint got hit, it will be removed immediately.
+     *
+     * @param emulator
+     * @return
+     */
     public boolean isBreakpointHit(Emulator emulator)
     {
         final int adr = emulator.cpu.pc;
@@ -190,6 +201,9 @@ public class Breakpoints
             final Breakpoint bp = enabledBreakpoints[i];
             if ( bp.matchesAddress( adr ) && bp.matches( emulator ) )
             {
+                if ( bp.isTemporary ) {
+                    remove(bp);
+                }
                 return true;
             }
         }
@@ -237,6 +251,26 @@ public class Breakpoints
         final Breakpoint[] tmp = Arrays.copyOf(array,array.length+1);
         tmp[tmp.length-1] = toAdd;
         return tmp;
+    }
+
+    public void removeAllTemporaryBreakpoints() {
+
+        final List<Breakpoint> toRemove = new ArrayList<>();
+        for ( Breakpoint existing : enabledBreakpoints )
+        {
+            if ( existing.isTemporary ) {
+                toRemove.add( existing );
+            }
+        }
+        for ( Breakpoint existing : disabledBreakpoints )
+        {
+            if ( existing.isTemporary ) {
+                toRemove.add( existing );
+            }
+        }
+        for ( Breakpoint bp : toRemove ) {
+            remove(bp);
+        }
     }
 
     public void remove(Breakpoint b) {
@@ -301,10 +335,13 @@ public class Breakpoints
 
         visitBreakpoints(bp ->
         {
-            final boolean enabled = isEnabled(bp);
-            final String prefix = "breakpoint."+bp.address+".";
-            data.put( prefix+"enabled", Boolean.toString( enabled ) );
-            data.put( prefix+"condition", bp.condition.getExpression());
+            if ( ! bp.isTemporary ) // only remember persistent breakpoints
+            {
+                final boolean enabled = isEnabled( bp );
+                final String prefix = "breakpoint." + bp.address + ".";
+                data.put( prefix + "enabled", Boolean.toString( enabled ) );
+                data.put( prefix + "condition", bp.condition.getExpression() );
+            }
             return true;
         });
     }

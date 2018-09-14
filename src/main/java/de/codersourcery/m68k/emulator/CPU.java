@@ -832,6 +832,64 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         opcodeMap[instruction & 0xffff].execute(instruction);
     }
 
+    public boolean isAtBranchInstruction()
+    {
+        return internalGetBranchInstructionSizeInBytes() > 0;
+    }
+
+    public int getBranchInstructionSizeInBytes()
+    {
+        final int size = internalGetBranchInstructionSizeInBytes();
+        if ( size < 2 ) {
+            throw new IllegalArgumentException( "Invalid size "+size );
+        }
+        return size;
+    }
+
+    private int internalGetBranchInstructionSizeInBytes()
+    {
+        if ( (pc&1) != 0 ) { // avoid exception because of unaligned memory access
+            return -1;
+        }
+        final int opCode= memory.readWordNoCheck(pc);
+        final InstructionImpl insn = opcodeMap[opCode & 0xffff];
+        if ( insn == BCC_8BIT_ENCODING || insn == BCC_16BIT_ENCODING || insn == BCC_32BIT_ENCODING )
+        {
+            final int cc = (opCode & 0b0000111100000000) >> 8;
+            if ( cc == Condition.BSR.bits )
+            {
+                if ( insn == BCC_8BIT_ENCODING )
+                {
+                    return 2;
+                }
+                if ( insn == BCC_16BIT_ENCODING )
+                {
+                    return 4;
+                }
+                return 8; // 68020+ only...
+            }
+        }
+        else if ( insn == JSR_ENCODING )
+        {
+            final int eaMode = (opCode >> 3) & 0b111;
+            final int eaRegister = opCode & 0b111;
+            switch( eaMode ) {
+                case 0b111:
+                    switch(eaRegister)
+                    {
+                        case 0b001:
+                            return 6;
+                    }
+                case 0b101:
+                case 0b110:
+                    return 4;
+                default:
+                    return 2;
+            }
+        }
+        return -1;
+    }
+
     public boolean isBackTraceAvailable()
     {
         return DEBUG_RECORD_BACKTRACE && (backtraceBufferFull || backtraceWritePtr>0);
@@ -2810,7 +2868,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
 
     private void moveb(int instruction)
     {
-        decodeSourceOperand(instruction,2,false); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
+        decodeSourceOperand(instruction,1,false); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
         value = (value<<24)>>24; // sign-extend so that updateFlagsAfterMove() works correctly
         updateFlagsAfterMove(1);
         storeValue(instruction,1 );
