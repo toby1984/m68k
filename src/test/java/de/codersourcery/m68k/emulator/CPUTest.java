@@ -2718,7 +2718,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         execute(cpu -> cpu.memory.writeLong(adr,0x12345678) ,
                 "move.l #$ffffffff,d0",
                 "move.b "+Misc.hex( adr )+",d0")
-                .expectD0(0xffffff34);
+                .expectD0(0xffffff12);
 
         execute(cpu -> cpu.memory.writeLong(adr,0x12345678) ,
                 "move.l #$ffffffff,d0",
@@ -2749,7 +2749,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 "move.l #$ffffffff,d1",
                 "move.b $7(a1),d1" )
                 .expectD1( 0xffffff12 )
-                .noCarry().noOverflow().noExtended().notNegative().zero().notSupervisor();
+                .noCarry().noOverflow().noExtended().notNegative().notZero().notSupervisor();
     }
 
     public void testMoveByte()

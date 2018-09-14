@@ -28,7 +28,7 @@ import java.util.Map;
  */
 public class CPU
 {
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
     private static final boolean DEBUG_RECORD_BACKTRACE = true;
 
     private final CPUType cpuType;
@@ -683,11 +683,6 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         }
                         return;
                     case 0b100:
-                        if ( operandSize < 2 ) {
-                            // fail as operandSize is used to increment PC and the PC
-                            // must always be on word boundaries for 68k
-                            throw new IllegalArgumentException( "Operand size must be >= 2" );
-                        }
                         /*
                          * MOVE #xxxx,.... (1-6 extra words).
                          * // 1,2,4, OR 6, EXCEPT FOR PACKED DECIMAL REAL OPERANDS
@@ -697,7 +692,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         cycles += operandSize == 4 ? 8 : 4;
                         if ( advancePC )
                         {
-                            pc += operandSize;
+                            pc += (operandSize == 1 ? 2 : operandSize);
                         }
                         return;
                 }
@@ -1362,7 +1357,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
     }
 
     /**
-     * Decodes an 16-bit instruction word's source operand.
+     * Decodes an 16-bit instruction word's source operand and advances the PC accordingly.
      *
      * @param instruction
      * @param operandSizeInBytes
@@ -1370,7 +1365,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
      *                             the value from there
      * @return true if the operand is a register, otherwise false
      */
-    private boolean decodeSourceOperand(int instruction, int operandSizeInBytes,boolean calculateAddressOnly) {
+    private boolean decodeSourceOperand(int instruction,
+                                        int operandSizeInBytes,
+                                        boolean calculateAddressOnly)
+    {
         return decodeSourceOperand(instruction,operandSizeInBytes,calculateAddressOnly,true);
     }
 
@@ -1381,10 +1379,14 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
      * @param operandSizeInBytes
      * @param calculateAddressOnly whether to only calculate the effective address but not actually load
      *                             the value from there
-     * @param advancePC whether to advance the PC after reading additional instruction words
+     * @param advancePC whether to advance the PC after reading additional instruction words. Suppressing
+     *                  this is needed when the operation reading from and then writing to the destination operand
      * @return true if the operand is a register, otherwise false
      */
-    private boolean decodeSourceOperand(int instruction, int operandSizeInBytes,boolean calculateAddressOnly,boolean advancePC)
+    private boolean decodeSourceOperand(int instruction,
+                                        int operandSizeInBytes,
+                                        boolean calculateAddressOnly,
+                                        boolean advancePC)
     {
         // InstructionEncoding.of("ooooDDDMMMmmmsss");
         int eaMode     = (instruction & 0b111000) >> 3;
@@ -1461,10 +1463,26 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                         }
                         cycles += 12;
                         return false;
+                    case 0b100:
+                        /*
+                         * MOVE #xxxx,.... (1-6 extra words).
+                         * // 1,2,4, OR 6, EXCEPT FOR PACKED DECIMAL REAL OPERANDS
+                         * IMMEDIATE_VALUE(0b111,fixedValue(100), 6),   // move #XXXX
+                         */
+                        ea = pc;
+                        cycles += operandSizeInBytes == 4 ? 8 : 4;
+
+                        if ( ! calculateAddressOnly ) {
+                            value = memLoad( ea, operandSizeInBytes == 1 ? 2 : operandSizeInBytes );
+                        }
+                        if ( advancePC )
+                        {
+                            pc += (operandSizeInBytes == 1 ? 2 : operandSizeInBytes);
+                        }
+                        return false;
                 }
                 // $$FALL-THROUGH$$
             default:
-                // calculateEffectiveAddress(operandSizeInBytes, eaMode, eaRegister,advancePC)
                 calculateEffectiveAddress(operandSizeInBytes, eaMode, eaRegister,advancePC,advancePC);
                 if ( ! calculateAddressOnly )
                 {
@@ -2869,7 +2887,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
 
     private void moveb(int instruction)
     {
-        decodeSourceOperand(instruction,2,false); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
+        decodeSourceOperand(instruction,1,false); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
         value = (value<<24)>>24; // sign-extend so that updateFlagsAfterMove() works correctly
         updateFlagsAfterMove(1);
         storeValue(instruction,1 );
