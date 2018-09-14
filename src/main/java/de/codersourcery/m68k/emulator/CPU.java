@@ -28,7 +28,7 @@ import java.util.Map;
  */
 public class CPU
 {
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
     private static final boolean DEBUG_RECORD_BACKTRACE = true;
 
     private final CPUType cpuType;

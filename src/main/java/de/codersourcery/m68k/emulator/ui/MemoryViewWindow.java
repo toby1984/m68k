@@ -23,7 +23,11 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
 {
     private static final int BYTES_PER_ROW = 16; // TODO: Hard-coded in Memory#hexdump
 
-    private static final Pattern ADR_REGISTER_PATTERN = Pattern.compile("a([0-7]{1})",Pattern.CASE_INSENSITIVE);
+    private static final Pattern ARITH_PATTERN =
+            Pattern.compile(".*?(\\+|-)\\s*(\\$?[0-9a-fA-F]+)",Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern ADR_REGISTER_PATTERN =
+            Pattern.compile("a([0-7]{1})",Pattern.CASE_INSENSITIVE);
 
     private final KeyListener keyAdapter = new KeyAdapter() {
         @Override
@@ -116,7 +120,7 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
         cnstrs.fill=GridBagConstraints.BOTH;
         final JScrollPane scrollPane = new JScrollPane( hexdump );
         hexdump.addKeyListener( keyAdapter );
-        scrollPane.addKeyListener( keyAdapter );
+        hexdump.setFocusable( true );
         getContentPane().add( scrollPane,cnstrs );
         addComponentListener( new ComponentAdapter()
         {
@@ -146,6 +150,21 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
 
     private void parseExpression(String value)
     {
+        final int offset;
+        if ( ! StringUtils.isBlank(value) ) {
+            final Matcher m = ARITH_PATTERN.matcher( value );
+            if ( m.matches() ) {
+                final String op = m.group(1);
+                final String operand = m.group(2);
+                offset = ("-".equals(op) ? -1 : 1) * parseNumber( operand );
+                value = value.substring( 0, value.indexOf(op) );
+            } else {
+                offset = 0;
+            }
+        } else {
+            offset = 0;
+        }
+
         if ( ! StringUtils.isBlank(value) )
         {
             final Matcher matcher = ADR_REGISTER_PATTERN.matcher( value.trim() );
@@ -160,7 +179,7 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
                         @Override
                         public int getAddress(Emulator emulator)
                         {
-                            return emulator.cpu.addressRegisters[regNum];
+                            return emulator.cpu.addressRegisters[regNum] + offset;
                         }
 
                         @Override
@@ -179,7 +198,7 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
                         @Override
                         public int getAddress(Emulator emulator)
                         {
-                            return emulator.cpu.pc;
+                            return emulator.cpu.pc + offset;
                         }
 
                         @Override
@@ -195,7 +214,7 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
                 final int adr = parseNumber( value.trim() );
                 synchronized (LOCK)
                 {
-                    adrProvider = new FixedAdrProvider( adr );
+                    adrProvider = new FixedAdrProvider( adr+offset );
                 }
             }
         }

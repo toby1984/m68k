@@ -9,6 +9,10 @@ import de.codersourcery.m68k.utils.Misc;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableCellRenderer;
+import java.awt.Color;
+import java.awt.Component;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.KeyAdapter;
@@ -21,6 +25,8 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
 
     // @GuardedBy( LOCK )
     private Breakpoints breakpoints = new Breakpoints();
+
+    private Breakpoint currentBreakpoint;
 
     private final MyAbstractTableModel tableModel = new MyAbstractTableModel();
 
@@ -198,6 +204,29 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
     {
         super("Breakpoints", ui);
 
+        final TableCellRenderer tableCellRenderer = new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column)
+            {
+                Component result =
+                        super.getTableCellRendererComponent( table, value, isSelected, hasFocus, row, column );
+
+                final boolean highlight;
+                synchronized(LOCK)
+                {
+                    final Breakpoint current = tableModel.getBreakpoint( row );
+                    highlight = currentBreakpoint != null &&
+                            current.address == currentBreakpoint.address;
+                }
+                if ( highlight ) {
+                    BreakpointsWindow.this.setBackground( Color.RED );
+                } else {
+                    BreakpointsWindow.this.setBackground( BreakpointsWindow.this.getBackground() );
+                }
+                return result;
+            }
+        };
+        table.setDefaultRenderer( String.class, tableCellRenderer );
         table.addKeyListener(new KeyAdapter() {
             @Override
             public void keyReleased(KeyEvent e)
@@ -249,6 +278,8 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
         final boolean dataChanged;
         synchronized (LOCK)
         {
+            final int pc = emulator.cpu.pc;
+            currentBreakpoint = emulator.getBreakpoints().getBreakpoint( pc );
             dataChanged = emulator.getBreakpoints().isDifferent(breakpoints);
             if (dataChanged)
             {
