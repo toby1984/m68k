@@ -2739,6 +2739,19 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
                 .noCarry().noOverflow().noExtended().notNegative().notZero().notSupervisor();
     }
 
+    public void testMoveByteFromOddAddress()
+    {
+        final int adr = PROGRAM_START_ADDRESS+128;
+
+        execute( cpu -> {},
+                "lea "+adr+",a1",
+                "move.b #$12,$7(a1)",
+                "move.l #$ffffffff,d1",
+                "move.b $7(a1),d1" )
+                .expectD1( 0xffffff12 )
+                .noCarry().noOverflow().noExtended().notNegative().zero().notSupervisor();
+    }
+
     public void testMoveByte()
     {
         execute(cpu -> {} ,

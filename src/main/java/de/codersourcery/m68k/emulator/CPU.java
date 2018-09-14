@@ -419,13 +419,9 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         {
             case 0b000:
                 // DATA_REGISTER_DIRECT;
-                // value = dataRegisters[ eaRegister ];
-                // return;
             case 0b001:
                 // ADDRESS_REGISTER_DIRECT;
-                // value = addressRegisters[ eaRegister ];
-                // return;
-                throw new RuntimeException("Internal error, should've been handled by caller");
+                throw new RuntimeException("Internal error, should've been handled by caller already");
             case 0b010:
                 // ADDRESS_REGISTER_INDIRECT;
                 ea = addressRegisters[ eaRegister ];
@@ -687,6 +683,11 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                         }
                         return;
                     case 0b100:
+                        if ( operandSize < 2 ) {
+                            // fail as operandSize is used to increment PC and the PC
+                            // must always be on word boundaries for 68k
+                            throw new IllegalArgumentException( "Operand size must be >= 2" );
+                        }
                         /*
                          * MOVE #xxxx,.... (1-6 extra words).
                          * // 1,2,4, OR 6, EXCEPT FOR PACKED DECIMAL REAL OPERANDS
@@ -2868,7 +2869,7 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
 
     private void moveb(int instruction)
     {
-        decodeSourceOperand(instruction,1,false); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
+        decodeSourceOperand(instruction,2,false); // operandSize == 2 because PC must always be even so byte is actually stored as 16 bits
         value = (value<<24)>>24; // sign-extend so that updateFlagsAfterMove() works correctly
         updateFlagsAfterMove(1);
         storeValue(instruction,1 );
