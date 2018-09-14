@@ -8,6 +8,7 @@ import de.codersourcery.m68k.utils.Misc;
 
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
@@ -17,7 +18,12 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class BreakpointsWindow extends AppWindow implements ITickListener,
         Emulator.IEmulatorStateCallback
@@ -27,7 +33,7 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
     // @GuardedBy( LOCK )
     private Breakpoints breakpoints = new Breakpoints();
 
-    private Breakpoint currentBreakpoint;
+    private Breakpoint activeBreakpoint;
 
     private final MyAbstractTableModel tableModel = new MyAbstractTableModel();
 
@@ -233,8 +239,8 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
                 synchronized(LOCK)
                 {
                     final Breakpoint current = tableModel.getBreakpoint( row );
-                    highlight = currentBreakpoint != null &&
-                            current.address == currentBreakpoint.address;
+                    highlight = activeBreakpoint != null &&
+                            current.address == activeBreakpoint.address;
                 }
                 if ( highlight ) {
                     setBackground( Color.RED );
@@ -244,6 +250,7 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
                 return result;
             }
         };
+        table.setSelectionMode( ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         table.setDefaultRenderer( String.class, tableCellRenderer );
         table.addKeyListener(new KeyAdapter() {
             @Override
@@ -251,26 +258,35 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
             {
                 if ( e.getKeyCode() == KeyEvent.VK_DELETE )
                 {
-                    final int idx = table.getSelectedRow();
-                    if ( idx != -1 )
+                    final int[] rows = table.getSelectedRows();
+                    if ( rows.length == 0 )
                     {
-                        final int modelRow = table.convertRowIndexToModel(idx);
-                        synchronized (LOCK)
+                        return;
+                    }
+                    synchronized (LOCK)
+                    {
+                        final List<Breakpoint> toDelete =
+                                Arrays.stream(rows)
+                                        .map( table::convertRowIndexToModel )
+                                        .mapToObj( tableModel::getBreakpoint )
+                                        .collect( Collectors.toList() );
+                        runOnEmulator(emu ->
                         {
-                            final Breakpoint existing = tableModel.getBreakpoint(modelRow);
-                            if (existing != null)
+                            boolean deleted = false;
+                            for ( Breakpoint copy: toDelete )
                             {
-                                runOnEmulator(emu ->
+                                final Breakpoint bp = emu.getBreakpoints().getBreakpoint( copy.address );
+                                if ( bp != null )
                                 {
-                                    final Breakpoint bp = emu.getBreakpoints().getBreakpoint(existing.address);
-                                    if (bp != null)
-                                    {
-                                        emu.getBreakpoints().remove(bp);
-                                        emu.invokeTickCallback();
-                                    }
-                                });
+                                    emu.getBreakpoints().remove( bp );
+                                    deleted = true;
+                                }
                             }
-                        }
+                            if ( deleted )
+                            {
+                                emu.invokeTickCallback();
+                            }
+                        });
                     }
                 }
             }
@@ -294,23 +310,20 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
     public void tick(Emulator emulator)
     {
         final boolean dataChanged;
-        final Breakpoint newBp;
+        final boolean bpChanged;
         synchronized (LOCK)
         {
-            final int pc = emulator.cpu.pc;
-            newBp = emulator.getBreakpoints().getBreakpoint( pc );
-            System.out.println("current bp: "+newBp);
-            currentBreakpoint = newBp;
+            final Breakpoint previouslyActive = activeBreakpoint;
+            activeBreakpoint = emulator.getBreakpoints().getBreakpoint( emulator.cpu.pc );
+            bpChanged = previouslyActive == null ^ activeBreakpoint == null ||
+                    previouslyActive != null && previouslyActive.address != activeBreakpoint.address;
+
             dataChanged = emulator.getBreakpoints().isDifferent(breakpoints);
             if (dataChanged)
             {
                 breakpoints = emulator.getBreakpoints().createCopy();
             }
         }
-        final boolean bpChanged = (newBp == null && currentBreakpoint != null ) ||
-                (newBp != null && currentBreakpoint == null ) ||
-                ( newBp != null && currentBreakpoint != null && newBp.address != currentBreakpoint.address);
-
         if ( dataChanged || bpChanged )
         {
             System.out.println("tick(): BPWindow now has model with "+tableModel.getRowCount()+" rows");
