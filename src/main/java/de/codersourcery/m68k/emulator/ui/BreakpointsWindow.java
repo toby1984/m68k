@@ -19,7 +19,8 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class BreakpointsWindow extends AppWindow implements ITickListener
+public class BreakpointsWindow extends AppWindow implements ITickListener,
+        Emulator.IEmulatorStateCallback
 {
     private final Object LOCK = new Object();
 
@@ -31,6 +32,23 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
     private final MyAbstractTableModel tableModel = new MyAbstractTableModel();
 
     private JTable table = new JTable(tableModel);
+
+    @Override
+    public void stopped(Emulator emulator)
+    {
+        tick(emulator);
+    }
+
+    @Override
+    public void singleStepFinished(Emulator emulator)
+    {
+        tick(emulator);
+    }
+
+    @Override
+    public void enteredContinousMode(Emulator emulator)
+    {
+    }
 
     private class MyAbstractTableModel extends AbstractTableModel
     {
@@ -219,9 +237,9 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
                             current.address == currentBreakpoint.address;
                 }
                 if ( highlight ) {
-                    BreakpointsWindow.this.setBackground( Color.RED );
+                    setBackground( Color.RED );
                 } else {
-                    BreakpointsWindow.this.setBackground( BreakpointsWindow.this.getBackground() );
+                    setBackground( BreakpointsWindow.this.getBackground() );
                 }
                 return result;
             }
@@ -276,17 +294,24 @@ public class BreakpointsWindow extends AppWindow implements ITickListener
     public void tick(Emulator emulator)
     {
         final boolean dataChanged;
+        final Breakpoint newBp;
         synchronized (LOCK)
         {
             final int pc = emulator.cpu.pc;
-            currentBreakpoint = emulator.getBreakpoints().getBreakpoint( pc );
+            newBp = emulator.getBreakpoints().getBreakpoint( pc );
+            System.out.println("current bp: "+newBp);
+            currentBreakpoint = newBp;
             dataChanged = emulator.getBreakpoints().isDifferent(breakpoints);
             if (dataChanged)
             {
                 breakpoints = emulator.getBreakpoints().createCopy();
             }
         }
-        if ( dataChanged )
+        final boolean bpChanged = (newBp == null && currentBreakpoint != null ) ||
+                (newBp != null && currentBreakpoint == null ) ||
+                ( newBp != null && currentBreakpoint != null && newBp.address != currentBreakpoint.address);
+
+        if ( dataChanged || bpChanged )
         {
             System.out.println("tick(): BPWindow now has model with "+tableModel.getRowCount()+" rows");
             repaint();
