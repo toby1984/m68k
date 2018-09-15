@@ -259,6 +259,7 @@ public class DisassemblerTest extends TestCase
 
     public void testMulu()
     {
+        assertEquals( "00000000: mulu.w #$c,d3", disassemble(0xc6,0xfc,0x00,0x0c) );
         compile("mulu.w $1200,d3");
         compile("mulu.w d4,d3");
     }
@@ -633,9 +634,23 @@ public class DisassemblerTest extends TestCase
         final byte[] executable = this.asm.getBytes(false);
         System.out.println("COMPILED: "+Memory.hexdump(0,executable,0,executable.length));
 
-        memory.writeBytes( 0,executable );
-
-        final String disassembled = disasm.disassemble( 0, executable.length );
+        final String disassembled = disassemble( executable );
         assertEquals(expectedSource,disassembled);
+    }
+
+    private String disassemble(int d1,int ...data) {
+        final int len = data == null ? 0 : data.length;
+        final byte[] bArray = new byte[1+len];
+        bArray[0]=(byte) d1;
+        for ( int i = 0 ; i < len ; i++ ) {
+            bArray[i+1] = (byte) data[i];
+        }
+        return disassemble( bArray );
+    }
+
+    private String disassemble(byte[] data)
+    {
+        memory.writeBytes( 0,data);
+        return disasm.disassemble( 0, data.length );
     }
 }

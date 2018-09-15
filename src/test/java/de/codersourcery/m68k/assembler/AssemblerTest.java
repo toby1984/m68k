@@ -406,6 +406,7 @@ public class AssemblerTest extends TestCase
 
     public void testMulu()
     {
+        assertArrayEquals(compile("mulu.w #$0c,d3"), 0xc6,0xfc,0x00,0x0c );
         assertArrayEquals(compile("mulu.w $1200,d3"),0xc6,0xf8,0x12,0x00);
         assertArrayEquals(compile("mulu.w d4,d3"),0xc6,0xc4);
     }

@@ -428,7 +428,7 @@ public enum Instruction
                 @Override
                 public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
                 {
-                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA)
+                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.DATA)
                         .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
                 }
 
@@ -2657,7 +2657,7 @@ D/A   |     |   |           |
     }
 
     private static void checkMultiplyDivide(InstructionNode node) {
-        checkSourceAddressingModeKind(node,AddressingModeKind.DATA,AddressingModeKind.ALTERABLE);
+        checkSourceAddressingModeKind(node,AddressingModeKind.DATA);
         if ( node.hasExplicitOperandSize() && ! node.hasOperandSize(OperandSize.WORD ) ) {
             throw new RuntimeException(node.instruction.getMnemonic()+"on 68000 only supports word operands");
         }
