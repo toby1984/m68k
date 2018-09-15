@@ -2878,11 +2878,11 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
     }
 
     private void btstDn(int instruction) {
-        bitOp(instruction,BitOp.CLEAR,BitOpMode.REGISTER);
+        bitOp(instruction,BitOp.TEST,BitOpMode.REGISTER);
     }
 
     private void btstImmediate(int instruction) {
-        bitOp(instruction,BitOp.CLEAR,BitOpMode.IMMEDIATE);
+        bitOp(instruction,BitOp.TEST,BitOpMode.IMMEDIATE);
     }
 
     private void moveb(int instruction)
@@ -4165,7 +4165,7 @@ C — Set if a borrow occurs; cleared otherwise.
 
     private final InstructionImpl JSR_ENCODING = this::jsr;
 
-    private final InstructionImpl LEA_WORD_ENCODING = this::lea;
+    private final InstructionImpl LEA_ENCODING = this::lea;
 
     private final InstructionImpl LINK_ENCODING = this::link;
 
