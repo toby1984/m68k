@@ -64,17 +64,10 @@ public class Memory
     }
 
     public final MMU mmu;
-    public final Breakpoints breakpoints;
+    public final MemoryBreakpoints breakpoints = new MemoryBreakpoints();
 
     public Memory(MMU mmu) {
         this.mmu = mmu;
-        this.breakpoints = new Breakpoints();
-    }
-
-    public Memory(MMU mmu, Breakpoints breakpoints)
-    {
-        this.mmu = mmu;
-        this.breakpoints = breakpoints;
     }
 
     public void bulkWrite(int startAddress,byte[] data,int offset,int count)
@@ -119,7 +112,7 @@ public class Memory
         // and 68000 does not allow word/long accesses on odd
         // addresses we know that we can never cross
         // a memory page boundary here
-        breakpoints.checkMemoryBreakpointHit( address,2, )
+        breakpoints.checkRead( address,address+2 );
         return page.readWord(offset);
     }
 
@@ -150,6 +143,7 @@ public class Memory
         // addresses we know that we can never cross
         // a memory page boundary here
         page.writeWord(offset,value);
+        breakpoints.checkWrite( address,address+2 );
     }
 
     private void checkPageWriteable(MemoryPage page, int pageNo)
@@ -164,6 +158,7 @@ public class Memory
     {
         final int pageNo = mmu.getPageNo( address );
         final int offset = mmu.getOffsetInPage( address );
+        breakpoints.checkRead( address,address+1 );
         return mmu.getPage( pageNo ).readByte( offset );
     }
 

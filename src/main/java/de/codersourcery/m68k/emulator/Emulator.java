@@ -118,7 +118,7 @@ public class Emulator
         this.video = new Video(amiga);
         final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler(amiga,blitter,video);
         this.mmu = new MMU(faultHandler);
-        this.memory = new Memory(this.mmu,this.breakpoints);
+        this.memory = new Memory(this.mmu);
         video.setMemory( this.memory );
         this.blitter.setMemory( this.memory );
         this.cpu = new CPU(amiga.getCPUType(), memory);
@@ -271,6 +271,9 @@ public class Emulator
 
             cpu.reset();
 
+            // clear current memory breakpoint,just in
+            // case one was triggered already
+            memory.breakpoints.lastHit = null;
             mode = EmulatorMode.STOPPED;
         }
 
@@ -458,16 +461,20 @@ public class Emulator
                         System.err.println("*** emulation stopped because of error ***");
                         stateCallback.stopped(Emulator.this);
                     }
-                    if ( breakpoints.hasEnabledBreakpoints() )
+                    final boolean cpuBreakpointHit = breakpoints.hasEnabledBreakpoints() &&
+                            cpu.cycles == 1 &&
+                            breakpoints.checkBreakpointHit(Emulator.this );
+
+                    if ( cpuBreakpointHit || memory.breakpoints.lastHit != null )
                     {
-                        if ( cpu.cycles == 1 &&
-                             (breakpoints.lastHit != null ||
-                             breakpoints.checkBreakpointHit(Emulator.this ) ) )
+                        mode = EmulatorMode.STOPPED;
+
+                        System.err.println("*** emulation stopped because of breakpoint ***");
+                        try
                         {
-                            breakpoints.lastHit = null;
-                            mode = EmulatorMode.STOPPED;
-                            System.err.println("*** emulation stopped because of breakpoint ***");
-                            stateCallback.stopped(Emulator.this);
+                            stateCallback.stopped( Emulator.this );
+                        } finally {
+                            memory.breakpoints.lastHit = null;
                         }
                     }
                 }

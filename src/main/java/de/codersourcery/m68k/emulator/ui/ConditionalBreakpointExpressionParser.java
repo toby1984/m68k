@@ -41,7 +41,6 @@ public class ConditionalBreakpointExpressionParser
         final Operator operator = parseOperator(m.group(2));
         final String rhs = m.group( 3 );
 
-        final String normalized = lhs+operator+rhs;
         if ( isStatusRegister( lhs ) )
         {
             final int mask = flagStringToBitMask( rhs );

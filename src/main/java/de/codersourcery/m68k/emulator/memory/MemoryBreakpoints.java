@@ -1,6 +1,4 @@
-package de.codersourcery.m68k.emulator;
-
-import de.codersourcery.m68k.emulator.ui.ConditionalBreakpointExpressionParser;
+package de.codersourcery.m68k.emulator.memory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,26 +13,28 @@ import java.util.stream.Stream;
  *
  * Breakpoints may ONLY be manipulated from inside the emulator thread.
  */
-public class Breakpoints
+public class MemoryBreakpoints
 {
-    private Breakpoint[] enabledBreakpoints = new Breakpoint[0];
-    private Breakpoint[] disabledBreakpoints = new Breakpoint[0];
+    private MemoryBreakpoint[] enabledBreakpoints = new MemoryBreakpoint[0];
+    private MemoryBreakpoint[] disabledBreakpoints = new MemoryBreakpoint[0];
+
+    public MemoryBreakpoint lastHit = null;
 
     private int hashcode;
 
-    public void populateFrom(Breakpoints breakpoints)
+    public void populateFrom(MemoryBreakpoints breakpoints)
     {
-        enabledBreakpoints = Stream.of(breakpoints.enabledBreakpoints).toArray(Breakpoint[]::new);
-        disabledBreakpoints = Stream.of(breakpoints.disabledBreakpoints).toArray(Breakpoint[]::new);
+        enabledBreakpoints = Stream.of(breakpoints.enabledBreakpoints).toArray(MemoryBreakpoint[]::new);
+        disabledBreakpoints = Stream.of(breakpoints.disabledBreakpoints).toArray(MemoryBreakpoint[]::new);
         updateHashCode();
     }
 
     public interface IBreakpointVisitor
     {
-        boolean visit(Breakpoint bp);
+        boolean visit(MemoryBreakpoint bp);
     }
 
-    public Breakpoints() {
+    public MemoryBreakpoints() {
     }
 
     @Override
@@ -65,7 +65,7 @@ public class Breakpoints
         return hashcode;
     }
 
-    public boolean isDifferent(Breakpoints other) {
+    public boolean isDifferent(MemoryBreakpoints other) {
         return this.hashcode != other.hashcode;
     }
 
@@ -92,25 +92,25 @@ public class Breakpoints
         return enabledBreakpoints.length > 0;
     }
 
-    public Breakpoints(Breakpoints other)
+    public MemoryBreakpoints(MemoryBreakpoints other)
     {
         this.enabledBreakpoints = Arrays.copyOf(other.enabledBreakpoints,other.enabledBreakpoints.length);
         this.disabledBreakpoints = Arrays.copyOf(other.disabledBreakpoints,other.disabledBreakpoints.length);
         this.hashcode = other.hashcode;
     }
 
-    public Breakpoints createCopy() {
-        return new Breakpoints(this);
+    public MemoryBreakpoints createCopy() {
+        return new MemoryBreakpoints(this);
     }
 
-    public void add(Breakpoint b)
+    public void add(MemoryBreakpoint b)
     {
         internalRemove(b);
         enabledBreakpoints = addToArray(enabledBreakpoints,b);
         updateHashCode();
     }
 
-    public void setEnabled(Breakpoint bp, boolean enabled)
+    public void setEnabled(MemoryBreakpoint bp, boolean enabled)
     {
         if ( enabled ) {
             setEnabled(bp);
@@ -119,11 +119,11 @@ public class Breakpoints
         }
     }
 
-    public void setDisabled(Breakpoint bp)
+    public void setDisabled(MemoryBreakpoint bp)
     {
         for (int i = 0,len=disabledBreakpoints.length; i < len; i++)
         {
-            Breakpoint existing = disabledBreakpoints[i];
+            MemoryBreakpoint existing = disabledBreakpoints[i];
             if (bp == existing)
             {
                 return;
@@ -132,7 +132,7 @@ public class Breakpoints
 
         for (int i = 0,len=enabledBreakpoints.length; i < len; i++)
         {
-            Breakpoint existing = enabledBreakpoints[i];
+            MemoryBreakpoint existing = enabledBreakpoints[i];
             if (bp == existing)
             {
                 enabledBreakpoints = removeFromArray(enabledBreakpoints,bp);
@@ -144,11 +144,11 @@ public class Breakpoints
         throw new RuntimeException("Unknown breakpoint "+bp);
     }
 
-    public void setEnabled(Breakpoint bp)
+    public void setEnabled(MemoryBreakpoint bp)
     {
         for (int i = 0,len = enabledBreakpoints.length ; i < len; i++)
         {
-            Breakpoint existing = enabledBreakpoints[i];
+            MemoryBreakpoint existing = enabledBreakpoints[i];
             if (bp == existing)
             {
                 return;
@@ -157,7 +157,7 @@ public class Breakpoints
 
         for (int i = 0,len = disabledBreakpoints.length ; i < len ; i++)
         {
-            Breakpoint existing = disabledBreakpoints[i];
+            MemoryBreakpoint existing = disabledBreakpoints[i];
             if (bp == existing)
             {
                 disabledBreakpoints = removeFromArray(disabledBreakpoints,bp);
@@ -169,47 +169,43 @@ public class Breakpoints
         throw new RuntimeException("Unknown breakpoint "+bp);
     }
 
-    public Breakpoint getBreakpoint(int address)
+    public void checkRead(int startInclusive,int endExclusive)
     {
-        for ( Breakpoint bp : enabledBreakpoints ) {
-            if ( bp.matchesAddress( address ) ) {
-                return bp;
-            }
-        }
-        for ( Breakpoint bp : disabledBreakpoints ) {
-            if ( bp.matchesAddress( address ) ) {
-                return bp;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Checks whether any breakpoint is hit by the current emulator state.
-     *
-     * If a temporary breakpoint got hit, it will be removed immediately.
-     *
-     * @param emulator
-     * @return
-     */
-    public boolean checkBreakpointHit(Emulator emulator)
-    {
-        final int adr = emulator.cpu.pc;
-        for (int i = 0, len = enabledBreakpoints.length ; i < len ; i++)
+        final int len = enabledBreakpoints.length;
+        if ( len > 0 )
         {
-            final Breakpoint bp = enabledBreakpoints[i];
-            if ( bp.matchesAddress( adr ) && bp.matches( emulator ) )
+            int i = 0;
+            do
             {
-                if ( bp.isTemporary ) {
-                    remove(bp);
+                final MemoryBreakpoint bp = enabledBreakpoints[i++];
+                if ( bp.matches( startInclusive, endExclusive, MemoryBreakpoint.ACCESS_READ ) )
+                {
+                    lastHit = bp;
+                    return;
                 }
-                return true;
-            }
+            } while ( i < len );
         }
-        return false;
     }
 
-    private static boolean contains(Breakpoint[] array,Breakpoint bp)
+    public void checkWrite(int startInclusive,int endExclusive)
+    {
+        final int len = enabledBreakpoints.length;
+        if ( len > 0 )
+        {
+            int i = 0;
+            do
+            {
+                final MemoryBreakpoint bp = enabledBreakpoints[i++];
+                if ( bp.matches( startInclusive, endExclusive, MemoryBreakpoint.ACCESS_WRITE ) )
+                {
+                    lastHit = bp;
+                    return;
+                }
+            } while ( i < len );
+        }
+    }
+
+    private static boolean contains(MemoryBreakpoint[] array,MemoryBreakpoint bp)
     {
         for ( int i = 0,len=array.length ; i < len ; i++) {
             if ( array[i] == bp ) {
@@ -219,7 +215,7 @@ public class Breakpoints
         return false;
     }
 
-    public boolean isEnabled(Breakpoint b)
+    public boolean isEnabled(MemoryBreakpoint b)
     {
         if ( contains(enabledBreakpoints,b) ) {
             return true;
@@ -240,48 +236,28 @@ public class Breakpoints
         return false;
     }
 
-    private static Breakpoint[] removeFromArray(Breakpoint[] array, Breakpoint toRemove)
+    private static MemoryBreakpoint[] removeFromArray(MemoryBreakpoint[] array, MemoryBreakpoint toRemove)
     {
-        return Stream.of( array ).filter( x -> x != toRemove ).toArray( Breakpoint[]::new);
+        return Stream.of( array ).filter( x -> x != toRemove ).toArray( MemoryBreakpoint[]::new);
     }
 
-    private static Breakpoint[] addToArray(Breakpoint[] array, Breakpoint toAdd)
+    private static MemoryBreakpoint[] addToArray(MemoryBreakpoint[] array, MemoryBreakpoint toAdd)
     {
         if ( array.length == 0 ) {
-            return new Breakpoint[]{toAdd};
+            return new MemoryBreakpoint[]{toAdd};
         }
-        final List<Breakpoint> tmp = new ArrayList<>( Arrays.asList( array ) );
+        final List<MemoryBreakpoint> tmp = new ArrayList<>( Arrays.asList( array ) );
         for ( int i = 0 , len = tmp.size() ; i < len ; i++ ) {
             if ( toAdd.address <= tmp.get(i).address ) {
                 tmp.add(i,toAdd);
-                return tmp.toArray( new Breakpoint[0] );
+                return tmp.toArray( new MemoryBreakpoint[0] );
             }
         }
         tmp.add(toAdd);
-        return tmp.toArray( new Breakpoint[0] );
+        return tmp.toArray( new MemoryBreakpoint[0] );
     }
 
-    public void removeAllTemporaryBreakpoints() {
-
-        final List<Breakpoint> toRemove = new ArrayList<>();
-        for ( Breakpoint existing : enabledBreakpoints )
-        {
-            if ( existing.isTemporary ) {
-                toRemove.add( existing );
-            }
-        }
-        for ( Breakpoint existing : disabledBreakpoints )
-        {
-            if ( existing.isTemporary ) {
-                toRemove.add( existing );
-            }
-        }
-        for ( Breakpoint bp : toRemove ) {
-            remove(bp);
-        }
-    }
-
-    public void remove(Breakpoint b) {
+    public void remove(MemoryBreakpoint b) {
 
         if ( ! internalRemove(b) )
         {
@@ -289,17 +265,17 @@ public class Breakpoints
         }
     }
 
-    private boolean internalRemove(Breakpoint b)
+    private boolean internalRemove(MemoryBreakpoint b)
     {
         boolean removed = false;
-        for ( Breakpoint existing : enabledBreakpoints )
+        for ( MemoryBreakpoint existing : enabledBreakpoints )
         {
             if ( existing == b ) {
                 enabledBreakpoints = removeFromArray(enabledBreakpoints,existing);
                 removed = true;
             }
         }
-        for ( Breakpoint existing : disabledBreakpoints )
+        for ( MemoryBreakpoint existing : disabledBreakpoints )
         {
             if ( existing == b ) {
                 disabledBreakpoints = removeFromArray(disabledBreakpoints,existing);
@@ -312,22 +288,44 @@ public class Breakpoints
         return removed;
     }
 
-    public static Breakpoints load(Map<String,String> data)
+    public MemoryBreakpoint getBreakpoint(int address)
     {
-        final Breakpoints result = new Breakpoints();
-        final Pattern p = Pattern.compile("breakpoint\\.(\\d+)\\.(.*)");
+        for (int i = 0, enabledBreakpointsLength = enabledBreakpoints.length; i < enabledBreakpointsLength; i++)
+        {
+            MemoryBreakpoint bp = enabledBreakpoints[i];
+            if ( bp.address == address )
+            {
+                return bp;
+            }
+        }
+        for (int i = 0, disabledBreakpointsLength = disabledBreakpoints.length; i < disabledBreakpointsLength; i++)
+        {
+            MemoryBreakpoint bp = disabledBreakpoints[i];
+            if ( bp.address == address )
+            {
+                return bp;
+            }
+        }
+        return null;
+    }
+
+    public static MemoryBreakpoints load(Map<String,String> data)
+    {
+        final MemoryBreakpoints result = new MemoryBreakpoints();
+        final Pattern p = Pattern.compile("membreakpoint\\.(\\d+)\\.(.*)");
         for ( var entry : data.entrySet() )
         {
-            final Matcher matcher =
-                p.matcher(entry.getKey());
+            final Matcher matcher = p.matcher(entry.getKey());
             if ( matcher.matches() )
             {
                 final int adr = Integer.parseInt( matcher.group(1) );
                 if ( result.getBreakpoint(adr) == null )
                 {
-                    final String prefix = "breakpoint."+adr+".";
+                    final String prefix = "membreakpoint."+adr+".";
                     final boolean enabled = Boolean.parseBoolean(data.get(prefix+"enabled") );
-                    final Breakpoint bp = new Breakpoint(adr, ConditionalBreakpointExpressionParser.parse(data.get(prefix + "condition")));
+                    final int flags = Integer.parseInt(data.get(prefix+"flags") );
+                    final MemoryBreakpoint bp =
+                            new MemoryBreakpoint(adr, flags);
                     result.add(bp);
                     if ( ! enabled )
                     {
@@ -343,13 +341,10 @@ public class Breakpoints
 
         visitBreakpoints(bp ->
         {
-            if ( ! bp.isTemporary ) // only remember persistent breakpoints
-            {
-                final boolean enabled = isEnabled( bp );
-                final String prefix = "breakpoint." + bp.address + ".";
-                data.put( prefix + "enabled", Boolean.toString( enabled ) );
-                data.put( prefix + "condition", bp.condition.getExpression() );
-            }
+            final boolean enabled = isEnabled( bp );
+            final String prefix = "membreakpoint." + bp.address + ".";
+            data.put( prefix + "enabled", Boolean.toString( enabled ) );
+            data.put( prefix + "flags", Integer.toString(bp.accessFlags));
             return true;
         });
     }

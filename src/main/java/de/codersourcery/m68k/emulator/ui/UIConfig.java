@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.Breakpoints;
+import de.codersourcery.m68k.emulator.memory.MemoryBreakpoints;
 import org.apache.commons.lang3.Validate;
 
 import java.io.File;
@@ -24,6 +25,7 @@ public class UIConfig
             new HashMap<>();
 
     private Breakpoints breakpoints = new Breakpoints();
+    private MemoryBreakpoints memoryBreakpoints = new MemoryBreakpoints();
 
     private File kickRomDisassemblyLocation;
     private File kickRomLocation;
@@ -69,6 +71,7 @@ public class UIConfig
         }
         final Map<String, String> tmp = new HashMap<>();
         breakpoints.save(tmp);
+        memoryBreakpoints.save(tmp);
         props.putAll(tmp);
         props.store( out ,"Automatically gnerated");
     }
@@ -91,6 +94,7 @@ public class UIConfig
         states.forEach( state -> result.windowStates.put( state.getWindowKey(), state ) );
 
         result.breakpoints = Breakpoints.load(map);
+        result.memoryBreakpoints = MemoryBreakpoints.load(map);
         return result;
     }
 
@@ -107,6 +111,17 @@ public class UIConfig
     public Breakpoints getBreakpoints()
     {
         return breakpoints;
+    }
+
+    public void setMemoryBreakpoints(MemoryBreakpoints memoryBreakpoints)
+    {
+        Validate.notNull(memoryBreakpoints, "breakpoints must not be null");
+        this.memoryBreakpoints = memoryBreakpoints;
+    }
+
+    public MemoryBreakpoints getMemoryBreakpoints()
+    {
+        return memoryBreakpoints;
     }
 
     public void setBreakpoints(Breakpoints breakpoints)

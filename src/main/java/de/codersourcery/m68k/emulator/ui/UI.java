@@ -3,6 +3,7 @@ package de.codersourcery.m68k.emulator.ui;
 import de.codersourcery.m68k.emulator.Amiga;
 import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.Emulator;
+import de.codersourcery.m68k.emulator.memory.MemoryBreakpoints;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
@@ -81,6 +82,7 @@ public class UI extends JFrame
 
         emulator = new Emulator(Amiga.AMIGA_500,loadKickstartRom());
         emulator.getBreakpoints().populateFrom( loadConfig().getBreakpoints() );
+        emulator.memory.breakpoints.populateFrom( loadConfig().getMemoryBreakpoints() );
         emulator.setCallbackInvocationTicks(1000000);
 
         emulator.setStateCallback( new Emulator.IEmulatorStateCallback()
@@ -171,6 +173,7 @@ public class UI extends JFrame
         registerWindow( new EmulatorStateWindow("Emulator", this) );
         registerWindow( new MemoryViewWindow(this) );
         registerWindow( new BreakpointsWindow(this) );
+        registerWindow( new MemoryBreakpointsWindow(this) );
         registerWindow( new ScreenWindow("Screen", this) );
         romListing = registerWindow( new ROMListingViewer( "ROM listing", this ) );
         setContentPane( desktop );
@@ -404,14 +407,24 @@ public class UI extends JFrame
         mainWindow.setLocationAndSize( UI.this.getBounds());
         config.setWindowState(mainWindow);
 
-        final AtomicReference<Breakpoints> bps = new AtomicReference<>();
+        final AtomicReference<Breakpoints> bps1 = new AtomicReference<>();
         doWithEmulator(emu -> {
-           bps.set( emu.getBreakpoints().createCopy() );
+           bps1.set( emu.getBreakpoints().createCopy() );
         });
 
-        if ( bps.get() != null )
+        if ( bps1.get() != null )
         {
-            config.setBreakpoints( bps.get() );
+            config.setBreakpoints( bps1.get() );
+        }
+
+        final AtomicReference<MemoryBreakpoints> bps2 = new AtomicReference<>();
+        doWithEmulator(emu -> {
+            bps2.set( emu.memory.breakpoints.createCopy() );
+        });
+
+        if ( bps2.get() != null )
+        {
+            config.setMemoryBreakpoints( bps2.get() );
         }
 
         final File file = getConfigPath();
