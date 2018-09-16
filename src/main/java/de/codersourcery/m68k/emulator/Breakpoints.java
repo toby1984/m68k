@@ -20,6 +20,7 @@ public class Breakpoints
     private Breakpoint[] enabledBreakpoints = new Breakpoint[0];
     private Breakpoint[] disabledBreakpoints = new Breakpoint[0];
 
+    public Breakpoint lastHit = null;
 
     private int hashcode;
 
@@ -193,7 +194,7 @@ public class Breakpoints
      * @param emulator
      * @return
      */
-    public boolean isBreakpointHit(Emulator emulator)
+    public boolean checkBreakpointHit(Emulator emulator)
     {
         final int adr = emulator.cpu.pc;
         for (int i = 0, len = enabledBreakpoints.length ; i < len ; i++)
@@ -201,6 +202,25 @@ public class Breakpoints
             final Breakpoint bp = enabledBreakpoints[i];
             if ( bp.matchesAddress( adr ) && bp.matches( emulator ) )
             {
+                lastHit = bp;
+                if ( bp.isTemporary ) {
+                    remove(bp);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean checkMemoryBreakpointHit(int address,int size,int flags)
+    {
+        final int end = address+size;
+        for (int i = 0, len = enabledBreakpoints.length ; i < len ; i++)
+        {
+            final Breakpoint bp = enabledBreakpoints[i];
+            if ( bp.matchesAddress( address, end) && bp.matches( flags ) )
+            {
+                lastHit = bp;
                 if ( bp.isTemporary ) {
                     remove(bp);
                 }
@@ -248,9 +268,18 @@ public class Breakpoints
 
     private static Breakpoint[] addToArray(Breakpoint[] array, Breakpoint toAdd)
     {
-        final Breakpoint[] tmp = Arrays.copyOf(array,array.length+1);
-        tmp[tmp.length-1] = toAdd;
-        return tmp;
+        if ( array.length == 0 ) {
+            return new Breakpoint[]{toAdd};
+        }
+        final List<Breakpoint> tmp = new ArrayList<>( Arrays.asList( array ) );
+        for ( int i = 0 , len = tmp.size() ; i < len ; i++ ) {
+            if ( toAdd.address <= tmp.get(i).address ) {
+                tmp.add(i,toAdd);
+                return tmp.toArray( new Breakpoint[0] );
+            }
+        }
+        tmp.add(toAdd);
+        return tmp.toArray( new Breakpoint[0] );
     }
 
     public void removeAllTemporaryBreakpoints() {

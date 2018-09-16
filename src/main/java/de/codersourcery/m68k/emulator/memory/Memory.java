@@ -1,5 +1,6 @@
 package de.codersourcery.m68k.emulator.memory;
 
+import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.exceptions.BadAlignmentException;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codersourcery.m68k.emulator.exceptions.MemoryWriteProtectedException;
@@ -63,10 +64,17 @@ public class Memory
     }
 
     public final MMU mmu;
+    public final Breakpoints breakpoints;
 
-    public Memory(MMU mmu)
+    public Memory(MMU mmu) {
+        this.mmu = mmu;
+        this.breakpoints = new Breakpoints();
+    }
+
+    public Memory(MMU mmu, Breakpoints breakpoints)
     {
         this.mmu = mmu;
+        this.breakpoints = breakpoints;
     }
 
     public void bulkWrite(int startAddress,byte[] data,int offset,int count)
@@ -111,6 +119,7 @@ public class Memory
         // and 68000 does not allow word/long accesses on odd
         // addresses we know that we can never cross
         // a memory page boundary here
+        breakpoints.checkMemoryBreakpointHit( address,2, )
         return page.readWord(offset);
     }
 

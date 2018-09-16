@@ -118,7 +118,7 @@ public class Emulator
         this.video = new Video(amiga);
         final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler(amiga,blitter,video);
         this.mmu = new MMU(faultHandler);
-        this.memory = new Memory(this.mmu);
+        this.memory = new Memory(this.mmu,this.breakpoints);
         video.setMemory( this.memory );
         this.blitter.setMemory( this.memory );
         this.cpu = new CPU(amiga.getCPUType(), memory);
@@ -460,12 +460,14 @@ public class Emulator
                     }
                     if ( breakpoints.hasEnabledBreakpoints() )
                     {
-                        if ( cpu.cycles == 1 && breakpoints.isBreakpointHit(Emulator.this ) )
+                        if ( cpu.cycles == 1 &&
+                             (breakpoints.lastHit != null ||
+                             breakpoints.checkBreakpointHit(Emulator.this ) ) )
                         {
+                            breakpoints.lastHit = null;
                             mode = EmulatorMode.STOPPED;
                             System.err.println("*** emulation stopped because of breakpoint ***");
                             stateCallback.stopped(Emulator.this);
-                            continue;
                         }
                     }
                 }

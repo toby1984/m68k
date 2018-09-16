@@ -11,6 +11,9 @@ import java.util.Objects;
  */
 public final class Breakpoint
 {
+    public static final int MEM_READ = 1;
+    public static final int MEM_WRITE = 2;
+
     public final int address;
     public final IBreakpointCondition condition;
     public final boolean isTemporary;
@@ -37,6 +40,11 @@ public final class Breakpoint
         return condition.matches( emulator );
     }
 
+    public boolean matches(int accessFlags)
+    {
+        return condition.matches( accessFlags );
+    }
+
     @Override
     public int hashCode()
     {
@@ -55,6 +63,10 @@ public final class Breakpoint
 
     public boolean matchesAddress(int address) {
         return this.address == address;
+    }
+
+    public boolean matchesAddress(int startAddress,int endAddressExclusive) {
+        return startAddress <= this.address && this.address < endAddressExclusive;
     }
 
     public Breakpoint createCopy()

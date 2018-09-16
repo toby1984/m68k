@@ -19,12 +19,17 @@ public abstract class IBreakpointCondition
         }
 
         @Override
+        public boolean matches(int accessFlags)
+        {
+            return true;
+        }
+
+        @Override
         public String getExpression()
         {
             return "";
         }
     };
-
 
     /**
      * Returns whether the emulator's state satisfies this condition.
@@ -33,6 +38,8 @@ public abstract class IBreakpointCondition
      * @return <code>true</code> if the emulator's state satisfies this condition.
      */
     public abstract boolean matches(Emulator emulator);
+
+    public abstract boolean matches(int accessFlags);
 
     public abstract String getExpression();
 
