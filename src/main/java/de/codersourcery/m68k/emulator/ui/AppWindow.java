@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.Emulator;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import javax.swing.*;
@@ -13,6 +14,7 @@ import java.awt.event.KeyListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -30,6 +32,12 @@ import java.util.regex.Pattern;
 public abstract class AppWindow extends JInternalFrame
 {
     private static final Pattern HEX_DIGITS= Pattern.compile("[a-f]+",Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern ARITH_PATTERN =
+            Pattern.compile(".*?(\\+|-)\\s*(\\$?[0-9a-fA-F]+)",Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern ADR_REGISTER_PATTERN =
+            Pattern.compile("a([0-7]{1})",Pattern.CASE_INSENSITIVE);
 
     private static final List<Consumer<KeyEvent>> keyReleasedListener =
             new ArrayList<>();
@@ -138,5 +146,97 @@ public abstract class AppWindow extends JInternalFrame
             return Integer.parseInt( value.substring(1),16 );
         }
         return Integer.parseInt( value,16 );
+    }
+
+    protected interface IAdrProvider
+    {
+        int getAddress(Emulator emulator);
+        public boolean isFixedAddress();
+    }
+
+    protected static final class FixedAdrProvider implements IAdrProvider {
+
+        private final int address;
+
+        public FixedAdrProvider(int address)
+        {
+            this.address = address;
+        }
+
+        @Override
+        public int getAddress(Emulator emulator)
+        {
+            return address;
+        }
+
+        @Override
+        public boolean isFixedAddress()
+        {
+            return true;
+        }
+    }
+
+    protected final IAdrProvider parseExpression(String value)
+    {
+        final int offset;
+        if ( ! StringUtils.isBlank(value) ) {
+            final Matcher m = ARITH_PATTERN.matcher( value );
+            if ( m.matches() ) {
+                final String op = m.group(1);
+                final String operand = m.group(2);
+                offset = ("-".equals(op) ? -1 : 1) * parseNumber( operand );
+                value = value.substring( 0, value.indexOf(op) );
+            } else {
+                offset = 0;
+            }
+        } else {
+            offset = 0;
+        }
+
+        if ( ! StringUtils.isBlank(value) )
+        {
+            final Matcher matcher = ADR_REGISTER_PATTERN.matcher( value.trim() );
+
+            if ( matcher.matches() )
+            {
+                final int regNum = Integer.parseInt( matcher.group( 1 ) );
+                return new IAdrProvider()
+                {
+                    @Override
+                    public int getAddress(Emulator emulator)
+                    {
+                        return emulator.cpu.addressRegisters[regNum] + offset;
+                    }
+
+                    @Override
+                    public boolean isFixedAddress()
+                    {
+                        return false;
+                    }
+                };
+            }
+            else if ( value.trim().equalsIgnoreCase( "pc" ) ) {
+                return new IAdrProvider()
+                {
+                    @Override
+                    public int getAddress(Emulator emulator)
+                    {
+                        return emulator.cpu.pc + offset;
+                    }
+
+                    @Override
+                    public boolean isFixedAddress()
+                    {
+                        return false;
+                    }
+                };
+            }
+            else
+            {
+                final int adr = parseNumber( value.trim() );
+                return new FixedAdrProvider( adr+offset );
+            }
+        }
+        return null;
     }
 }

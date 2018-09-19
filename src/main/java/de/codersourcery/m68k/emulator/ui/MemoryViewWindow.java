@@ -1,7 +1,6 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.Emulator;
-import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
@@ -15,19 +14,11 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorStateCallback,
         ITickListener
 {
     private static final int BYTES_PER_ROW = 16; // TODO: Hard-coded in Memory#hexdump
-
-    private static final Pattern ARITH_PATTERN =
-            Pattern.compile(".*?(\\+|-)\\s*(\\$?[0-9a-fA-F]+)",Pattern.CASE_INSENSITIVE);
-
-    private static final Pattern ADR_REGISTER_PATTERN =
-            Pattern.compile("a([0-7]{1})",Pattern.CASE_INSENSITIVE);
 
     private final KeyListener keyAdapter = new KeyAdapter() {
         @Override
@@ -64,28 +55,6 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
         }
     };
 
-    protected static final class FixedAdrProvider implements IAdrProvider {
-
-        private final int address;
-
-        public FixedAdrProvider(int address)
-        {
-            this.address = address;
-        }
-
-        @Override
-        public int getAddress(Emulator emulator)
-        {
-            return address;
-        }
-
-        @Override
-        public boolean isFixedAddress()
-        {
-            return true;
-        }
-    }
-
     private final Object LOCK = new Object();
 
     // @Guardedby( LOCK )
@@ -104,7 +73,17 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
         hexdump.setFont( new Font(Font.MONOSPACED,Font.PLAIN,12 ) );
 
         expression.setText( "$00000000" );
-        expression.addActionListener( ev -> parseExpression( expression.getText() ) );
+        expression.addActionListener( ev ->
+        {
+            final IAdrProvider provider = parseExpression( expression.getText() );
+            if ( provider != null ) {
+                synchronized (LOCK)
+                {
+                    adrProvider = provider;
+                }
+                runOnEmulator( this::update );
+            }
+        });
 
         addKeyListener( keyAdapter );
         setFocusable( true );
@@ -148,79 +127,6 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
         });
     }
 
-    private void parseExpression(String value)
-    {
-        final int offset;
-        if ( ! StringUtils.isBlank(value) ) {
-            final Matcher m = ARITH_PATTERN.matcher( value );
-            if ( m.matches() ) {
-                final String op = m.group(1);
-                final String operand = m.group(2);
-                offset = ("-".equals(op) ? -1 : 1) * parseNumber( operand );
-                value = value.substring( 0, value.indexOf(op) );
-            } else {
-                offset = 0;
-            }
-        } else {
-            offset = 0;
-        }
-
-        if ( ! StringUtils.isBlank(value) )
-        {
-            final Matcher matcher = ADR_REGISTER_PATTERN.matcher( value.trim() );
-
-            if ( matcher.matches() )
-            {
-                final int regNum = Integer.parseInt( matcher.group( 1 ) );
-                synchronized (LOCK)
-                {
-                    adrProvider = new IAdrProvider()
-                    {
-                        @Override
-                        public int getAddress(Emulator emulator)
-                        {
-                            return emulator.cpu.addressRegisters[regNum] + offset;
-                        }
-
-                        @Override
-                        public boolean isFixedAddress()
-                        {
-                            return false;
-                        }
-                    };
-                }
-            }
-            else if ( value.trim().equalsIgnoreCase( "pc" ) ) {
-                synchronized (LOCK)
-                {
-                    adrProvider = new IAdrProvider()
-                    {
-                        @Override
-                        public int getAddress(Emulator emulator)
-                        {
-                            return emulator.cpu.pc + offset;
-                        }
-
-                        @Override
-                        public boolean isFixedAddress()
-                        {
-                            return false;
-                        }
-                    };
-                }
-            }
-            else
-            {
-                final int adr = parseNumber( value.trim() );
-                synchronized (LOCK)
-                {
-                    adrProvider = new FixedAdrProvider( adr+offset );
-                }
-            }
-        }
-        ui.doWithEmulator( this::update );
-    }
-
     @Override
     public String getWindowKey()
     {
@@ -262,11 +168,5 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
     public void tick(Emulator emulator)
     {
         update( emulator );
-    }
-
-    private interface IAdrProvider
-    {
-        int getAddress(Emulator emulator);
-        public boolean isFixedAddress();
     }
 }

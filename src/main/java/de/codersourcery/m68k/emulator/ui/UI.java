@@ -174,6 +174,7 @@ public class UI extends JFrame
         registerWindow( new MemoryViewWindow(this) );
         registerWindow( new BreakpointsWindow(this) );
         registerWindow( new MemoryBreakpointsWindow(this) );
+        registerWindow( new StructExplorer(this) );
         registerWindow( new ScreenWindow("Screen", this) );
         romListing = registerWindow( new ROMListingViewer( "ROM listing", this ) );
         setContentPane( desktop );
