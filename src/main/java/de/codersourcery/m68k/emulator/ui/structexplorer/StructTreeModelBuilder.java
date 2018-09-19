@@ -12,7 +12,10 @@ public class StructTreeModelBuilder
 {
     public enum StructType
     {
-        NODE( "struct Node" ),LIST( "struct List" );
+        NODE( "struct Node" ),
+        MEM_HDR( "struct MemHeader" ),
+        MEM_CHUNK( "struct MemChunk" ),
+        LIST( "struct List" );
 
         private final String uiLabel;
 
@@ -50,14 +53,17 @@ public class StructTreeModelBuilder
 
     private static final class StructDesc
     {
-        public final String label;
         public final StructType type;
         public final List<StructField> fields = new ArrayList<>();
 
-        public StructDesc(String label,StructType type)
+        public StructDesc(StructType type)
         {
-            this.label = label;
             this.type = type;
+        }
+
+        public StructDesc fields(StructDesc desc) {
+            this.fields.addAll( desc.fields );
+            return this;
         }
 
         public StructDesc field(StructField field) {
@@ -132,7 +138,7 @@ public class StructTreeModelBuilder
             .add("NT_USER",254)
             .add("NT_EXTENDED",255);
 
-    private static final StructDesc STRUCT_NODE = new StructDesc("struct Node",StructType.NODE)
+    private static final StructDesc STRUCT_NODE = new StructDesc(StructType.NODE)
             .field( structPtr( "ln_Succ", StructType.NODE ) ) // struct Node *ln_Succ;
             .field( structPtr( "ln_Pred", StructType.NODE ) ) // struct Node *ln_Pred;
             .field( uint8("ln_Type", NT_TYPES ) ) // uint8        ln_Type
@@ -140,12 +146,39 @@ public class StructTreeModelBuilder
             .field( stringPtr("ln_Name") ); // STRPTR       ln_Name;
 
     // struct List
-    private static final StructDesc STRUCT_LIST = new StructDesc("struct List",StructType.LIST)
+    private static final StructDesc STRUCT_LIST = new StructDesc(StructType.LIST)
             .field( structPtr( "lh_Head", StructType.NODE ) ) // struct Node *lh_Head;
             .field( structPtr( "lh_Tail", StructType.NODE ) ) // struct Node *lh_Tail;
             .field( structPtr( "lh_TailPred", StructType.NODE ) ) // struct Node *lh_TailPred;
             .field( uint8("lh_Type", NT_TYPES) ) // uint8        lh_Type;
             .field( uint8("lh_Pad") ); // uint8        lh_Pad;
+
+    /*
+    struct	MemChunk {
+    struct  MemChunk *mc_Next;	// pointer to next chunk
+    ULONG   mc_Bytes;		// chunk byte size
+};
+     */
+    private static final StructDesc STRUCT_MEM_CHUNK = new StructDesc(StructType.MEM_CHUNK)
+            .field( structPtr("mc_Next",StructType.MEM_CHUNK ) )
+            .field( uint32("mc_Bytes"));
+
+    /*
+struct MemHeader {
+struct Node       mh_Node;
+UWORD             mh_Attributes;  // characteristics of this region
+struct  MemChunk *mh_First;       // first free region
+APTR              mh_Lower;       // lower memory bound
+APTR              mh_Upper;       // upper memory bound + 1
+ULONG             mh_Free;        //total number of free bytes
+ */
+    private static final StructDesc STRUCT_MEM_HDR = new StructDesc(StructType.MEM_HDR)
+            .fields( STRUCT_NODE )
+            .field( uint16( "mh_Attributes" ) )
+            .field( structPtr( "mh_First", StructType.MEM_CHUNK) )
+            .field( ptr( "mh_Lower" ) )
+            .field( ptr( "mh_Upper" ) )
+            .field( uint32("mh_Free") );
 
     private final Emulator emulator;
 
@@ -162,7 +195,7 @@ public class StructTreeModelBuilder
     private StructTreeNode createTreeModel(String prefix,int baseAddress,StructType type,int depth,int maxDepth) {
 
         final StructDesc desc = getStructDesc( type );
-        StructTreeNode result = new StructTreeNode(baseAddress,prefix + desc.label+" @ "+Misc.hex( baseAddress ) );
+        StructTreeNode result = new StructTreeNode(baseAddress,prefix + desc.type+" @ "+Misc.hex( baseAddress ) );
         int offset = 0;
         for ( StructField field : desc.fields )
         {
@@ -278,9 +311,12 @@ public class StructTreeModelBuilder
 
     private StructDesc getStructDesc(StructType type)
     {
-        switch(type) {
-            case NODE: return STRUCT_NODE;
-            case LIST: return STRUCT_LIST;
+        switch(type)
+        {
+            case NODE:      return STRUCT_NODE;
+            case MEM_HDR:   return STRUCT_MEM_HDR;
+            case MEM_CHUNK: return STRUCT_MEM_CHUNK;
+            case LIST:      return STRUCT_LIST;
             default:
                 throw new RuntimeException("Unhandled struct type "+type);
         }
@@ -294,6 +330,27 @@ public class StructTreeModelBuilder
     private static StructField stringPtr(String name)
     {
         return new StructField(name,FieldType.CHAR_PTR);
+    }
+
+    private static StructField ptr(String name)
+    {
+        return new StructField(name,FieldType.PTR);
+    }
+
+    private static StructField int32(String name) {
+        return new StructField(name,FieldType.INT32);
+    }
+
+    private static StructField uint32(String name) {
+        return new StructField(name,FieldType.UINT32);
+    }
+
+    private static StructField int16(String name) {
+        return new StructField(name,FieldType.INT16);
+    }
+
+    private static StructField uint16(String name) {
+        return new StructField(name,FieldType.UINT16);
     }
 
     private static StructField int8(String name) {
