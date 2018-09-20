@@ -128,9 +128,9 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
     }
 
     @Override
-    public String getWindowKey()
+    public WindowKey getWindowKey()
     {
-        return "memoryview";
+        return WindowKey.MEMORY_VIEW;
     }
 
     private void update(Emulator emulator)

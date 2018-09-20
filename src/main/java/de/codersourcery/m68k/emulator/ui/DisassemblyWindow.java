@@ -354,8 +354,8 @@ public class DisassemblyWindow extends AppWindow
     }
 
     @Override
-    public String getWindowKey()
+    public WindowKey getWindowKey()
     {
-        return "disassembly";
+        return WindowKey.DISASSEMBLY;
     }
 }

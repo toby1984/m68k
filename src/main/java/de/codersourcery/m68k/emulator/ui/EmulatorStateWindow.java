@@ -17,10 +17,9 @@ public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulator
     private final JButton resetButton;
     private final JButton stepOverButton;
 
-    public EmulatorStateWindow(String title, UI ui)
+    public EmulatorStateWindow(UI ui)
     {
-        super( title, ui );
-
+        super( "Emulator", ui );
 
         setLayout( new FlowLayout() );
         runButton = addButton("Run", () -> {
@@ -63,9 +62,9 @@ public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulator
     }
 
     @Override
-    public String getWindowKey()
+    public WindowKey getWindowKey()
     {
-        return "emulatorcontrol";
+        return WindowKey.EMULATOR_STATE;
     }
 
     private JButton addButton(String label,Runnable action) {

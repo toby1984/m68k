@@ -59,9 +59,9 @@ public class ScreenWindow extends AppWindow implements ITickListener,
 
     private final MyPanel panel = new MyPanel();
 
-    public ScreenWindow(String title, UI ui)
+    public ScreenWindow(UI ui)
     {
-        super( title, ui );
+        super( "Screen" , ui );
 
         final GridBagConstraints cnstrs = cnstrs( 0, 0 );
         cnstrs.weightx=1;
@@ -89,9 +89,9 @@ public class ScreenWindow extends AppWindow implements ITickListener,
     }
 
     @Override
-    public String getWindowKey()
+    public WindowKey getWindowKey()
     {
-        return "screen";
+        return WindowKey.SCREEN;
     }
 
     @Override

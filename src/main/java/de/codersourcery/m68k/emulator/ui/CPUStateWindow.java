@@ -122,9 +122,9 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         return result;
     }
 
-    public CPUStateWindow(String title, UI ui)
+    public CPUStateWindow(UI ui)
     {
-        super( title, ui );
+        super( "CPU State", ui );
         setPreferredSize( new Dimension(600,200 ) );
         getContentPane().setLayout( new GridBagLayout() );
         for ( int i = 0 ; i < 8 ; i++ )
@@ -207,9 +207,9 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
     }
 
     @Override
-    public String getWindowKey()
+    public WindowKey getWindowKey()
     {
-        return "cpustate";
+        return WindowKey.CPU_STATE;
     }
 
     @Override

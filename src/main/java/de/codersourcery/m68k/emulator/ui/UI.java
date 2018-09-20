@@ -23,11 +23,10 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 public class UI extends JFrame
 {
-    private static final String MAIN_WINDOW_KEY = "mainWindow";
-
     final JDesktopPane desktop = new JDesktopPane();
 
     private Emulator emulator;
@@ -35,7 +34,6 @@ public class UI extends JFrame
     private final List<ITickListener> tickListeners = new ArrayList<>();
     private final List<Emulator.IEmulatorStateCallback> stateChangeListeners = new ArrayList<>();
     private final List<AppWindow> windows = new ArrayList<>();
-    private ROMListingViewer romListing;
 
     private UIConfig uiConfig;
 
@@ -137,13 +135,39 @@ public class UI extends JFrame
         return Optional.ofNullable( result == JFileChooser.APPROVE_OPTION ? fileChooser.getSelectedFile() : null );
     }
 
-    private <T extends AppWindow> T registerWindow(T window)
+    private Optional<AppWindow>  getWindow(AppWindow.WindowKey key) {
+        return windows.stream().filter( w -> w.getClass() == key.clazz ).findFirst();
+    }
+
+    private void unregisterWindow(AppWindow.WindowKey key)
     {
+        final Optional<AppWindow> optWindow = getWindow( key );
+        if ( ! optWindow.isPresent() ) {
+            return;
+        }
+        final AppWindow window = optWindow.get();
+        windows.remove( window );
+        window.dispose();
+        desktop.remove(  window );
+
+        if ( window instanceof ITickListener) {
+            tickListeners.remove( (ITickListener) window );
+        }
+        if ( window instanceof Emulator.IEmulatorStateCallback) {
+            stateChangeListeners.remove( (Emulator.IEmulatorStateCallback) window);
+        }
+    }
+
+    private AppWindow registerWindow(AppWindow.WindowKey key)
+    {
+        final Optional<WindowState> state = loadConfig().getWindowState( key );
+
+        if ( state.isPresent() && ! state.get().isEnabled() ) {
+            return null;
+        }
+        final AppWindow window = key.newInstance( this );
         windows.add(window);
         desktop.add(window);
-
-        final Optional<WindowState> state =
-                loadConfig().getWindowState( window.getWindowKey() );
 
         if ( state.isPresent() ) {
             System.out.println("Applying window state "+state.get());
@@ -159,6 +183,21 @@ public class UI extends JFrame
         if ( window instanceof Emulator.IEmulatorStateCallback) {
             stateChangeListeners.add( (Emulator.IEmulatorStateCallback) window);
         }
+
+        if ( window instanceof ROMListingViewer)
+        {
+            final ROMListingViewer romListing = (ROMListingViewer) window;
+            if ( loadConfig().getKickRomDisassemblyLocation() != null )
+            {
+                try
+                {
+                    romListing.setKickRomDisasm( loadConfig().getKickRomDisassemblyLocation() );
+                }
+                catch(Exception e) {
+                    error(e);
+                }
+            }
+        }
         return window;
     }
 
@@ -168,15 +207,10 @@ public class UI extends JFrame
         setJMenuBar( createMenuBar() );
 
         // add internal windows
-        registerWindow( new DisassemblyWindow(this) );
-        registerWindow( new CPUStateWindow("CPU", this) );
-        registerWindow( new EmulatorStateWindow("Emulator", this) );
-        registerWindow( new MemoryViewWindow(this) );
-        registerWindow( new BreakpointsWindow(this) );
-        registerWindow( new MemoryBreakpointsWindow(this) );
-        registerWindow( new StructExplorer(this) );
-        registerWindow( new ScreenWindow("Screen", this) );
-        romListing = registerWindow( new ROMListingViewer( "ROM listing", this ) );
+        Stream.of( AppWindow.WindowKey.values() )
+                .filter( x -> x != AppWindow.WindowKey.MAIN_WINDOW )
+                .forEach( this::registerWindow );
+
         setContentPane( desktop );
 
         // display main window
@@ -185,16 +219,10 @@ public class UI extends JFrame
         setVisible(true);
 
         // apply main window state
-        final Optional<WindowState> state = loadConfig().getWindowState(MAIN_WINDOW_KEY);
-        state.ifPresent(s ->
-        {
-            setBounds(s.getLocationAndSize());
-        });
+        final Optional<WindowState> state = loadConfig().getWindowState( AppWindow.WindowKey.MAIN_WINDOW );
+        state.ifPresent(s -> setBounds(s.getLocationAndSize()) );
 
         final UIConfig config = loadConfig();
-        if ( config.getKickRomDisassemblyLocation() != null ) {
-            romListing.setKickRomDisasm( config.getKickRomDisassemblyLocation() );
-        }
 
         if ( config.getKickRomLocation() != null && config.getKickRomLocation().exists() )
         {
@@ -214,7 +242,45 @@ public class UI extends JFrame
         final JMenuBar menuBar = new JMenuBar();
 
         final JMenu menu1 = new JMenu("File" );
+        final JMenu menu2 = new JMenu("View" );
+
+        final UIConfig config = loadConfig();
+        for ( AppWindow.WindowKey key : AppWindow.WindowKey.values() )
+        {
+            if ( key == AppWindow.WindowKey.MAIN_WINDOW )
+            {
+                continue;
+            }
+            final Optional<WindowState> state = config.getWindowState( key );
+            final boolean enabled = state.map( x -> x.isEnabled() ).orElse( Boolean.TRUE );
+            final JCheckBoxMenuItem item = new JCheckBoxMenuItem( key.uiLabel , enabled );
+            item.addActionListener( ev ->
+            {
+                final Optional<AppWindow> window = getWindow( key );
+                if ( window.isPresent() )
+                {
+                    final WindowState newState = window.get().getWindowState();
+                    newState.setEnabled( false );
+                    unregisterWindow( key );
+                    config.setWindowState( newState );
+                }
+                else
+                {
+                    final Optional<WindowState> newState = config.getWindowState( key );
+                    if ( newState.isPresent() ) {
+                        newState.get().setEnabled( true );
+                        config.setWindowState( newState.get() );
+                    }
+                    final AppWindow w = registerWindow( key );
+                    if ( w != null ) {
+                        config.setWindowState( w.getWindowState() );
+                    }
+                }
+            });
+            menu2.add(item);
+        }
         menuBar.add( menu1 );
+        menuBar.add( menu2 );
 
         menu1.add( menuItem("Load kickstart ROM", () ->
         {
@@ -263,7 +329,8 @@ public class UI extends JFrame
             final Optional<File> selection = selectFile(loadConfig().getKickRomDisassemblyLocation(),filter);
             if ( selection.isPresent() )
             {
-                romListing.setKickRomDisasm( selection.get() );
+                final Optional<AppWindow> window = getWindow( AppWindow.WindowKey.ROM_LISTING );
+                window.ifPresent(  w -> ((ROMListingViewer) w).setKickRomDisasm( selection.get() ) );
                 loadConfig().setKickRomDisassemblyLocation( selection.get() );
             }
         }));
@@ -404,7 +471,7 @@ public class UI extends JFrame
         final WindowState mainWindow = new WindowState();
         mainWindow.setEnabled(true);
         mainWindow.setVisible(true);
-        mainWindow.setWindowKey(MAIN_WINDOW_KEY);
+        mainWindow.setWindowKey( AppWindow.WindowKey.MAIN_WINDOW );
         mainWindow.setLocationAndSize( UI.this.getBounds());
         config.setWindowState(mainWindow);
 

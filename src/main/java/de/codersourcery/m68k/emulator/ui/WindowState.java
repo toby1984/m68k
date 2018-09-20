@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 
 public class WindowState
 {
-    private String windowKey;
+    private AppWindow.WindowKey windowKey;
     private Rectangle locationAndSize;
     private boolean isEnabled;
     private boolean isVisible;
@@ -75,12 +75,12 @@ public class WindowState
         this.locationAndSize = locationAndSize;
     }
 
-    public String getWindowKey()
+    public AppWindow.WindowKey getWindowKey()
     {
         return windowKey;
     }
 
-    public void setWindowKey(String windowKey)
+    public void setWindowKey(AppWindow.WindowKey windowKey)
     {
         this.windowKey = windowKey;
     }
@@ -88,12 +88,12 @@ public class WindowState
     public Map<String,String>  asMap()
     {
         final Map<String,String> map = new HashMap<>();
-        map.put("window."+windowKey+".x", Integer.toString( locationAndSize.x ) );
-        map.put("window."+windowKey+".y", Integer.toString( locationAndSize.y ) );
-        map.put("window."+windowKey+".w", Integer.toString( locationAndSize.width ) );
-        map.put("window."+windowKey+".h", Integer.toString( locationAndSize.height ) );
-        map.put("window."+windowKey+".enabled", Boolean.toString( isEnabled) );
-        map.put("window."+windowKey+".visible", Boolean.toString( isVisible) );
+        map.put("window."+windowKey.id+".x", Integer.toString( locationAndSize.x ) );
+        map.put("window."+windowKey.id+".y", Integer.toString( locationAndSize.y ) );
+        map.put("window."+windowKey.id+".w", Integer.toString( locationAndSize.width ) );
+        map.put("window."+windowKey.id+".h", Integer.toString( locationAndSize.height ) );
+        map.put("window."+windowKey.id+".enabled", Boolean.toString( isEnabled) );
+        map.put("window."+windowKey.id+".visible", Boolean.toString( isVisible) );
         return map;
     }
 
@@ -131,7 +131,7 @@ outer:
 
                     final WindowState state = new WindowState();
                     state.locationAndSize = new Rectangle(x,y,w,h);
-                    state.windowKey = windowKey;
+                    state.windowKey = AppWindow.WindowKey.fromId(windowKey);
                     state.isEnabled = enabled;
                     state.isVisible = visible;
                     result.add(state);

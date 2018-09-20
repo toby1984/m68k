@@ -21,20 +21,13 @@ public class UIConfig
     private static final String KEY_KICKROM_LOCATION = "kickRomLocation";
     private static final String KEY_KICKROM_DISASM_LOCATION = "kickRomDisasmLocation";
 
-    private final Map<String,WindowState> windowStates=
-            new HashMap<>();
+    private final Map<AppWindow.WindowKey,WindowState> windowStates = new HashMap<>();
 
     private Breakpoints breakpoints = new Breakpoints();
     private MemoryBreakpoints memoryBreakpoints = new MemoryBreakpoints();
 
     private File kickRomDisassemblyLocation;
     private File kickRomLocation;
-
-    public List<WindowState> getWindowStates()
-    {
-        return windowStates.values().stream()
-                .map(x->x.createCopy()).collect( Collectors.toList());
-    }
 
     public File getKickRomLocation()
     {
@@ -46,7 +39,7 @@ public class UIConfig
         this.kickRomLocation = kickRomLocation;
     }
 
-    public Optional<WindowState> getWindowState(String windowKey) {
+    public Optional<WindowState> getWindowState(AppWindow.WindowKey windowKey) {
         return Optional.ofNullable( windowStates.get( windowKey ) );
     }
 

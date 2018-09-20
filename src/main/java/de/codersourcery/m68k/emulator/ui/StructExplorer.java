@@ -102,9 +102,9 @@ public class StructExplorer extends AppWindow implements
     }
 
     @Override
-    public String getWindowKey()
+    public WindowKey getWindowKey()
     {
-        return "struct-explorer";
+        return WindowKey.STRUCT_EXPLORER;
     }
 
     @Override

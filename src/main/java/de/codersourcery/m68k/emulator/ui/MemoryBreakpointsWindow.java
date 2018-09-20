@@ -351,9 +351,9 @@ public class MemoryBreakpointsWindow extends AppWindow implements Emulator.IEmul
     }
 
     @Override
-    public String getWindowKey()
+    public WindowKey getWindowKey()
     {
-        return "membreakpoints";
+        return WindowKey.MEMORY_BREAKPOINTS;
     }
 
     @Override

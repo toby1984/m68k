@@ -63,9 +63,9 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
         return (StyledDocument) textfield.getStyledDocument();
     }
 
-    public ROMListingViewer(String title, UI ui)
+    public ROMListingViewer(UI ui)
     {
-        super( title, ui );
+        super( "ROM listing" , ui );
 
         this.textfield.setEditable( false );
         getContentPane().setLayout( new GridBagLayout() );
@@ -160,9 +160,9 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     }
 
     @Override
-    public String getWindowKey()
+    public WindowKey getWindowKey()
     {
-        return "romlisting";
+        return WindowKey.ROM_LISTING;
     }
 
     @Override

@@ -337,9 +337,9 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
     }
 
     @Override
-    public String getWindowKey()
+    public WindowKey getWindowKey()
     {
-        return "breakpoints";
+        return WindowKey.BREAKPOINTS;
     }
 
     @Override

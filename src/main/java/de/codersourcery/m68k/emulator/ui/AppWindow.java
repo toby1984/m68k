@@ -10,12 +10,13 @@ import java.awt.GridBagConstraints;
 import java.awt.Insets;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Abstract base class for application windows.
@@ -59,6 +60,60 @@ public abstract class AppWindow extends JInternalFrame
             };
 
     protected final UI ui;
+
+    public enum WindowKey
+    {
+        BREAKPOINTS( "breakpoints", "Breakpoints", BreakpointsWindow.class ),
+        CPU_STATE( "cpustate" , "CPU State", CPUStateWindow.class),
+        DISASSEMBLY( "disassembly" , "Disassembly", DisassemblyWindow.class),
+        EMULATOR_STATE( "emulatorcontrol" , "Emulator", EmulatorStateWindow.class ),
+        MAIN_WINDOW("mainWindow", "Main Window", null),
+        MEMORY_VIEW( "memoryview" , "Memory", MemoryViewWindow.class ),
+        MEMORY_BREAKPOINTS( "membreakpoints" , "Memory Breakpoints", MemoryBreakpointsWindow.class ),
+        ROM_LISTING("romlisting", "ROM Listing", ROMListingViewer.class ),
+        STRUCT_EXPLORER( "struct-explorer" , "Struct Explorer", StructExplorer.class ),
+        SCREEN( "screen" , "Screen", ScreenWindow.class );
+
+        public final String id;
+        public final String uiLabel;
+        public final Class<? extends AppWindow> clazz;
+
+        WindowKey(String id, String uiLabel, Class<? extends AppWindow> clazz)
+        {
+            this.id = id;
+            this.uiLabel = uiLabel;
+            this.clazz = clazz;
+        }
+
+        public AppWindow newInstance(UI ui)
+        {
+            try
+            {
+                final Constructor<? extends AppWindow> constructor = clazz.getConstructor( new Class[]{UI.class} );
+                return constructor.newInstance( ui );
+            }
+            catch(Exception e) {
+                throw new RuntimeException("Failed to instantiate "+clazz.getName(),e);
+            }
+        }
+
+        public static WindowKey fromId(String windowKey)
+        {
+            return Stream.of( WindowKey.values() ).filter( x -> x.id.equals(windowKey))
+                    .findFirst().orElseThrow();
+        }
+
+        /*
+                registerWindow( new DisassemblyWindow(this) );
+        registerWindow( new CPUStateWindow("CPU", this) );
+        registerWindow( new EmulatorStateWindow("Emulator", this) );
+        registerWindow( new MemoryViewWindow(this) );
+        registerWindow( new BreakpointsWindow(this) );
+        registerWindow( new MemoryBreakpointsWindow(this) );
+        registerWindow( new StructExplorer(this) );
+        registerWindow( new ScreenWindow("Screen", this) );
+         */
+    }
 
     public AppWindow(String title,UI ui)
     {
@@ -116,7 +171,7 @@ public abstract class AppWindow extends JInternalFrame
         }
     }
 
-    public abstract String getWindowKey();
+    public abstract WindowKey getWindowKey();
 
     public void applyWindowState(WindowState state)
     {
