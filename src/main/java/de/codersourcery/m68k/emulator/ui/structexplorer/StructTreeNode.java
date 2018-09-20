@@ -1,8 +1,10 @@
 package de.codersourcery.m68k.emulator.ui.structexplorer;
 
+import java.sql.Struct;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -11,14 +13,14 @@ import java.util.Stack;
 public class StructTreeNode
 {
     public final List<StructTreeNode> children = new ArrayList<>();
-    public int address;
+    public final int address;
     public StructTreeNode parent;
     public String lable;
 
     public StructTreeNode(int address,String lable)
     {
-        this.lable = lable;
         this.address = address;
+        this.lable = lable;
     }
 
     public Iterator<StructTreeNode> iterator() {
@@ -41,6 +43,17 @@ public class StructTreeNode
                 return result;
             }
         };
+    }
+
+    public Object[] pathToRoot() {
+
+        final LinkedList<StructTreeNode> path = new LinkedList<>();
+        StructTreeNode current = this;
+        do {
+            path.addFirst( current );
+            current = current.parent;
+        } while ( current != null );
+        return path.toArray();
     }
 
     public static boolean compare(StructTreeNode tree1, StructTreeNode tree2) {
@@ -68,8 +81,7 @@ public class StructTreeNode
     {
         if ( o instanceof StructTreeNode) {
             final StructTreeNode that = (StructTreeNode) o;
-            return address == that.address &&
-                    Objects.equals( lable, that.lable );
+            return this.address == that.address && this.lable.equals( that.lable );
         }
         return false;
     }
@@ -77,10 +89,10 @@ public class StructTreeNode
     @Override
     public int hashCode()
     {
-        return Objects.hash( address, lable );
+        return Objects.hash(this.address,this.lable);
     }
 
-    public void addChild(StructTreeNode node) {
+    public void add(StructTreeNode node) {
         node.parent = this;
         children.add(node);
     }

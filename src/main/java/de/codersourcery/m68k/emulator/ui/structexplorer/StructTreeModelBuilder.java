@@ -3,10 +3,12 @@ package de.codersourcery.m68k.emulator.ui.structexplorer;
 import de.codersourcery.m68k.emulator.Emulator;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codersourcery.m68k.utils.Misc;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.BiFunction;
 
 public class StructTreeModelBuilder
 {
@@ -15,7 +17,8 @@ public class StructTreeModelBuilder
         NODE( "struct Node" ),
         MEM_HDR( "struct MemHeader" ),
         MEM_CHUNK( "struct MemChunk" ),
-        LIST( "struct List" );
+        LIST( "struct List" ),
+        TASK("struct Task");
 
         private final String uiLabel;
 
@@ -41,66 +44,106 @@ public class StructTreeModelBuilder
         UINT32( 4 ),
         CHAR_PTR( 4 ),
         PTR( 4 ),
-        STRUCT_PTR( 4 );
+        STRUCT_PTR( 4 ),
+        INLINED_STRUCT(0xffff);
 
-        public final int sizeInBytes;
+        public final int size;
 
         FieldType(int sizeInBytes)
         {
-            this.sizeInBytes = sizeInBytes;
+            this.size = sizeInBytes;
         }
     }
 
     private static final class StructDesc
     {
         public final StructType type;
-        public final List<StructField> fields = new ArrayList<>();
+        public int size;
+        private final List<StructField> allFields = new ArrayList<>();
 
         public StructDesc(StructType type)
         {
             this.type = type;
         }
 
-        public StructDesc fields(StructDesc desc) {
-            this.fields.addAll( desc.fields );
+        public List<StructField> fields() {
+            return allFields;
+        }
+
+        public StructDesc fields(String label,StructDesc desc)
+        {
+            final StructField newField = new StructField( label, FieldType.INLINED_STRUCT, desc.type );
+            this.allFields.add( newField );
+            size += newField.sizeInBytes();
             return this;
         }
 
         public StructDesc field(StructField field) {
-            fields.add(field);
+            allFields.add(field);
+            size += field.sizeInBytes();
             return this;
         }
     }
 
-    private static final class EnumValues
+    protected static abstract class LookupTable<T extends LookupTable<T>>
     {
-        private int[] values = new int[0];
-        private String[] labels = new String[0];
+        protected int[] values = new int[0];
+        protected String[] labels = new String[0];
 
-        public EnumValues add(String label,int value)
+        public T add(String label,int value)
         {
             values = Arrays.copyOf(values, values.length+1);
             values[values.length-1] = value;
             labels = Arrays.copyOf(labels,labels.length+1);
             labels[labels.length-1] = label;
-            return this;
+            return (T) this;
         }
 
-        public String lookup(int value) {
+        public abstract String lookup(int value, BiFunction<Integer,String,String> labelGen, String defaultValue);
+    }
+
+    private static final class EnumValues extends LookupTable<EnumValues>
+    {
+        @Override
+        public String lookup(int value, BiFunction<Integer,String,String> labelGen, String defaultValue)
+        {
             for ( int i = 0 , len = values.length ; i < len ; i++ ) {
                 if ( values[i] == value ) {
-                    return labels[i];
+                    return labelGen.apply( Integer.valueOf(value) , labels[i] );
                 }
             }
-            return null;
+            return labelGen.apply( Integer.valueOf(value), defaultValue );
+        }
+    }
+
+    private static final class BitMask extends LookupTable<BitMask>
+    {
+        @Override
+        public String lookup(int value, BiFunction<Integer,String,String> labelGen, String defaultValue)
+        {
+            final StringBuilder result = new StringBuilder();
+            for ( int i = 0 , len = values.length ; i < len ; i++ )
+            {
+                if ( (value & values[i]) == values[i] )
+                {
+                    if ( result.length() > 0 ) {
+                        result.append("|");
+                    }
+                    result.append(labels[i]);
+                }
+            }
+            return labelGen.apply( Integer.valueOf(value), result.length() == 0 ? defaultValue : result.toString() );
         }
     }
 
     private static final class StructField
     {
+        public static final int DISPLAY_BITS = 1<<0;
+
         public String name;
         public FieldType type;
         public Object subType;
+        public int displayFlags;
 
         public StructField(String name, FieldType type) {
             this(name,type,null);
@@ -111,6 +154,26 @@ public class StructTreeModelBuilder
             this.name = name;
             this.type = type;
             this.subType = subType;
+        }
+
+        public boolean isDisplayBits()
+        {
+            return (displayFlags & DISPLAY_BITS) != 0;
+        }
+
+        public StructField showBits()
+        {
+            displayFlags |= DISPLAY_BITS;
+            return this;
+        }
+
+        public int sizeInBytes()
+        {
+            if ( type == FieldType.INLINED_STRUCT )
+            {
+                return getStructDesc( (StructType) subType ).size;
+            }
+            return type.size;
         }
     }
 
@@ -137,6 +200,23 @@ public class StructTreeModelBuilder
             .add("NT_DEATHMESSAGE",19)
             .add("NT_USER",254)
             .add("NT_EXTENDED",255);
+
+    private static final BitMask TASK_FLAGS = new BitMask()
+            .add("TF_PROCTIME",1<<0)
+            .add("TF_ETASK",1<<3)
+            .add("TF_STACKCHK",1<<4)
+            .add("TF_EXCEPT",1<<5)
+            .add("TF_SWITCH",1<<6)
+            .add("TF_LAUNCH",1<<7);
+
+    private static final BitMask TASK_STATES = new BitMask()
+            .add("TS_INVALID",1<<0)
+            .add("TS_ADDED",1<<1)
+            .add("TS_RUN",1<<2)
+            .add("TS_READY",1<<3)
+            .add("TS_WAIT",1<<4)
+            .add("TS_EXCEPT",1<<5)
+            .add("TS_REMOVED",1<<6);
 
     private static final StructDesc STRUCT_NODE = new StructDesc(StructType.NODE)
             .field( structPtr( "ln_Succ", StructType.NODE ) ) // struct Node *ln_Succ;
@@ -173,12 +253,64 @@ APTR              mh_Upper;       // upper memory bound + 1
 ULONG             mh_Free;        //total number of free bytes
  */
     private static final StructDesc STRUCT_MEM_HDR = new StructDesc(StructType.MEM_HDR)
-            .fields( STRUCT_NODE )
+            .fields( "mh_node", STRUCT_NODE )
             .field( uint16( "mh_Attributes" ) )
             .field( structPtr( "mh_First", StructType.MEM_CHUNK) )
             .field( ptr( "mh_Lower" ) )
             .field( ptr( "mh_Upper" ) )
             .field( uint32("mh_Free") );
+
+    /*
+struct Task {
+    struct  Node tc_Node;
+    UBYTE   tc_Flags;
+    UBYTE   tc_State;
+    BYTE    tc_IDNestCnt;	    // intr disabled nesting
+    BYTE    tc_TDNestCnt;	    // task disabled nesting
+    ULONG   tc_SigAlloc;	    // sigs allocated
+    ULONG   tc_SigWait;	        // sigs we are waiting for
+    ULONG   tc_SigRecvd;	    // sigs we have received
+    ULONG   tc_SigExcept;	    // sigs we will take excepts for
+    UWORD   tc_TrapAlloc;	    // traps allocated
+    UWORD   tc_TrapAble;	    // traps enabled
+    APTR    tc_ExceptData;	    // points to except data
+    APTR    tc_ExceptCode;	    // points to except code
+    APTR    tc_TrapData;	    // points to trap data
+    APTR    tc_TrapCode;	    // points to trap code
+    APTR    tc_SPReg;		    // stack pointer
+    APTR    tc_SPLower;	        // stack lower bound
+    APTR    tc_SPUpper;	        // stack upper bound + 2
+    VOID    (*tc_Switch)();	    // task losing CPU
+    VOID    (*tc_Launch)();	    // task getting CPU
+    struct  List tc_MemEntry;	//  /* Allocated memory. Freed by RemTask()
+    APTR    tc_UserData;	    // For use by the task; no restrictions!
+};
+
+
+     */
+    private static final StructDesc STRUCT_TASK = new StructDesc(StructType.TASK)
+            .fields( "tc_Node", STRUCT_NODE )
+            .field( uint8("tc_Flags", TASK_FLAGS) )
+            .field( uint8("tc_State",TASK_STATES) )
+            .field( int8("tc_IDNestCnt") )	    // intr disabled nesting
+            .field( int8("tc_TDNestCnt") )	    // task disabled nesting
+            .field( uint32("tc_SigAlloc").showBits() )	    // sigs allocated
+            .field( uint32("tc_SigWait").showBits() )	        // sigs we are waiting for
+            .field( uint32("tc_SigRecvd").showBits() )	    // sigs we have received
+            .field( uint32("tc_SigExcept").showBits() )	    // sigs we will take excepts for
+            .field( uint16("tc_TrapAlloc").showBits() )	    // traps allocated
+            .field( uint16("tc_TrapAble").showBits() )	    // traps enabled
+            .field( ptr("tc_ExceptData") )	    // points to except data
+            .field( ptr("tc_ExceptCode") )	    // points to except code
+            .field( ptr("tc_TrapData") )	    // points to trap data
+            .field( ptr("tc_TrapCode") )	    // points to trap code
+            .field( ptr("tc_SPReg") )		    // stack pointer
+            .field( ptr("tc_SPLower") )	        // stack lower bound
+            .field( ptr("tc_SPUpper") )	        // stack upper bound + 2
+            .field( ptr("(*tc_Switch)()") )	    // task losing CPU
+            .field( ptr("(*tc_Launch)()") )	    // task getting CPU
+            .fields( "tc_MemEntry", STRUCT_LIST )	//  /* Allocated memory. Freed by RemTask()
+            .field( ptr("tc_UserData") );	    // For use by the task; no restrictions!
 
     private final Emulator emulator;
 
@@ -189,105 +321,157 @@ ULONG             mh_Free;        //total number of free bytes
 
     public StructTreeNode build(int baseAddress, StructType type,int maxDepth)
     {
-        return createTreeModel( "", baseAddress, type, 0 , maxDepth );
+        StructTreeNode result = new StructTreeNode(baseAddress, "");
+        int ptr = baseAddress;
+        for ( int i = 0 ; i < 4 ; i++ )
+        {
+            result.add( createTreeModel( "", ptr , type, 0, maxDepth ) );
+            ptr += getStructDesc( type ).size;
+        }
+        return result;
     }
 
     private StructTreeNode createTreeModel(String prefix,int baseAddress,StructType type,int depth,int maxDepth) {
 
         final StructDesc desc = getStructDesc( type );
-        StructTreeNode result = new StructTreeNode(baseAddress,prefix + desc.type+" @ "+Misc.hex( baseAddress ) );
+        final StructTreeNode result = new StructTreeNode( baseAddress, prefix + desc.type+" @ "+Misc.hex( baseAddress ) );
+
         int offset = 0;
-        for ( StructField field : desc.fields )
+        final List<StructField> fields = desc.fields();
+        for (int i = 0, fieldsSize = fields.size(); i < fieldsSize; i++)
         {
+            final StructField field = fields.get( i );
             final int adr = baseAddress + offset;
-            int value=0;
-            switch( field.type )
-            {
-                case INT8:
-                case UINT8:
-                    value = readByte( adr );
-                    if ( field.type == FieldType.UINT8 ) {
-                        value &= 0xff;
-                    }
-                    String sValue;
-                    if ( field.subType instanceof EnumValues ) {
-                        String label = ((EnumValues) field.subType).lookup( value );
-                        if ( label == null ) {
-                            sValue = "??? - "+Integer.toString(value)+" ("+Misc.hex(value)+")";
-                        } else {
-                            sValue = label+" - "+Integer.toString(value)+" ("+Misc.hex(value)+")";
-                        }
-                    } else {
-                        sValue = Integer.toString(value)+" ("+Misc.hex(value)+")";
-                    }
-                    result.addChild( new StructTreeNode( adr, field.name+" - "+sValue ) );
-                    break;
-                case INT16:
-                case UINT16:
-                    if ( canReadWord( adr ) )
-                    {
-                        value = readWord( adr );
-                        if ( field.type == FieldType.UINT16 ) {
-                            value &= 0xffff;
-                        }
-                        result.addChild( new StructTreeNode( adr, field.name+" - "+Misc.hex(value) ) );
-                    } else {
-                        result.addChild( new StructTreeNode( adr, field.name+" - <bad alignment: "+Misc.hex(adr) ) );
-                    }
-                    break;
-                case INT32:
-                case UINT32:
-                    if ( canReadLong( adr ) )
-                    {
-                        value = readLong( adr );
-                        result.addChild( new StructTreeNode( adr, field.name+" - "+Misc.hex(value) ) );
-                    } else {
-                        result.addChild( new StructTreeNode( adr, field.name+" - <bad alignment: "+Misc.hex(adr) ) );
-                    }
-                    break;
-                case CHAR_PTR:
-                    if ( canReadLong( adr ) )
-                    {
-                        value = readLong( adr );
-                        if ( value != 0 )
-                        {
-                            result.addChild( new StructTreeNode( value, field.name +" - "+parseString(value) ) );
-                        } else {
-                            result.addChild( new StructTreeNode( 0,field.name+" - <NULL>" ) );
-                        }
-                    } else {
-                        result.addChild( new StructTreeNode( 0,field.name+"- bad alignment: "+Misc.hex(adr) ) );
-                    }
-                    break;
-                case PTR:
-                    if ( canReadLong( adr ) )
-                    {
-                        value = readLong( adr );
-                        result.addChild( new StructTreeNode( 0, field.name+" - "+Misc.hex(value) ) );
-                    } else {
-                        result.addChild( new StructTreeNode( 0,field.name+" - bad alignment: "+Misc.hex(adr) ) );
-                    }
-                    break;
-                case STRUCT_PTR:
-                    if ( canReadLong( adr ) )
-                    {
-                        value = readLong( adr );
-                        if ( depth+1 < maxDepth )
-                        {
-                            result.addChild( createTreeModel( field.name+" - ",value, (StructType) field.subType,depth+1, maxDepth ) );
-                        }
-                        else
-                        {
-                            result.addChild( new StructTreeNode( 0, field.name+" - "+Misc.hex( value ) ) );
-                        }
-                    } else {
-                        result.addChild( new StructTreeNode( 0,field.name+" - <bad alignment: "+Misc.hex(adr)+" >" ) );
-                    }
-                    break;
+            System.out.println("Now processing "+field.name+" @ "+Misc.hex(adr));
+            if ( field.type == FieldType.INLINED_STRUCT ) {
+                result.add( createTreeModel( field.name,adr,(StructType) field.subType,depth,maxDepth ) );
             }
-            offset += field.type.sizeInBytes;
+            else
+            {
+                result.add( valueOf( field, adr, depth, maxDepth ) );
+            }
+            offset += field.sizeInBytes();
         }
         return result;
+    }
+
+    private StructTreeNode valueOf(StructField field,int adr,int depth,int maxDepth)
+    {
+        int value = 0;
+        switch (field.type)
+        {
+            case INT8:
+            case UINT8:
+                value = readByte( adr );
+                if ( field.type == FieldType.UINT8 )
+                {
+                    value &= 0xff;
+                }
+                return new StructTreeNode( adr, field.name + " - " + translate( field, value ) );
+            case INT16:
+            case UINT16:
+                if ( canReadWord( adr ) )
+                {
+                    value = readWord( adr );
+                    if ( field.type == FieldType.UINT16 )
+                    {
+                        value &= 0xffff;
+                    }
+                    return new StructTreeNode( adr, field.name + " - " + translate( field, value ) );
+                }
+                return new StructTreeNode( adr, field.name + " - <bad alignment: " + Misc.hex( adr ) );
+            case INT32:
+            case UINT32:
+                if ( canReadLong( adr ) )
+                {
+                    value = readLong( adr );
+                    return new StructTreeNode( adr, field.name + " - " + translate( field, (int) value ) );
+                }
+                return new StructTreeNode( adr, field.name + " - <bad alignment: " + Misc.hex( adr ) );
+            case CHAR_PTR:
+                if ( canReadLong( adr ) )
+                {
+                    value = readLong( adr );
+                    if ( value != 0 )
+                    {
+                        return new StructTreeNode( adr, field.name + " - '" + parseString( value )+"'" );
+                    }
+                    return new StructTreeNode( adr, field.name + " - <NULL>" );
+                }
+                return new StructTreeNode( adr, field.name + "- bad alignment: " + Misc.hex( adr ) );
+            case PTR:
+                if ( canReadLong( adr ) )
+                {
+                    value = readLong( adr );
+                    return new StructTreeNode( adr, field.name + " - " + Misc.hex( value ) );
+                }
+                return new StructTreeNode( adr, field.name + " - bad alignment: " + Misc.hex( adr ) );
+            case STRUCT_PTR:
+                if ( canReadLong( adr ) )
+                {
+                    value = readLong( adr );
+                    if ( depth + 1 < maxDepth )
+                    {
+                        return createTreeModel( field.name + " - ", value, (StructType) field.subType, depth + 1, maxDepth );
+                    }
+                    return new StructTreeNode( adr, field.name + " - " + Misc.hex( value ) );
+                }
+                return new StructTreeNode( adr, field.name + " - <bad alignment: " + Misc.hex( adr ) + " >" );
+        }
+        throw new RuntimeException("Unhandled field type: "+field);
+    }
+
+    private String translate(StructField field, int value)
+    {
+        String sValue;
+        if ( field.subType instanceof LookupTable )
+        {
+            //         public abstract String lookup(int value, BiFunction<Integer,String,String> labelGen, String defaultValue);
+            final BiFunction<Integer,String,String> func = (rawValue,text) -> text+ " - " + rawValue + " (" + Misc.hex( rawValue ) + ")";
+            sValue = ((LookupTable) field.subType).lookup( value , func , "???" );
+        }
+        else
+        {
+            if ( field.isDisplayBits() )
+            {
+                switch( field.sizeInBytes() ) {
+                    case 1:
+                    case 2:
+                    case 4:
+                        sValue = toPrettyBinary(value,field.sizeInBytes()) + " (" + Misc.hex( value ) + ")";
+                        break;
+                    default:
+                        throw new RuntimeException("Don't know how to print "+field.sizeInBytes()+" bytes as bit mask,field: "+field);
+                }
+            }
+            else
+            {
+                sValue = Integer.toString( value ) + " (" + Misc.hex( value ) + ")";
+            }
+        }
+        return sValue;
+    }
+
+    private static String toPrettyBinary(int value,int sizeInBytes)
+    {
+        int v = value;
+        String result;
+        switch( sizeInBytes ) {
+            case 1:
+                v &= 0xff;
+                return "%"+StringUtils.leftPad( Integer.toBinaryString( v ) , 8, '0' );
+            case 2:
+                v &= 0xffff;
+                return "%"+
+                        StringUtils.leftPad( Integer.toBinaryString( (v>>>8) & 0xff ) , 8, '0' )+"_"+
+                        StringUtils.leftPad( Integer.toBinaryString( v & 0xff) , 8, '0' );
+            default:
+                return "%"+
+                        StringUtils.leftPad( Integer.toBinaryString( (v>>>24) & 0xff ) , 8, '0' )+"_"+
+                        StringUtils.leftPad( Integer.toBinaryString( (v>>>16) & 0xff ) , 8, '0' )+"_"+
+                        StringUtils.leftPad( Integer.toBinaryString( (v>>> 8) & 0xff ) , 8, '0' )+"_"+
+                        StringUtils.leftPad( Integer.toBinaryString(  v  & 0xff ) , 8, '0' );
+        }
     }
 
     private String parseString(int adr) {
@@ -306,10 +490,12 @@ ULONG             mh_Free;        //total number of free bytes
                 chars.append( (char) value );
             }
         } while ( chars.length() < 25 );
-        return chars.toString();
+        String result = chars.toString();
+        System.out.println("Parsing string @ "+Misc.hex(adr)+" => '"+result+"'");
+        return result;
     }
 
-    private StructDesc getStructDesc(StructType type)
+    private static StructDesc getStructDesc(StructType type)
     {
         switch(type)
         {
@@ -317,6 +503,7 @@ ULONG             mh_Free;        //total number of free bytes
             case MEM_HDR:   return STRUCT_MEM_HDR;
             case MEM_CHUNK: return STRUCT_MEM_CHUNK;
             case LIST:      return STRUCT_LIST;
+            case TASK:      return STRUCT_TASK;
             default:
                 throw new RuntimeException("Unhandled struct type "+type);
         }
@@ -361,7 +548,7 @@ ULONG             mh_Free;        //total number of free bytes
         return new StructField(name,FieldType.UINT8);
     }
 
-    private static StructField uint8(String name,EnumValues enumValues) {
+    private static StructField uint8(String name,LookupTable<?> enumValues) {
         return new StructField(name,FieldType.UINT8,enumValues);
     }
 

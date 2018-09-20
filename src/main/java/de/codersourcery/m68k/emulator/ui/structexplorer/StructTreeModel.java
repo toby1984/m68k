@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class StructTreeModel implements TreeModel
 {
     public final AtomicReference<StructTreeNode> root =
-            new AtomicReference<>( new StructTreeNode(0,"root") );
+            new AtomicReference<>( new StructTreeNode( 0,"root") );
 
     @Override
     public Object getRoot()

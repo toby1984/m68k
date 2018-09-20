@@ -9,8 +9,10 @@ import javax.swing.JComboBox;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.JTree;
+import javax.swing.tree.TreePath;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.util.Iterator;
 
 public class StructExplorer extends AppWindow implements
         ITickListener, Emulator.IEmulatorStateCallback
@@ -57,21 +59,24 @@ public class StructExplorer extends AppWindow implements
             runOnEmulator( this::tick );
         });
 
+        tree.setExpandsSelectedPaths( true );
+        tree.setRootVisible( false );
+
         setFocusable( true );
         getContentPane().setLayout( new GridBagLayout() );
         GridBagConstraints cnstrs = cnstrs( 0, 0 );
-        cnstrs.fill = GridBagConstraints.BOTH;
-        cnstrs.weightx=0.7;cnstrs.weighty=0.1;
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
+        cnstrs.weightx=0.7;cnstrs.weighty=0;
         expression.setColumns( 10 );
         getContentPane().add( expression,cnstrs );
 
         cnstrs = cnstrs( 1, 0 );
-        cnstrs.fill = GridBagConstraints.BOTH;
-        cnstrs.weightx=0.3;cnstrs.weighty=0.1;
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
+        cnstrs.weightx=0.3;cnstrs.weighty=0;
         getContentPane().add( comboBox ,cnstrs );
 
         cnstrs = cnstrs( 0, 1 );
-        cnstrs.weightx=1;cnstrs.weighty=0.9;
+        cnstrs.weightx=1;cnstrs.weighty=1;
         cnstrs.gridwidth = 2;
         cnstrs.fill=GridBagConstraints.BOTH;
         final JScrollPane scrollPane = new JScrollPane( tree );
@@ -121,9 +126,22 @@ public class StructExplorer extends AppWindow implements
             final StructTreeNode finalModel = newModel;
             runOnEDT( () ->
             {
+                final TreePath selected = tree.getSelectionPath();
                 // whole tree model changed
                 this.treeModel.setRoot( finalModel );
                 this.treeModel.fireModelChanged();
+                if ( selected != null )
+                {
+                    StructTreeNode lastNode = (StructTreeNode) selected.getLastPathComponent();
+                    for ( Iterator<StructTreeNode> iterator = finalModel.iterator(); iterator.hasNext() ; ) {
+                        StructTreeNode node = iterator.next();
+                        if ( node.equals( lastNode ) )
+                        {
+                            tree.setLeadSelectionPath( new TreePath( node.pathToRoot() ) );
+                            break;
+                        }
+                    }
+                }
             });
         }
     }
