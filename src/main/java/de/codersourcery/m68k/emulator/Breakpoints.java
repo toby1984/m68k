@@ -81,7 +81,6 @@ public class Breakpoints
             result = (result+1)*37 + disabledBreakpoints[i].hashCode();
         }
         hashcode = result;
-        System.out.println("updateHashCode(): "+result);
     }
 
     public int size() {

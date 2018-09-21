@@ -117,7 +117,6 @@ public class UI extends JFrame
     {
         for (ITickListener l : tickListeners)
         {
-            System.out.println("REFRESH: "+l);
             emulator.runOnThread(() -> l.tick(emulator),false);
         }
     }
@@ -163,6 +162,7 @@ public class UI extends JFrame
         final Optional<WindowState> state = loadConfig().getWindowState( key );
 
         if ( state.isPresent() && ! state.get().isEnabled() ) {
+            System.out.println("Window "+key+" is disabled.");
             return null;
         }
         final AppWindow window = key.newInstance( this );
@@ -441,6 +441,7 @@ public class UI extends JFrame
         if ( uiConfig == null )
         {
             final File file = getConfigPath();
+            System.out.println("Trying to load configuration from "+file.getAbsolutePath());
             if ( file.exists() )
             {
                 try (FileInputStream in = new FileInputStream( file ))
@@ -464,8 +465,22 @@ public class UI extends JFrame
         final UIConfig config = loadConfig();
 
         // persist windows
-        windows.stream().map( x->x.getWindowState() )
-                .forEach(  config::setWindowState );
+        for ( AppWindow.WindowKey key : AppWindow.WindowKey.values() )
+        {
+            if ( key == AppWindow.WindowKey.MAIN_WINDOW) {
+                continue; // handles as a special case below
+            }
+            final Optional<AppWindow> window = getWindow( key );
+            if ( window.isPresent() ) {
+                config.setWindowState( window.get().getWindowState() );
+            } else {
+                final Optional<WindowState> state = config.getWindowState( key );
+                if ( state.isPresent() ) {
+                    state.get().setEnabled( false );
+                    config.setWindowState( state.get() );
+                }
+            }
+        }
 
         // persist main window state
         final WindowState mainWindow = new WindowState();

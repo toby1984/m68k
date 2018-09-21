@@ -376,7 +376,6 @@ public class MemoryBreakpointsWindow extends AppWindow implements Emulator.IEmul
         }
         if ( dataChanged || bpChanged )
         {
-            System.out.println("tick(): BPWindow now has model with "+tableModel.getRowCount()+" rows");
             repaint();
             tableModel.fireTableDataChanged();
         } else {

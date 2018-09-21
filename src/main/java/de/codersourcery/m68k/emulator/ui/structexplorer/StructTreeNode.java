@@ -3,6 +3,7 @@ package de.codersourcery.m68k.emulator.ui.structexplorer;
 import java.sql.Struct;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -16,11 +17,20 @@ public class StructTreeNode
     public final int address;
     public StructTreeNode parent;
     public String lable;
+    public int nodeId;
 
     public StructTreeNode(int address,String lable)
     {
         this.address = address;
         this.lable = lable;
+    }
+
+    public void assignNodeIds() {
+
+        int id = 0;
+        for ( var it = iterator() ; it.hasNext() ; ) {
+            it.next().nodeId = id++;
+        }
     }
 
     public Iterator<StructTreeNode> iterator() {
@@ -60,7 +70,7 @@ public class StructTreeNode
 
         final Iterator<StructTreeNode> it1 = tree1.iterator();
         final Iterator<StructTreeNode> it2 = tree2.iterator();
-        final Set<StructTreeNode> visited = new HashSet<>();
+        final IdentityHashMap<StructTreeNode,Integer> visited = new IdentityHashMap<>();
         while ( it1.hasNext() && it2.hasNext() )
         {
             final StructTreeNode n1 = it1.next();
@@ -68,10 +78,10 @@ public class StructTreeNode
             if ( ! n1.equals( n2 ) ) {
                 return false;
             }
-            if ( visited.contains( n1 ) ) {
+            if ( visited.containsKey( n1 ) ) {
                 return true;
             }
-            visited.add( n1 );
+            visited.put( n1 , null );
         }
         return it1.hasNext() == it2.hasNext();
     }

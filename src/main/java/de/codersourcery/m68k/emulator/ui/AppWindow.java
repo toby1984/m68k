@@ -78,9 +78,14 @@ public abstract class AppWindow extends JInternalFrame
         public final String uiLabel;
         public final Class<? extends AppWindow> clazz;
 
+        public static final String WINDOW_KEY_PATTERN = "[_\\-a-zA-Z0-9]+";
+
         WindowKey(String id, String uiLabel, Class<? extends AppWindow> clazz)
         {
             this.id = id;
+            if ( ! Pattern.compile( WINDOW_KEY_PATTERN ).matcher( id ).matches() ) {
+                throw new IllegalArgumentException( "Invalid window key '"+id+", needs to match "+ WINDOW_KEY_PATTERN );
+            }
             this.uiLabel = uiLabel;
             this.clazz = clazz;
         }
@@ -178,7 +183,6 @@ public abstract class AppWindow extends JInternalFrame
         if ( ! getWindowKey().equals(state.getWindowKey()) ) {
             throw new IllegalArgumentException("Window state belongs to "+state.getWindowKey()+" but this is "+getWindowKey());
         }
-        // TODO: setEnabled() not honored here
         setVisible(state.isVisible());
         setBounds( state.getLocationAndSize() );
     }

@@ -18,6 +18,7 @@ public class StructTreeModelBuilder
         MEM_HDR( "struct MemHeader" ),
         MEM_CHUNK( "struct MemChunk" ),
         LIST( "struct List" ),
+        LIBRARY( "struct Library" ),
         TASK("struct Task");
 
         private final String uiLabel;
@@ -312,6 +313,46 @@ struct Task {
             .fields( "tc_MemEntry", STRUCT_LIST )	//  /* Allocated memory. Freed by RemTask()
             .field( ptr("tc_UserData") );	    // For use by the task; no restrictions!
 
+    /*
+struct Library
+{
+    .fields( "lib_Node" , StructType.NODE )
+    .field( uint8("lib_Flags") )
+    .field( uint8("lib_pad") )
+    .field( uint16("lib_NegSize") )            // number of bytes before library
+    .field( uint16("lib_PosSize") )          // number of bytes after library
+    .field( uint16("lib_Version") )
+    .field( uint16("lib_Revision") )
+    .field( stringPtr("lib_IdString") )
+    .field( uint32("lib_Sum") )                // the checksum itself
+    .field( uint16("lib_OpenCnt") )            // number of current opens
+};
+
+// Meaning of the flag bits:
+// A task is currently running a checksum on
+#define LIBF_SUMMING (1 << 0)  // this library (system maintains this flag)
+        #define LIBF_CHANGED (1 << 1)  // One or more entries have been changed in the library
+                                  code vectors used by SumLibrary (system maintains
+                                  this flag)
+
+        #define LIBF_SUMUSED (1 << 2)  // A checksum fault should cause a system panic
+                                  (library flag)
+        #define LIBF_DELEXP (1 << 3)   // A user has requested expunge but another user still
+                                  has the library open (this is maintained by library)
+     */
+
+    private static final StructDesc STRUCT_LIBRARY = new StructDesc(StructType.LIBRARY)
+            .fields( "lib_Node" , StructType.NODE )
+            .field( uint8("lib_Flags") )
+            .field( uint8("lib_pad") )
+            .field( uint16("lib_NegSize") )            // number of bytes before library
+            .field( uint16("lib_PosSize") )          // number of bytes after library
+            .field( uint16("lib_Version") )
+            .field( uint16("lib_Revision") )
+            .field( stringPtr("lib_IdString") )
+            .field( uint32("lib_Sum") )                // the checksum itself
+            .field( uint16("lib_OpenCnt") );            // number of current opens
+
     private final Emulator emulator;
 
     public StructTreeModelBuilder(Emulator emulator)
@@ -328,6 +369,7 @@ struct Task {
             result.add( createTreeModel( "", ptr , type, 0, maxDepth ) );
             ptr += getStructDesc( type ).size;
         }
+        result.assignNodeIds();
         return result;
     }
 
@@ -342,7 +384,6 @@ struct Task {
         {
             final StructField field = fields.get( i );
             final int adr = baseAddress + offset;
-            System.out.println("Now processing "+field.name+" @ "+Misc.hex(adr));
             if ( field.type == FieldType.INLINED_STRUCT ) {
                 result.add( createTreeModel( field.name,adr,(StructType) field.subType,depth,maxDepth ) );
             }
@@ -403,18 +444,26 @@ struct Task {
                 if ( canReadLong( adr ) )
                 {
                     value = readLong( adr );
-                    return new StructTreeNode( adr, field.name + " - " + Misc.hex( value ) );
+                    if ( value != 0 )
+                    {
+                        return new StructTreeNode( adr, field.name + " - " + Misc.hex( value ) );
+                    }
+                    return new StructTreeNode( adr, field.name + " - <NULL>");
                 }
                 return new StructTreeNode( adr, field.name + " - bad alignment: " + Misc.hex( adr ) );
             case STRUCT_PTR:
                 if ( canReadLong( adr ) )
                 {
                     value = readLong( adr );
-                    if ( depth + 1 < maxDepth )
+                    if ( value != 0 )
                     {
-                        return createTreeModel( field.name + " - ", value, (StructType) field.subType, depth + 1, maxDepth );
+                        if ( depth + 1 < maxDepth )
+                        {
+                            return createTreeModel( field.name + " - ", value, (StructType) field.subType, depth + 1, maxDepth );
+                        }
+                        return new StructTreeNode( adr, field.name + " - " + Misc.hex( value ) );
                     }
-                    return new StructTreeNode( adr, field.name + " - " + Misc.hex( value ) );
+                    return new StructTreeNode( adr, field.name + " - <NULL>");
                 }
                 return new StructTreeNode( adr, field.name + " - <bad alignment: " + Misc.hex( adr ) + " >" );
         }
@@ -491,7 +540,6 @@ struct Task {
             }
         } while ( chars.length() < 25 );
         String result = chars.toString();
-        System.out.println("Parsing string @ "+Misc.hex(adr)+" => '"+result+"'");
         return result;
     }
 
@@ -504,6 +552,7 @@ struct Task {
             case MEM_CHUNK: return STRUCT_MEM_CHUNK;
             case LIST:      return STRUCT_LIST;
             case TASK:      return STRUCT_TASK;
+            case LIBRARY:   return STRUCT_LIBRARY;
             default:
                 throw new RuntimeException("Unhandled struct type "+type);
         }

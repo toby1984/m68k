@@ -362,7 +362,6 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
         }
         if ( dataChanged || bpChanged )
         {
-            System.out.println("tick(): BPWindow now has model with "+tableModel.getRowCount()+" rows");
             repaint();
             tableModel.fireTableDataChanged();
         } else {

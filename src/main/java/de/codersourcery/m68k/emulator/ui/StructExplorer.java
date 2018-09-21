@@ -4,6 +4,7 @@ import de.codersourcery.m68k.emulator.Emulator;
 import de.codersourcery.m68k.emulator.ui.structexplorer.StructTreeModel;
 import de.codersourcery.m68k.emulator.ui.structexplorer.StructTreeModelBuilder;
 import de.codersourcery.m68k.emulator.ui.structexplorer.StructTreeNode;
+import de.codersourcery.m68k.utils.Misc;
 
 import javax.swing.JComboBox;
 import javax.swing.JScrollPane;
@@ -12,7 +13,10 @@ import javax.swing.JTree;
 import javax.swing.tree.TreePath;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class StructExplorer extends AppWindow implements
         ITickListener, Emulator.IEmulatorStateCallback
@@ -107,6 +111,18 @@ public class StructExplorer extends AppWindow implements
         return WindowKey.STRUCT_EXPLORER;
     }
 
+    private String debugString(StructTreeNode node) {
+        return "Node #"+node.nodeId+" @ "+ Misc.hex(node.address);
+    }
+
+    private String debugString(TreePath path) {
+        if ( path == null ) {
+            return "<NULL>";
+        }
+        return Arrays.stream( path.getPath() ).map( x -> debugString( (StructTreeNode) x) )
+                .collect( Collectors.joining(",") );
+    }
+
     @Override
     public void tick(Emulator emulator)
     {
@@ -130,15 +146,24 @@ public class StructExplorer extends AppWindow implements
                 // whole tree model changed
                 this.treeModel.setRoot( finalModel );
                 this.treeModel.fireModelChanged();
+
+                // try to restore expanded path
                 if ( selected != null )
                 {
-                    StructTreeNode lastNode = (StructTreeNode) selected.getLastPathComponent();
-                    for ( Iterator<StructTreeNode> iterator = finalModel.iterator(); iterator.hasNext() ; ) {
-                        StructTreeNode node = iterator.next();
-                        if ( node.equals( lastNode ) )
-                        {
-                            tree.setLeadSelectionPath( new TreePath( node.pathToRoot() ) );
-                            break;
+                    System.out.println("Selected: "+debugString(selected));
+outer:
+                    for ( int i = selected.getPathCount()-1 ; i >= 0 ; i--)
+                    {
+                        StructTreeNode node = (StructTreeNode) selected.getPathComponent( i );
+                        for ( Iterator<StructTreeNode> iterator = finalModel.iterator(); iterator.hasNext() ; ) {
+                            StructTreeNode actual = iterator.next();
+                            if ( node.nodeId == actual.nodeId )
+                            {
+                                final TreePath newPath = new TreePath( actual.pathToRoot() );
+                                System.out.println("new selection : "+ debugString(newPath) );
+                                tree.setSelectionPath( newPath );
+                                break outer;
+                            }
                         }
                     }
                 }

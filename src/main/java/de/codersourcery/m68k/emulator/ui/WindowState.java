@@ -101,7 +101,7 @@ public class WindowState
     {
         final List<WindowState> result = new ArrayList<>();
         final Pattern keyPattern =
-                Pattern.compile("^window\\.([_a-zA-Z0-9]+)\\.([_a-zA-Z0-9]+)");
+                Pattern.compile( "^window\\.(" + AppWindow.WindowKey.WINDOW_KEY_PATTERN + ")\\.([_a-zA-Z0-9]+)" );
         final Set<String> keys = new HashSet<>(map.keySet());
 outer:
         while ( true )
