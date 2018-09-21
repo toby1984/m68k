@@ -63,6 +63,16 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
         return (StyledDocument) textfield.getStyledDocument();
     }
 
+    public void showAddress(int address)
+    {
+        synchronized(LOCK) {
+            followPC = false;
+            addressToDisplay = address;
+            addressChanged = true;
+        }
+        runOnEmulator(this::tick );
+    }
+
     public ROMListingViewer(UI ui)
     {
         super( "ROM listing" , ui );
@@ -221,17 +231,14 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
                     if ( textOffset != null )
                     {
                         textfield.setCaretPosition( textOffset );
-                        if ( followPC )
+                        final int end = getEndOfLine( textOffset );
+                        if ( currentHighlight != null )
                         {
-                            final int end = getEndOfLine( textOffset );
-                            if ( currentHighlight != null )
-                            {
-                                currentHighlight.clear();
-                                currentHighlight = null;
-                            }
-                            currentHighlight = new Highlight( textOffset, end - textOffset );
-                            currentHighlight.highlight();
+                            currentHighlight.clear();
+                            currentHighlight = null;
                         }
+                        currentHighlight = new Highlight( textOffset, end - textOffset );
+                        currentHighlight.highlight();
                     }
                     addressChanged = false;
                 }

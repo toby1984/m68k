@@ -63,6 +63,7 @@ public abstract class AppWindow extends JInternalFrame
 
     public enum WindowKey
     {
+        BACKTRACE( "backtrace" , "Backtrace", BacktraceWindow.class ),
         BREAKPOINTS( "breakpoints", "Breakpoints", BreakpointsWindow.class ),
         CPU_STATE( "cpustate" , "CPU State", CPUStateWindow.class),
         DISASSEMBLY( "disassembly" , "Disassembly", DisassemblyWindow.class),

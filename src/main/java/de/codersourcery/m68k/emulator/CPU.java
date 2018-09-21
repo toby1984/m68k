@@ -31,12 +31,14 @@ public class CPU
     private static final boolean DEBUG = false;
     private static final boolean DEBUG_RECORD_BACKTRACE = true;
 
+    public static final int MAX_BACKTRACE_SIZE = 16;
+
     private final CPUType cpuType;
 
     private final InstructionImpl[] opcodeMap = new InstructionImpl[65536];
     private final String[] opcodeDebugMap = new String[65536];
 
-    private final int[] backtrace = new int[16];
+    private final int[] backtrace = new int[MAX_BACKTRACE_SIZE];
     private boolean backtraceBufferFull;
     private int backtraceReadPtr=0;
     private int backtraceWritePtr=0;
@@ -898,26 +900,27 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
      * @return
      * @see #DEBUG_RECORD_BACKTRACE
      */
-    public int[] getBackTrace()
+    public int getBackTrace(int[] result)
     {
         if ( ! isBackTraceAvailable() ) {
-            return new int[0];
+            return 0;
         }
-        final int[] result;
+
+        int count = 0;
         if ( backtraceBufferFull )
         {
-            result = new int[16];
-            for ( int i = 0,start = backtraceReadPtr ; i < 16 ; i++ ) {
+            for ( int i = 0,start = backtraceReadPtr ; i < 16 ; i++,count++ ) {
                 result[i] = backtrace[start];
                 start = (start+1) & 0b1111;
             }
-        } else {
-            result = new int[backtraceWritePtr];
-            for ( int i = 0 ; i < backtraceWritePtr ; i++ ) {
+        }
+        else
+        {
+            for ( int i = 0 ; i < backtraceWritePtr ; i++,count++ ) {
                 result[i] = backtrace[i];
             }
         }
-        return result;
+        return count;
     }
 
     private void illegalInstruction() {

@@ -134,7 +134,7 @@ public class UI extends JFrame
         return Optional.ofNullable( result == JFileChooser.APPROVE_OPTION ? fileChooser.getSelectedFile() : null );
     }
 
-    private Optional<AppWindow>  getWindow(AppWindow.WindowKey key) {
+    public Optional<AppWindow>  getWindow(AppWindow.WindowKey key) {
         return windows.stream().filter( w -> w.getClass() == key.clazz ).findFirst();
     }
 

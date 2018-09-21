@@ -343,10 +343,12 @@ public class Emulator
                 disasm.setResolveRelativeOffsets( true );
                 disasm.setDumpHex( true );
 
-                final int[] adrs = cpu.getBackTrace();
+                final int[] adrs = new int[ CPU.MAX_BACKTRACE_SIZE ];
+                final int length = cpu.getBackTrace(adrs);
                 final AtomicBoolean gotLine = new AtomicBoolean();
-                for ( int adr : adrs )
+                for ( int i = 0 ; i < length ; i++ )
                 {
+                    final int adr = adrs[i];
                     gotLine.set(false);
                     final Disassembler.LineConsumer consumer = new Disassembler.LineConsumer()
                     {

@@ -23,6 +23,8 @@ public class StructTreeModelBuilder
         INTVEC( "struct IntVec" ),
         SOFTINTLIST( "struct SoftIntList" ),
         EXEC_BASE( "struct ExecBase" ),
+        MEM_LIST( "struct MemList" ),
+        MEM_ENTRY( "struct MemEntry" ),
         MINLIST( "struct MinList" ),
         MINNODE( "struct MinNode" ),
         TASK("struct Task");
@@ -448,9 +450,6 @@ struct MinNode *mln_Pred;
             .field( structPtr("mlh_Tail", StructType.MINNODE) )
             .field( structPtr("mlh_TailPred", StructType.MINNODE) );
 
-    /*
-
-     */
     private static final BitMask ATTN_FLAGS = new BitMask()
             .add("AFB_68010",1<<0)	// also set for 68020
             .add("AFB_68020",1<<1)	// also set for 68030
@@ -522,6 +521,33 @@ struct MinNode *mln_Pred;
             .fields( "ex_MemHandlers", STRUCT_MINLIST) // struct	MinList	ex_MemHandlers;	//  The handler list
             .field( ptr("ex_MemHandler"));		//  Private! handler pointer
 
+    /*
+struct	MemEntry
+{
+    union {
+      ULONG   meu_Reqs;		// the AllocMem requirements
+      APTR    meu_Addr;		// the address of this memory region
+    } me_Un;
+    ULONG   me_Length;		// the length of this memory region
+    };
+     */
+    private static final StructDesc STRUCT_MEMENTRY= new StructDesc(StructType.MEM_ENTRY)
+        .field( uint32("meu_Reqs/meu_Addr (union)") )
+        .field( uint32("me_Length"));
+
+    /*
+ Note: sizeof(struct MemList) includes the size of the first MemEntry!
+    struct	MemList {
+    struct  Node ml_Node;
+    UWORD   ml_NumEntries;	/* number of entries in this struct
+    struct  MemEntry ml_ME[1];	/* the first entry
+};
+     */
+    private static final StructDesc STRUCT_MEMLIST = new StructDesc(StructType.MEM_LIST)
+        .fields( "ml_Node", STRUCT_NODE)
+        .field( uint16("ml_NumEntries") )
+        .fields( "ml_ME", STRUCT_MEMENTRY );
+
     private final Emulator emulator;
 
     public StructTreeModelBuilder(Emulator emulator)
@@ -554,19 +580,20 @@ struct MinNode *mln_Pred;
             final StructField field = fields.get( i );
             final int adr = baseAddress + offset;
             if ( field.type == FieldType.INLINED_STRUCT ) {
-                result.add( createTreeModel( field.name,adr,(StructType) field.subType,depth,maxDepth ) );
+                result.add( createTreeModel( "[ "+Misc.hex(adr)+" - "+Misc.hex(offset)+" ] " + field.name+" ",adr,(StructType) field.subType,depth,maxDepth ) );
             }
             else
             {
-                result.add( valueOf( field, adr, depth, maxDepth ) );
+                result.add( valueOf( field, adr, depth, maxDepth, offset ) );
             }
             offset += field.sizeInBytes();
         }
         return result;
     }
 
-    private StructTreeNode valueOf(StructField field,int adr,int depth,int maxDepth)
+    private StructTreeNode valueOf(StructField field,int adr,int depth,int maxDepth,int offset)
     {
+        final String sAddr = "[ "+Misc.hex(adr)+" - "+Misc.hex(offset)+" ] ";
         int value = 0;
         switch (field.type)
         {
@@ -577,7 +604,7 @@ struct MinNode *mln_Pred;
                 {
                     value &= 0xff;
                 }
-                return new StructTreeNode( adr, field.name + " - " + translate( field, value ) );
+                return new StructTreeNode( adr, sAddr+field.name + " - " + translate( field, value ) );
             case INT16:
             case UINT16:
                 if ( canReadWord( adr ) )
@@ -587,39 +614,39 @@ struct MinNode *mln_Pred;
                     {
                         value &= 0xffff;
                     }
-                    return new StructTreeNode( adr, field.name + " - " + translate( field, value ) );
+                    return new StructTreeNode( adr, sAddr+field.name + " - " + translate( field, value ) );
                 }
-                return new StructTreeNode( adr, field.name + " - <bad alignment: " + Misc.hex( adr ) );
+                return new StructTreeNode( adr, sAddr+field.name + " - <bad alignment: " + Misc.hex( adr ) );
             case INT32:
             case UINT32:
                 if ( canReadLong( adr ) )
                 {
                     value = readLong( adr );
-                    return new StructTreeNode( adr, field.name + " - " + translate( field, (int) value ) );
+                    return new StructTreeNode( adr, sAddr+field.name + " - " + translate( field, (int) value ) );
                 }
-                return new StructTreeNode( adr, field.name + " - <bad alignment: " + Misc.hex( adr ) );
+                return new StructTreeNode( adr, sAddr+field.name + " - <bad alignment: " + Misc.hex( adr ) );
             case CHAR_PTR:
                 if ( canReadLong( adr ) )
                 {
                     value = readLong( adr );
                     if ( value != 0 )
                     {
-                        return new StructTreeNode( adr, field.name + " - '" + parseString( value )+"'" );
+                        return new StructTreeNode( adr, sAddr+field.name + " - '" + parseString( value )+"'" );
                     }
-                    return new StructTreeNode( adr, field.name + " - <NULL>" );
+                    return new StructTreeNode( adr, sAddr+field.name + " - <NULL>" );
                 }
-                return new StructTreeNode( adr, field.name + "- bad alignment: " + Misc.hex( adr ) );
+                return new StructTreeNode( adr, sAddr+field.name + "- bad alignment: " + Misc.hex( adr ) );
             case PTR:
                 if ( canReadLong( adr ) )
                 {
                     value = readLong( adr );
                     if ( value != 0 )
                     {
-                        return new StructTreeNode( adr, field.name + " - " + Misc.hex( value ) );
+                        return new StructTreeNode( adr, sAddr+field.name + " - " + Misc.hex( value ) );
                     }
-                    return new StructTreeNode( adr, field.name + " - <NULL>");
+                    return new StructTreeNode( adr, sAddr+field.name + " - <NULL>");
                 }
-                return new StructTreeNode( adr, field.name + " - bad alignment: " + Misc.hex( adr ) );
+                return new StructTreeNode( adr, sAddr+field.name + " - bad alignment: " + Misc.hex( adr ) );
             case STRUCT_PTR:
                 if ( canReadLong( adr ) )
                 {
@@ -628,13 +655,13 @@ struct MinNode *mln_Pred;
                     {
                         if ( depth + 1 < maxDepth )
                         {
-                            return createTreeModel( field.name + " - ", value, (StructType) field.subType, depth + 1, maxDepth );
+                            return createTreeModel( sAddr+field.name + " - ", value, (StructType) field.subType, depth + 1, maxDepth );
                         }
-                        return new StructTreeNode( adr, field.name + " - " + Misc.hex( value ) );
+                        return new StructTreeNode( adr, sAddr+field.name + " - " + Misc.hex( value ) );
                     }
-                    return new StructTreeNode( adr, field.name + " - <NULL>");
+                    return new StructTreeNode( adr, sAddr+field.name + " - <NULL>");
                 }
-                return new StructTreeNode( adr, field.name + " - <bad alignment: " + Misc.hex( adr ) + " >" );
+                return new StructTreeNode( adr, sAddr+field.name + " - <bad alignment: " + Misc.hex( adr ) + " >" );
         }
         throw new RuntimeException("Unhandled field type: "+field);
     }
@@ -723,6 +750,8 @@ struct MinNode *mln_Pred;
             case INTVEC:    return STRUCT_INTVECTOR;
             case SOFTINTLIST: return STRUCT_SOFTINTLIST;
             case EXEC_BASE: return STRUCT_EXECBASE;
+            case MEM_LIST:  return STRUCT_MEMLIST;
+            case MEM_ENTRY: return STRUCT_MEMENTRY;
             case MINLIST:   return STRUCT_MINLIST;
             case MINNODE:   return STRUCT_MINNODE;
             case TASK:      return STRUCT_TASK;
