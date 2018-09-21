@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 public class StructTreeModelBuilder
 {
@@ -19,6 +20,11 @@ public class StructTreeModelBuilder
         MEM_CHUNK( "struct MemChunk" ),
         LIST( "struct List" ),
         LIBRARY( "struct Library" ),
+        INTVEC( "struct IntVec" ),
+        SOFTINTLIST( "struct SoftIntList" ),
+        EXEC_BASE( "struct ExecBase" ),
+        MINLIST( "struct MinList" ),
+        MINNODE( "struct MinNode" ),
         TASK("struct Task");
 
         private final String uiLabel;
@@ -67,6 +73,27 @@ public class StructTreeModelBuilder
             this.type = type;
         }
 
+        public StructDesc(StructDesc other) {
+            this.type = other.type;
+            this.size = other.size;
+            other.allFields.stream().map( f -> f.createCopy() ).forEach( allFields::add );
+        }
+
+        public StructDesc[] times(int count)
+        {
+            final StructDesc[] result = new StructDesc[count];
+            for (int i = 0; i < count; i++)
+            {
+                result[i] = createCopy();
+            }
+            return result;
+        }
+
+        public StructDesc createCopy()
+        {
+            return new StructDesc(this);
+        }
+
         public List<StructField> fields() {
             return allFields;
         }
@@ -79,9 +106,28 @@ public class StructTreeModelBuilder
             return this;
         }
 
+        public StructDesc fields(String label,StructDesc[] descs)
+        {
+            for ( StructDesc desc : descs )
+            {
+                final StructField newField = new StructField( label, FieldType.INLINED_STRUCT, desc.type );
+                this.allFields.add( newField );
+                size += newField.sizeInBytes();
+            }
+            return this;
+        }
+
         public StructDesc field(StructField field) {
             allFields.add(field);
             size += field.sizeInBytes();
+            return this;
+        }
+
+        public StructDesc field(StructField[] field)
+        {
+            final List<StructField> list = Arrays.asList( field );
+            allFields.addAll( list );
+            size += list.stream().mapToInt( l -> l.sizeInBytes() ).sum();
             return this;
         }
     }
@@ -155,6 +201,33 @@ public class StructTreeModelBuilder
             this.name = name;
             this.type = type;
             this.subType = subType;
+        }
+
+        public StructField(StructField structField)
+        {
+            this.subType = structField.subType;
+            this.name = structField.name;
+            this.type = structField.type;
+            this.displayFlags = structField.displayFlags;
+        }
+
+        public StructField createCopy() {
+            return new StructField(this);
+        }
+
+        public StructField[] times(int count) {
+            StructField[] result = new StructField[count];
+            for (int i = 0; i < count; i++)
+            {
+                result[i] = withName( name+"_"+i);
+            }
+            return result;
+        }
+
+        public StructField withName(String name) {
+            StructField result = new StructField(this);
+            result.name = name;
+            return result;
         }
 
         public boolean isDisplayBits()
@@ -313,45 +386,141 @@ struct Task {
             .fields( "tc_MemEntry", STRUCT_LIST )	//  /* Allocated memory. Freed by RemTask()
             .field( ptr("tc_UserData") );	    // For use by the task; no restrictions!
 
-    /*
-struct Library
-{
-    .fields( "lib_Node" , StructType.NODE )
-    .field( uint8("lib_Flags") )
-    .field( uint8("lib_pad") )
-    .field( uint16("lib_NegSize") )            // number of bytes before library
-    .field( uint16("lib_PosSize") )          // number of bytes after library
-    .field( uint16("lib_Version") )
-    .field( uint16("lib_Revision") )
-    .field( stringPtr("lib_IdString") )
-    .field( uint32("lib_Sum") )                // the checksum itself
-    .field( uint16("lib_OpenCnt") )            // number of current opens
-};
-
-// Meaning of the flag bits:
-// A task is currently running a checksum on
-#define LIBF_SUMMING (1 << 0)  // this library (system maintains this flag)
-        #define LIBF_CHANGED (1 << 1)  // One or more entries have been changed in the library
-                                  code vectors used by SumLibrary (system maintains
-                                  this flag)
-
-        #define LIBF_SUMUSED (1 << 2)  // A checksum fault should cause a system panic
-                                  (library flag)
-        #define LIBF_DELEXP (1 << 3)   // A user has requested expunge but another user still
-                                  has the library open (this is maintained by library)
-     */
+    private static final BitMask LIB_FLAGS = new BitMask()
+            .add("LIBF_SUMMING",1<<0)
+            .add("LIBF_CHANGED",1<<1)
+            .add("LIBF_SUMUSED",1<<2)
+            .add("LIBF_DELEXP",1<<3);
 
     private static final StructDesc STRUCT_LIBRARY = new StructDesc(StructType.LIBRARY)
-            .fields( "lib_Node" , StructType.NODE )
-            .field( uint8("lib_Flags") )
+            .fields( "lib_Node" , STRUCT_NODE)
+            .field( uint8("lib_Flags", LIB_FLAGS) )
             .field( uint8("lib_pad") )
             .field( uint16("lib_NegSize") )            // number of bytes before library
             .field( uint16("lib_PosSize") )          // number of bytes after library
             .field( uint16("lib_Version") )
             .field( uint16("lib_Revision") )
             .field( stringPtr("lib_IdString") )
-            .field( uint32("lib_Sum") )                // the checksum itself
+            .field( uint32("lib_ChkSum") )                // the checksum itself
             .field( uint16("lib_OpenCnt") );            // number of current opens
+
+    /*
+struct IntVector {
+APTR    iv_Data;
+VOID    (*iv_Code)();
+struct  Node *iv_Node;
+};*/
+
+    private static final StructDesc STRUCT_INTVECTOR = new StructDesc(StructType.INTVEC)
+            .field( ptr("iv_Data" ) )
+            .field( ptr("iv_Code" ) )
+            .field( structPtr("iv_Node", StructType.NODE ) );
+
+    /*
+struct SoftIntList {
+    struct List sh_List;
+    UWORD  sh_Pad;
+    };
+ */
+
+    private static final StructDesc STRUCT_SOFTINTLIST = new StructDesc(StructType.SOFTINTLIST)
+            .fields( "sh_List", STRUCT_LIST )
+            .field( uint16("sh_Pad") );
+
+    /*
+struct MinNode {
+struct MinNode *mln_Succ;
+struct MinNode *mln_Pred;
+};
+     */
+    private static final StructDesc STRUCT_MINNODE = new StructDesc(StructType.MINNODE)
+            .field( structPtr("mln_Succ", StructType.MINNODE ))
+            .field( structPtr("mln_Pred", StructType.MINNODE ));
+    /*
+    struct MinList {
+   struct  MinNode *mlh_Head;
+   struct  MinNode *mlh_Tail;
+   struct  MinNode *mlh_TailPred;
+}; // longword aligned
+     */
+    private static final StructDesc STRUCT_MINLIST = new StructDesc(StructType.MINLIST)
+            .field( structPtr("mlh_Head", StructType.MINNODE) )
+            .field( structPtr("mlh_Tail", StructType.MINNODE) )
+            .field( structPtr("mlh_TailPred", StructType.MINNODE) );
+
+    /*
+
+     */
+    private static final BitMask ATTN_FLAGS = new BitMask()
+            .add("AFB_68010",1<<0)	// also set for 68020
+            .add("AFB_68020",1<<1)	// also set for 68030
+            .add("AFB_68030",1<<2)	// also set for 68040
+            .add("AFB_68040",1<<3)	// also set for 68060
+            .add("AFB_68881",1<<4)	// also set for 68882
+            .add("AFB_68882",1<<5)   //
+            .add("AFB_FPU40",1<<6)	// Set if 68040 FPU
+            .add("AFB_68060",1<<7);
+
+    private static final StructDesc STRUCT_EXECBASE = new StructDesc(StructType.EXEC_BASE)
+            .fields( "LibNode", STRUCT_LIBRARY) // struct Library LibNode; // Standard library node
+            .field( uint16("SoftVer"))	//  kickstart release number (obs.)
+            .field( int16("LowMemChkSum"))		// checksum of 68000 trap vectors
+            .field( uint32("ChkBase"))		// system base pointer complement
+            .field( ptr("ColdCapture"))	// coldstart soft capture vector
+            .field( ptr("CoolCapture"))	//  coolstart soft capture vector
+            .field( ptr("WarmCapture"))	//  warmstart soft capture vector
+            .field( ptr("SysStkUpper"))	//  system stack base   (upper bound)
+            .field( ptr("SysStkLower"))	//  top of system stack (lower bound)
+            .field( uint32("MaxLocMem"))	//  top of chip memory
+            .field( ptr("DebugEntry"))	//  global debugger entry point
+            .field( ptr("DebugData"))	//  global debugger data segment
+            .field( ptr("AlertData"))	//  alert data segment
+            .field( ptr("MaxExtMem"))	//  top of extended mem, or null if none
+            .field( uint16("ChkSum"))	//  for all of the above (minus 2)
+            .fields( "IntVects", STRUCT_INTVECTOR.times(16) ) // struct	IntVector IntVects[16];
+            .fields( "ThisTask", STRUCT_TASK) //  pointer to current task (readable)
+            .field( uint32("IdleCount"))	//  idle counter
+            .field( uint32("DispCount"))	//  dispatch counter
+            .field( uint16("Quantum"))	//  time slice quantum
+            .field( uint16("Elapsed"))	//  current quantum ticks
+            .field( uint16("SysFlags"))	//  misc internal system flags
+            .field( int8("IDNestCnt"))	//  interrupt disable nesting count
+            .field( int8("TDNestCnt"))	//  task disable nesting count
+            .field( uint16("AttnFlags", ATTN_FLAGS))	//  special attention flags (readable)
+            .field( uint16("AttnResched"))	//  rescheduling attention
+            .field( ptr("ResModules"))	//  resident module array pointer
+            .field( ptr("TaskTrapCode"))
+            .field( ptr("TaskExceptCode"))
+            .field( ptr("TaskExitCode"))
+            .field( uint32("TaskSigAlloc"))
+            .field( uint16("TaskTrapAlloc"))
+            .fields( "MemList", STRUCT_LIST)
+            .fields( "ResourceList", STRUCT_LIST)
+            .fields( "DeviceList", STRUCT_LIST)
+            .fields( "IntrList", STRUCT_LIST)
+            .fields( "LibList", STRUCT_LIST)
+            .fields( "PortList", STRUCT_LIST)
+            .fields( "TaskReady", STRUCT_LIST)
+            .fields( "TaskWait", STRUCT_LIST)
+            .fields( "SoftInts", STRUCT_SOFTINTLIST.times(5) )
+            .field( int32("LastAlert").times(4) ) // LONG	LastAlert[4];
+            .field( uint8("VBlankFrequency") )	//  (readable)
+            .field( uint8("PowerSupplyFrequency") )	//  (readable)
+            .fields( "SemaphoreList", STRUCT_LIST)
+            .field( ptr("KickMemPtr"))	//  ptr to queue of mem lists
+            .field( ptr("KickTagPtr"))	//  ptr to rom tag queue
+            .field( ptr("KickCheckSum"))	//  checksum for mem and tags
+            .field( uint16("ex_Pad0"))		//  Private internal use
+            .field( uint32("ex_LaunchPoint"))		//  Private to Launch/Switch
+            .field( ptr("ex_RamLibPrivate"))
+            .field( uint32("ex_EClockFrequency"))	//  (readable)
+            .field( uint32("ex_CacheControl"))	//  Private to CacheControl calls
+            .field( uint32("ex_TaskID"))		//  Next available task ID
+            .field( uint32("ex_Reserved1").times(5) )
+            .field( ptr("ex_MMULock"))		//  private
+            .field( uint32("ex_Reserved2").times(3))
+            .fields( "ex_MemHandlers", STRUCT_MINLIST) // struct	MinList	ex_MemHandlers;	//  The handler list
+            .field( ptr("ex_MemHandler"));		//  Private! handler pointer
 
     private final Emulator emulator;
 
@@ -551,6 +720,11 @@ struct Library
             case MEM_HDR:   return STRUCT_MEM_HDR;
             case MEM_CHUNK: return STRUCT_MEM_CHUNK;
             case LIST:      return STRUCT_LIST;
+            case INTVEC:    return STRUCT_INTVECTOR;
+            case SOFTINTLIST: return STRUCT_SOFTINTLIST;
+            case EXEC_BASE: return STRUCT_EXECBASE;
+            case MINLIST:   return STRUCT_MINLIST;
+            case MINNODE:   return STRUCT_MINNODE;
             case TASK:      return STRUCT_TASK;
             case LIBRARY:   return STRUCT_LIBRARY;
             default:
@@ -587,6 +761,10 @@ struct Library
 
     private static StructField uint16(String name) {
         return new StructField(name,FieldType.UINT16);
+    }
+
+    private static StructField uint16(String name,LookupTable table) {
+        return new StructField(name,FieldType.UINT16,table);
     }
 
     private static StructField int8(String name) {
