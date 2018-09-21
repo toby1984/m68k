@@ -1569,7 +1569,6 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                          */
                         address = memory.readLongNoCheck(pc);
                         pc += 4;
-                        addressRegisters[eaRegister] = value;
                         cycles += 8;
                         break;
                     default:

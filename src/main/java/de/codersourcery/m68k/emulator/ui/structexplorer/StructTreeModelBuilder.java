@@ -477,7 +477,7 @@ struct MinNode *mln_Pred;
             .field( ptr("MaxExtMem"))	//  top of extended mem, or null if none
             .field( uint16("ChkSum"))	//  for all of the above (minus 2)
             .fields( "IntVects", STRUCT_INTVECTOR.times(16) ) // struct	IntVector IntVects[16];
-            .fields( "ThisTask", STRUCT_TASK) //  pointer to current task (readable)
+            .field( structPtr("ThisTask", StructType.TASK) ) //  pointer to current task (readable)
             .field( uint32("IdleCount"))	//  idle counter
             .field( uint32("DispCount"))	//  dispatch counter
             .field( uint16("Quantum"))	//  time slice quantum
