@@ -27,6 +27,12 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
     private JTextField pcTextfield;
 
     // @GuardedBy( DATA_LOCK )
+    private JTextField sspTextfield;
+
+    // @GuardedBy( DATA_LOCK )
+    private JTextField uspTextfield;
+
+    // @GuardedBy( DATA_LOCK )
     private int pc;
 
     // @GuardedBy( DATA_LOCK )
@@ -37,6 +43,35 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
 
     // @GuardedBy( DATA_LOCK )
     private final int[] addressRegisters = new int[8];
+
+    private static final class PanelWithTextField {
+        public final JPanel panel;
+        public final JTextField textfield;
+
+        private PanelWithTextField(JPanel panel, JTextField textfield)
+        {
+            this.panel = panel;
+            this.textfield = textfield;
+        }
+    }
+    private static PanelWithTextField createTextFieldWithLabel(String label,Consumer<JTextField> listener)
+    {
+        final JPanel panel = new JPanel();
+        panel.setLayout(  new GridBagLayout() );
+
+        GridBagConstraints cnstrs = cnstrs( 0, 0 );
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
+        cnstrs.weighty = 0;
+        cnstrs.weightx = 1;
+        panel.add( new JLabel(label) ,cnstrs);
+        final JTextField textfield = createTextField( listener );
+        cnstrs = cnstrs( 1, 0 );
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
+        cnstrs.weighty = 0;
+        cnstrs.weightx = 1;
+        panel.add( textfield, cnstrs );
+        return new PanelWithTextField(panel,textfield);
+    }
 
     private static JTextField createTextField(Consumer<JTextField> listener)
     {
@@ -156,8 +191,11 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
             cpuFlagCheckboxes.add( createCheckbox( checkboxLabels[i],cb -> updateCPUFlag(maskBits,cb)) );
         }
 
+        final JPanel topRow = new JPanel();
+        topRow.setLayout( new FlowLayout() );
+
         // add PC
-        pcTextfield = createTextField( tf -> doWithNumber(tf, adr ->
+        PanelWithTextField panelWithTF = createTextFieldWithLabel( "PC" , tf -> doWithNumber(tf, adr ->
         {
             ui.doWithEmulator(emu ->
             {
@@ -167,9 +205,39 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
                 emu.invokeTickCallback();
             });
         }));
-        GridBagConstraints cnstrs = cnstrsNoResize( 0, 0 );
+        pcTextfield = panelWithTF.textfield;
+        topRow.add( panelWithTF.panel );
+
+        // add supervisor stack ptr
+        panelWithTF = createTextFieldWithLabel( "SSP", tf -> doWithNumber(tf, adr ->
+        {
+            ui.doWithEmulator(emu ->
+            {
+                System.out.println("Setting SSP to "+ Misc.hex(adr&~1));
+                emu.cpu.supervisorModeStackPtr = adr & ~1;
+            });
+        }));
+        sspTextfield = panelWithTF.textfield;
+        topRow.add( panelWithTF.panel );
+
+        // add user-mode stack ptr
+        panelWithTF = createTextFieldWithLabel( "USP", tf -> doWithNumber(tf, adr ->
+        {
+            ui.doWithEmulator(emu ->
+            {
+                System.out.println("Setting USP to "+ Misc.hex(adr&~1));
+                emu.cpu.userModeStackPtr = adr & ~1;
+            });
+        }));
+        uspTextfield = panelWithTF.textfield;
+        topRow.add( panelWithTF.panel );
+
+        GridBagConstraints cnstrs = cnstrs(0,0);
         cnstrs.gridwidth = 1;
-        getContentPane().add( pcTextfield, cnstrs );
+        cnstrs.weightx = 1;
+        cnstrs.weighty = 0.1;
+        cnstrs.fill= GridBagConstraints.HORIZONTAL;
+        getContentPane().add( topRow , cnstrs );
 
         // add CPU state checkboxes
         final JPanel checkboxPanel = new JPanel();
@@ -178,7 +246,6 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
             checkboxPanel.add( cpuFlagCheckboxes.get(i) );
         }
         cnstrs = cnstrs(0,1);
-        cnstrs.gridwidth = 1;
         cnstrs.weightx = 1;
         cnstrs.weighty = 0.5;
         cnstrs.fill= GridBagConstraints.BOTH;
@@ -188,18 +255,17 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         registerPanel.setLayout(  new GridBagLayout() );
         int y = 0;
         for ( int i = 0 ; i < 8 ; i+=2 ) {
-            registerPanel.add( new JLabel("D"+i), cnstrsNoResize( 0, y ) );
-            registerPanel.add( dataRegistersTextfields.get(i) , cnstrsNoResize( 1, y ));
-            registerPanel.add( new JLabel("D"+(i+1)), cnstrsNoResize( 2, y ) );
-            registerPanel.add( dataRegistersTextfields.get(i+1) , cnstrsNoResize( 3, y ));
-            registerPanel.add( new JLabel("A"+i), cnstrsNoResize( 4, y ) );
-            registerPanel.add( addressRegistersTextfields.get(i) , cnstrsNoResize( 5, y ));
-            registerPanel.add( new JLabel("A"+(i+1)), cnstrsNoResize( 6, y ) );
-            registerPanel.add( addressRegistersTextfields.get(i+1) , cnstrsNoResize( 7, y ));
+            registerPanel.add( new JLabel("D"+i), cnstrs( 0, y ) );
+            registerPanel.add( dataRegistersTextfields.get(i) , cnstrs( 1, y ));
+            registerPanel.add( new JLabel("D"+(i+1)), cnstrs( 2, y ) );
+            registerPanel.add( dataRegistersTextfields.get(i+1) , cnstrs( 3, y ));
+            registerPanel.add( new JLabel("A"+i), cnstrs( 4, y ) );
+            registerPanel.add( addressRegistersTextfields.get(i) , cnstrs( 5, y ));
+            registerPanel.add( new JLabel("A"+(i+1)), cnstrs( 6, y ) );
+            registerPanel.add( addressRegistersTextfields.get(i+1) , cnstrs( 7, y ));
             y += 1;
         }
         cnstrs = cnstrs(0,2);
-        cnstrs.gridwidth = 1;
         cnstrs.weightx = 1;
         cnstrs.weighty = 0.5;
         cnstrs.fill= GridBagConstraints.BOTH;
@@ -215,8 +281,12 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
     @Override
     public void tick(Emulator emulator)
     {
+        final int usp;
+        final int ssp;
         synchronized(DATA_LOCK)
         {
+            usp = emulator.cpu.userModeStackPtr;
+            ssp = emulator.cpu.supervisorModeStackPtr;
             pc = emulator.cpu.pc;
             flags = emulator.cpu.statusRegister;
             for (int i = 0; i < 8; i++)
@@ -247,6 +317,8 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
                     addressRegistersTextfields.get( i ).setText( hex( addressRegisters[i] ) );
                 }
                 pcTextfield.setText( hex( pc ) );
+                uspTextfield.setText( hex( usp ) );
+                sspTextfield.setText( hex( ssp ) );
             }
         });
     }

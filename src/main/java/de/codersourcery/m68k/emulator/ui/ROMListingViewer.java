@@ -8,6 +8,8 @@ import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 import java.awt.*;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -26,6 +28,8 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
 
     // @GuardedBy( LOCK )
     private boolean addressChanged = false;
+
+    private String searchText;
 
     private final TreeMap<Integer,Integer> linesByAddress=new TreeMap<>();
 
@@ -78,6 +82,30 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
         super( "ROM listing" , ui );
 
         this.textfield.setEditable( false );
+        this.textfield.addKeyListener( new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e)
+            {
+                if ( e.getKeyCode() == KeyEvent.VK_F )
+                {
+                    if ( ( e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK ) != 0 )
+                    {
+                        String input = JOptionPane.showInputDialog( null, "Enter text",searchText);
+                        if ( StringUtils.isNotBlank(input) )
+                        {
+                            searchText = input;
+                            search( input );
+                        }
+                    }
+                }
+                else if ( e.getKeyCode() == KeyEvent.VK_F3 )
+                {
+                    if ( StringUtils.isNotBlank(searchText) ) {
+                        search(searchText);
+                    }
+                }
+            }
+        } );
         getContentPane().setLayout( new GridBagLayout() );
         addressTextfield.setColumns(8);
         addressTextfield.addActionListener( ev ->
@@ -112,6 +140,35 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
         highlightStyle = document().addStyle( "highlightstyle", null );
         StyleConstants.setBackground(highlightStyle,Color.RED);
         defaultStyle = document().addStyle( "defaultstyle", null );
+    }
+
+    private void search(String searchString)
+    {
+        if ( searchString == null || searchString.trim().isEmpty() )
+        {
+            return;
+        }
+        final int searchStringLen = searchString.length();
+        final int searchStart = textfield.getCaretPosition()+1;
+
+        final String text = textfield.getText();
+outer:
+        for ( int i = searchStart ,len = text.length() ; i < len ; i++ )
+        {
+            if ( text.charAt( i ) == searchString.charAt( 0 ) )
+            {
+                for (int j = 0; j < searchStringLen; j++)
+                {
+                    if ( text.charAt( i + j ) != searchString.charAt( j ) )
+                    {
+                        continue outer;
+                    }
+                }
+                // found match
+                textfield.setCaretPosition( i );
+                return;
+            }
+        }
     }
 
     public void setKickRomDisasm(File file)

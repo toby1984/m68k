@@ -108,17 +108,6 @@ public abstract class AppWindow extends JInternalFrame
             return Stream.of( WindowKey.values() ).filter( x -> x.id.equals(windowKey))
                     .findFirst().orElseThrow();
         }
-
-        /*
-                registerWindow( new DisassemblyWindow(this) );
-        registerWindow( new CPUStateWindow("CPU", this) );
-        registerWindow( new EmulatorStateWindow("Emulator", this) );
-        registerWindow( new MemoryViewWindow(this) );
-        registerWindow( new BreakpointsWindow(this) );
-        registerWindow( new MemoryBreakpointsWindow(this) );
-        registerWindow( new StructExplorer(this) );
-        registerWindow( new ScreenWindow("Screen", this) );
-         */
     }
 
     public AppWindow(String title,UI ui)
@@ -143,17 +132,18 @@ public abstract class AppWindow extends JInternalFrame
         keyReleasedListener.add(l);
     }
 
-    protected final GridBagConstraints cnstrs(int x, int y)
+    protected static final GridBagConstraints cnstrs(int x, int y)
     {
         final GridBagConstraints result = new GridBagConstraints();
         result.gridx = x; result.gridy = y;
+        result.gridwidth = 1 ; result.gridheight = 1;
         result.weightx = 1; result.weighty = 1;
         result.insets = new Insets(1,1,1,1);
         result.fill = GridBagConstraints.BOTH;
         return result;
     }
 
-    protected final GridBagConstraints cnstrsNoResize(int x,int y)
+    protected static final GridBagConstraints cnstrsNoResize(int x,int y)
     {
         final GridBagConstraints result = cnstrs(x,y);
         result.weightx = 0; result.weighty = 0;

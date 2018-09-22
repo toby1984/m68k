@@ -28,10 +28,6 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
             IAdrProvider newProvider = null;
             synchronized (LOCK)
             {
-                if ( ! adrProvider.isFixedAddress() )
-                {
-                    return;
-                }
                 address = adrProvider.getAddress( null );
             }
             if ( e.getKeyCode() == KeyEvent.VK_PAGE_UP ) {
@@ -86,6 +82,8 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
         });
 
         addKeyListener( keyAdapter );
+        hexdump.addKeyListener( keyAdapter );
+        hexdump.setFocusable( true );
         setFocusable( true );
         getContentPane().setLayout( new GridBagLayout() );
         GridBagConstraints cnstrs = cnstrs( 0, 0 );
@@ -98,6 +96,9 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
         cnstrs.weightx=1;cnstrs.weighty=0.9;
         cnstrs.fill=GridBagConstraints.BOTH;
         final JScrollPane scrollPane = new JScrollPane( hexdump );
+        expression.addKeyListener( keyAdapter );
+        scrollPane.addKeyListener( keyAdapter );
+        scrollPane.setFocusable( true );
         hexdump.addKeyListener( keyAdapter );
         hexdump.setFocusable( true );
         getContentPane().add( scrollPane,cnstrs );

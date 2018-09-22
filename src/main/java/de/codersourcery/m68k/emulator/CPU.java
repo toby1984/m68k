@@ -285,8 +285,8 @@ public class CPU
 
     private boolean stopped;
 
-    private int userModeStackPtr;
-    private int supervisorModeStackPtr;
+    public int userModeStackPtr;
+    public int supervisorModeStackPtr;
 
     public int pcAtStartOfLastInstruction;
     public int pc;
@@ -867,7 +867,10 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
                 return 8; // 68020+ only...
             }
         }
-        else if ( insn == JSR_ENCODING )
+        if ( insn == DBCC_ENCODING ) {
+            return 4;
+        }
+        if ( insn == JSR_ENCODING )
         {
             final int eaMode = (opCode >> 3) & 0b111;
             final int eaRegister = opCode & 0b111;
@@ -1788,9 +1791,6 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
             cycles += 38;
         }
 
-        // push old status register
-        pushWord(oldSr);
-
         // push old program counter
         if ( irq == IRQ.ADDRESS_ERROR )
         {
@@ -1808,6 +1808,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         } else {
             pushLong( pc );
         }
+
+        // push old status register
+        pushWord(oldSr);
+        
         final int newAddress = memory.readLongNoCheck(irq.pcVectorAddress);
         if ( newAddress == 0 ) {
             System.err.println("***********************************");
@@ -1834,8 +1838,8 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
         activeIrq = null;
 
-        pc = popLong();
         statusRegister = popWord();
+        pc = popLong();
 
         // switch back to user-mode stack
         supervisorModeStackPtr = addressRegisters[7];
@@ -1871,10 +1875,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
         // MOVE Dx,-(A7)
         sp -= 2;
-        memory.writeWord(sp, value >> 16 ); // push high
+        memory.writeWord(sp,value); // push low
 
         sp -= 2;
-        memory.writeWord(sp,value); // push low
+        memory.writeWord(sp, value >> 16 ); // push high
 
         addressRegisters[7]= sp;
     }
@@ -1883,10 +1887,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
         int sp = addressRegisters[7];
 
-        int lo = memory.readWord(sp);
+        int hi = memory.readWord(sp);
         sp += 2;
 
-        int hi = memory.readWord(sp);
+        int lo = memory.readWord(sp);
         sp += 2;
 
         addressRegisters[7]= sp;
@@ -3179,8 +3183,8 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
 
     private void pea(int instruction) {
         // PEA
-        decodeSourceOperand( instruction,4,true );
-        pushLong( value );
+        decodeSourceOperand( instruction,4,true);
+        pushLong( ea );
     }
 
     private void negx(int instruction) {
