@@ -2345,7 +2345,7 @@ public class CPUTest extends TestCase
     public void testUnlink()
     {
         execute( cpu -> {},3,
-                "move.l #$56781234,(2020)",
+                "move.l #$12345678,(2020)",
                 "move.l #2020,a3",
                 "unlk a3" )
                 .expectA3(0x12345678)
@@ -2690,13 +2690,18 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 
     public void testPEA()
     {
+        execute(cpu -> {} ,
+                "pea $12345678",
+                "move.l (a7)+,d0")
+                .expectD0(0x12345678)
+                .noCarry().noOverflow().noExtended().notNegative().notZero().notSupervisor();
+
         final int adr = PROGRAM_START_ADDRESS + 128;
         execute(cpu -> {} ,
-                "lea "+adr+",a3",
-                "move.l #$12345678,(a3)",
+                "lea $12345678,a3",
                 "pea (a3)",
                 "move.l (a7)+,d0")
-                .expectD0(0x56781234) // swapped
+                .expectD0(0x12345678)
                 .noCarry().noOverflow().noExtended().notNegative().notZero().notSupervisor();
     }
 
@@ -2838,9 +2843,8 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
 
     public void testRTR()
     {
-        final int swapped = (PROGRAM_START_ADDRESS << 16) | (PROGRAM_START_ADDRESS >>> 16);
         execute(cpu -> {} ,
-                "move.l #"+swapped+",-(a7)", // swapped because stack grows towards address 0
+                "move.l #"+PROGRAM_START_ADDRESS+",-(a7)",
                 "move.w #$ff,-(a7)",
                 "rtr")
                 .expectPC( PROGRAM_START_ADDRESS )
@@ -3306,8 +3310,6 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
         public ExpectionBuilder expectTopOfStack(int expected)
         {
             int actual = cpu.memory.readLong(cpu.addressRegisters[7] );
-            // swap because CPU#push(int) pushes HIGH word first
-            actual = (actual >>> 16) | (actual << 16);
             return assertHexEquals( "value on top of stack mismatch" , expected, actual);
         }
 

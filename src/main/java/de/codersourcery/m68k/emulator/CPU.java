@@ -1811,7 +1811,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
         // push old status register
         pushWord(oldSr);
-        
+
         final int newAddress = memory.readLongNoCheck(irq.pcVectorAddress);
         if ( newAddress == 0 ) {
             System.err.println("***********************************");

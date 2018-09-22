@@ -2119,7 +2119,8 @@ destination Dn mode, not the destination < ea > mode.
             case NEG:
                 return NEG_ENCODING;
             case PEA:
-                return PEA_ENCODING;
+                extraInsnWords = getExtraWordPatterns(insn.source(),Operand.SOURCE,insn,context);
+                return PEA_ENCODING.append( extraInsnWords );
             case RTR:
                 return RTR_ENCODING;
             case RESET:

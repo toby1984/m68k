@@ -354,6 +354,7 @@ public class AssemblerTest extends TestCase
     }
 
     public void testPEA() {
+        assertArrayEquals(compile("pea $12345678")    ,0x48,0x79,0x12,0x34,0x56,0x78);
         assertArrayEquals(compile("pea (a3)")    ,0x48,0x53);
     }
 
