@@ -27,6 +27,9 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
     private JTextField pcTextfield;
 
     // @GuardedBy( DATA_LOCK )
+    private JTextField statusRegister;
+
+    // @GuardedBy( DATA_LOCK )
     private JTextField sspTextfield;
 
     // @GuardedBy( DATA_LOCK )
@@ -162,6 +165,8 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         super( "CPU State", ui );
         setPreferredSize( new Dimension(600,200 ) );
         getContentPane().setLayout( new GridBagLayout() );
+
+        // create register textfields
         for ( int i = 0 ; i < 8 ; i++ )
         {
             final int regNum = i;
@@ -169,6 +174,7 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
             addressRegistersTextfields.add( createTextField( tf -> updateAddressRegister(regNum,tf)) );
         }
 
+        // create status register checkboxes
         final int[] flagMasks =
         {
             CPU.FLAG_CARRY,
@@ -242,7 +248,20 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         // add CPU state checkboxes
         final JPanel checkboxPanel = new JPanel();
         checkboxPanel.setLayout( new FlowLayout() );
-        for ( int i = 0 ; i < checkboxLabels.length ; i++ ) {
+
+        statusRegister = createTextField( ev ->
+        {
+            final int value = parseNumber( statusRegister.getText() );
+            ui.doWithEmulator(emu ->
+            {
+                System.out.println("Setting SR to "+ Misc.hex(value));
+                emu.cpu.setStatusRegister( value );
+            });
+        });
+        statusRegister.setColumns( 5 );
+
+        checkboxPanel.add(statusRegister);
+        for ( int i = checkboxLabels.length-1 ; i >= 0 ; i-- ) {
             checkboxPanel.add( cpuFlagCheckboxes.get(i) );
         }
         cnstrs = cnstrs(0,1);
@@ -255,13 +274,13 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         registerPanel.setLayout(  new GridBagLayout() );
         int y = 0;
         for ( int i = 0 ; i < 8 ; i+=2 ) {
-            registerPanel.add( new JLabel("D"+i), cnstrs( 0, y ) );
+            registerPanel.add( new JLabel("D"+i), cnstrsNoResize( 0, y ) );
             registerPanel.add( dataRegistersTextfields.get(i) , cnstrs( 1, y ));
-            registerPanel.add( new JLabel("D"+(i+1)), cnstrs( 2, y ) );
+            registerPanel.add( new JLabel("D"+(i+1)), cnstrsNoResize( 2, y ) );
             registerPanel.add( dataRegistersTextfields.get(i+1) , cnstrs( 3, y ));
-            registerPanel.add( new JLabel("A"+i), cnstrs( 4, y ) );
+            registerPanel.add( new JLabel("A"+i), cnstrsNoResize( 4, y ) );
             registerPanel.add( addressRegistersTextfields.get(i) , cnstrs( 5, y ));
-            registerPanel.add( new JLabel("A"+(i+1)), cnstrs( 6, y ) );
+            registerPanel.add( new JLabel("A"+(i+1)), cnstrsNoResize( 6, y ) );
             registerPanel.add( addressRegistersTextfields.get(i+1) , cnstrs( 7, y ));
             y += 1;
         }
@@ -283,8 +302,10 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
     {
         final int usp;
         final int ssp;
+        final int sr;
         synchronized(DATA_LOCK)
         {
+            sr = emulator.cpu.statusRegister;
             usp = emulator.cpu.userModeStackPtr;
             ssp = emulator.cpu.supervisorModeStackPtr;
             pc = emulator.cpu.pc;
@@ -299,6 +320,7 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
         {
             synchronized( DATA_LOCK)
             {
+                statusRegister.setText( hex( sr ) );
                 cpuFlagCheckboxes.get( 0 ).setSelected( (flags & CPU.FLAG_CARRY) != 0 );
                 cpuFlagCheckboxes.get( 1 ).setSelected( (flags & CPU.FLAG_OVERFLOW) != 0 );
                 cpuFlagCheckboxes.get( 2 ).setSelected( (flags & CPU.FLAG_ZERO) != 0 );
