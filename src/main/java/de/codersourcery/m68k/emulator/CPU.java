@@ -1841,9 +1841,12 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         statusRegister = popWord();
         pc = popLong();
 
-        // switch back to user-mode stack
-        supervisorModeStackPtr = addressRegisters[7];
-        addressRegisters[7] = userModeStackPtr;
+        if ( ! isSupervisorMode() )
+        {
+            // switched back to user-mode stack
+            supervisorModeStackPtr = addressRegisters[7];
+            addressRegisters[7] = userModeStackPtr;
+        }
     }
 
     private void pushWord(int value) {

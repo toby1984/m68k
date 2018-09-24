@@ -471,7 +471,13 @@ public class Emulator
                     {
                         mode = EmulatorMode.STOPPED;
 
-                        System.err.println("*** emulation stopped because of breakpoint ***");
+                        if ( cpuBreakpointHit ) {
+                            System.err.println("*** emulation stopped because of CPU breakpoint ***");
+                        }
+                        else
+                        {
+                            System.err.println( "*** emulation stopped because of memory breakpoint ***" );
+                        }
                         try
                         {
                             stateCallback.stopped( Emulator.this );
