@@ -40,6 +40,9 @@ public abstract class AppWindow extends JInternalFrame
     private static final Pattern ADR_REGISTER_PATTERN =
             Pattern.compile("a([0-7]{1})",Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern DATA_REGISTER_PATTERN =
+            Pattern.compile("d([0-7]{1})",Pattern.CASE_INSENSITIVE);
+
     private static final List<Consumer<KeyEvent>> keyReleasedListener =
             new ArrayList<>();
 
@@ -245,7 +248,7 @@ public abstract class AppWindow extends JInternalFrame
 
         if ( ! StringUtils.isBlank(value) )
         {
-            final Matcher matcher = ADR_REGISTER_PATTERN.matcher( value.trim() );
+            Matcher matcher = ADR_REGISTER_PATTERN.matcher( value.trim() );
 
             if ( matcher.matches() )
             {
@@ -265,7 +268,29 @@ public abstract class AppWindow extends JInternalFrame
                     }
                 };
             }
-            else if ( value.trim().equalsIgnoreCase( "pc" ) ) {
+
+            matcher = DATA_REGISTER_PATTERN.matcher( value.trim() );
+
+            if ( matcher.matches() )
+            {
+                final int regNum = Integer.parseInt( matcher.group( 1 ) );
+                return new IAdrProvider()
+                {
+                    @Override
+                    public int getAddress(Emulator emulator)
+                    {
+                        return emulator.cpu.dataRegisters[regNum] + offset;
+                    }
+
+                    @Override
+                    public boolean isFixedAddress()
+                    {
+                        return false;
+                    }
+                };
+            }
+
+            if ( value.trim().equalsIgnoreCase( "pc" ) ) {
                 return new IAdrProvider()
                 {
                     @Override
@@ -281,11 +306,8 @@ public abstract class AppWindow extends JInternalFrame
                     }
                 };
             }
-            else
-            {
-                final int adr = parseNumber( value.trim() );
-                return new FixedAdrProvider( adr+offset );
-            }
+            final int adr = parseNumber( value.trim() );
+            return new FixedAdrProvider( adr+offset );
         }
         return null;
     }

@@ -332,6 +332,24 @@ NAME        ADD  R/W  CHIP    FUNCTION
         if ( adr == 0x03 ) {
             return (byte) readDMACONR();
         }
+
+        if ( adr == 0x04 ) {
+            // VPOSR hi-byte
+            return (byte) (video.readVPOSR() >>> 8);
+        }
+        if ( adr == 0x05 ) {
+            // VPOSR lo-byte
+            return (byte) video.readVPOSR();
+        }
+        if ( adr == 0x06 ) {
+            // VHPOSR hi-byte
+            return (byte) (video.readVHPOSR() >>> 8);
+        }
+        if ( adr == 0x07 ) {
+            // VHPOSR lo-byte
+            return (byte) (video.readVHPOSR() >>> 8);
+        }
+
         // 0x0E0...0x1e4 => video
         if ( adr >= 0x0e0 && adr <= 0x1E5) {
             return video.readByte( adr );

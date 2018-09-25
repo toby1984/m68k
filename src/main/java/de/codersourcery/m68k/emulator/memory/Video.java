@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.memory;
 
 import de.codersourcery.m68k.emulator.Amiga;
+import de.codersourcery.m68k.emulator.CPU;
 import de.codersourcery.m68k.emulator.chips.IRQController;
 import de.codersourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codersourcery.m68k.utils.Misc;
@@ -91,6 +92,8 @@ public class Video extends MemoryPage
     public static final int SPR7CTL  = 0x17A; //  W   AD      Sprite 7 vert stop position and control data
     public static final int SPR7DATA = 0x17C; //  W   D       Sprite 7 image data register A
     public static final int SPR7DATB = 0x17E; //  W   D       Sprite 7 image data register B
+
+    private static final int CPU_CYCLES_UNTIL_NEXT_SCANLINE = (int) (227.5f*2);
 
     // BIT# 15,14,13,12,11,10,09,08,07,06,05,04,03,02,01,00
     //  RGB  X  X  X  X  R3 R2 R1 R0 G3 G2 G1 G0 B3 B2 B1 B0
@@ -188,6 +191,7 @@ These registers control the operation of the
     public IRQController irqController;
     public final Amiga amiga;
 
+    private int ticksUntilNextScanline;
     private int ticksUntilVBlank;
 
     public int[] bpldat = new int[6];
@@ -202,6 +206,20 @@ These registers control the operation of the
 
     public int bpl1mod; // modulo for odd bitplanes
     public int bpl2mod; // modulo for even bitplanes
+
+    private int vpos;
+    private int hpos;
+
+    // interlace frame marker bit
+    private int longFrame; // long frame bit, either 0x8000 (long frame) or 0
+
+    /*
+"All lines are not the same length in NTSC.
+Every other line is long line (228 color clocks, 0-$E3), with the others being 227 color clocks long.
+In PAL, they are all 227 long. The display sees all these lines as 227 1/2 color clocks long, while the copper sees alternating long and short lines."
+See http://amigadev.elowar.com/read/ADCD.../node004C.html
+     */
+    private int longLine; // LOL = Long line bit. When low, it indicates short raster line.
 
     public Video(Amiga amiga) {
         this.amiga = amiga;
@@ -219,6 +237,10 @@ These registers control the operation of the
         bpl1mod = 0;
         bpl2mod = 0;
         ticksUntilVBlank = calcTicksUntilVBlank();
+        ticksUntilNextScanline = CPU_CYCLES_UNTIL_NEXT_SCANLINE;
+        vpos = 0;
+        longFrame = 0;
+        longLine = amiga.isPAL() ? 0b1000_0000 : 0; // LOL = Long line bit. When low, it indicates short raster line.
     }
 
     @Override
@@ -501,6 +523,30 @@ These registers control the operation of the
         if ( --ticksUntilVBlank < 0 ) {
             ticksUntilVBlank = calcTicksUntilVBlank();
         }
+        hpos++; // TODO: Broken, this is not how it works ... pixels per cycle depends on current resolution and needs to take into account blank areas
+        if ( hpos >= getDisplayWidth() ) {
+            hpos = 0;
+        }
+
+        if ( --ticksUntilNextScanline < 0 )
+        {
+            ticksUntilNextScanline = CPU_CYCLES_UNTIL_NEXT_SCANLINE;
+
+            if ( ! amiga.isPAL() ) // only applicable for NTSC amigas
+            {
+                longLine ^= 0b1000_0000;
+            }
+
+            vpos++;
+            final int height =  amiga.isPAL() ? 256 : 200;
+            if ( vpos >= height) {
+                vpos = 0;
+                if ( isInterlaced() )
+                {
+                    longFrame ^= 0x8000;
+                }
+            }
+        }
     }
 
     private int calcTicksUntilVBlank()
@@ -562,5 +608,18 @@ These registers control the operation of the
     public void setIRQController(IRQController irqController)
     {
         this.irqController = irqController;
+    }
+
+    /*
+[ ] VPOSR       *004  R   A( E )  Read vert most signif. bit (and frame flop)
+[ ] VHPOSR      *006  R   A       Read vert and horiz. position of beam
+     */
+    public int readVPOSR()
+    {
+        return longFrame | amiga.getAgnusID() << 8 | ( vpos & 0b111_0000_0000) >> 8;
+    }
+
+    public int readVHPOSR() {
+        return (vpos<< 8 ) | ((hpos >> 1) & 0xff);
     }
 }

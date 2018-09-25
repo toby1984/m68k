@@ -1,26 +1,20 @@
-NTSC:
+NTSC: 7.1591 MHz
 
-14.318181 MHz
-
-= 6,98412738322*10^-8 s ~ 70ns
-
-PAL:
-
-14.187580 MHz
-
-= 7,04841840539*10^-8 s ~ 70ns
+PAL: 7.09379 MHz
 
 1 ns = 1*10-9 s
 
 Color clock: master clk/4 = cpu clk/2 
 
 NTSC: 3,57954525 Mhz = 2,79365095329e-07 s = 279,3 ns
-PAL: 3,546895 Mhz = 2,81936736216e-07 s = 281,9 ns
+PAL:  3,546895 Mhz   = 2,81936736216e-07 s = 281,9 ns
 
+1x CPU cycle = 140ns
 
-1x CPU cycle = 140ns = 8-bit transfer Memory Cycle 
+CPU RAM access = 4 cycles (2 cycles address,2 cycles data transfer) = 560ns
 
 1x DMA cycle = 280ns = 2 CPU cycles
 
 CPU read/write = 2 cycles to setup address, 2 cycles for read/write
 
+1 scanline = 227.5 DMA cycles = 227.5 * 280 ns = 63700ns = 455 CPU cycles/scanline 

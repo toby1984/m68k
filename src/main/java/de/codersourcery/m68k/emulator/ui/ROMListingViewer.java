@@ -4,6 +4,7 @@ import de.codersourcery.m68k.emulator.Emulator;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
+import javax.swing.text.BadLocationException;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
@@ -34,6 +35,7 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     private final TreeMap<Integer,Integer> linesByAddress=new TreeMap<>();
 
     private final JTextPane textfield = new JTextPane();
+    private final JScrollPane scrollpane;
 
     private final Style highlightStyle;
     private final Style defaultStyle;
@@ -81,7 +83,7 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     {
         super( "ROM listing" , ui );
 
-        this.textfield.setEditable( false );
+        this.textfield.setEditable( true );
         this.textfield.addKeyListener( new KeyAdapter() {
             @Override
             public void keyReleased(KeyEvent e)
@@ -135,7 +137,8 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
 
         cnstrs = cnstrs(0,1);
         cnstrs.weighty=0.9;cnstrs.weightx=1;
-        getContentPane().add( new JScrollPane(textfield) , cnstrs );
+        scrollpane = new JScrollPane(textfield);
+        getContentPane().add( scrollpane , cnstrs );
 
         highlightStyle = document().addStyle( "highlightstyle", null );
         StyleConstants.setBackground(highlightStyle,Color.RED);
@@ -288,6 +291,20 @@ outer:
                     if ( textOffset != null )
                     {
                         textfield.setCaretPosition( textOffset );
+                        Rectangle position = null;
+                        try
+                        {
+                            position = textfield.modelToView( textOffset );
+                        }
+                        catch (BadLocationException e)
+                        {
+                            error(e);
+                        }
+                        System.out.println("Caret at "+position);
+                        final JViewport pane = (JViewport) textfield.getParent();
+                        System.out.println("Viewport size: "+scrollpane.getViewport().getView().getSize());
+                        System.out.println("Viewport bounds: "+pane.getBounds());
+                        System.out.println("Visible rect: "+pane.getVisibleRect());
                         final int end = getEndOfLine( textOffset );
                         if ( currentHighlight != null )
                         {

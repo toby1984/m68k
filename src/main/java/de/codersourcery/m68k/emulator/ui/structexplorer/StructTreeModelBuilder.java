@@ -27,7 +27,8 @@ public class StructTreeModelBuilder
         MEM_ENTRY( "struct MemEntry" ),
         MINLIST( "struct MinList" ),
         MINNODE( "struct MinNode" ),
-        TASK("struct Task");
+        TASK("struct Task"),
+        RESIDENT("struct Resident");
 
         private final String uiLabel;
 
@@ -548,6 +549,51 @@ struct	MemEntry
         .field( uint16("ml_NumEntries") )
         .fields( "ml_ME", STRUCT_MEMENTRY );
 
+    /*
+struct Resident {
+    field( uint16("rt_MatchWord") )	          //  word to match on (ILLEGAL)
+    field( structPtr( "rt_MatchTag", StructType.RESIDENT)) //  pointer to the above
+    field( ptr("rt_EndSkip"))		     //  address to continue scan
+    field( uint8("rt_Flags"))		         //  various tag flags
+    field( uint8("rt_Version"))		     //  release version number
+    field( uint8("rt_Type"))		         //  type of module (NT_XXXXXX)
+    field( int8("rt_Pri"))		         //  initialization priority
+    field( stringPtr("rt_Name"))		         //  pointer to node name
+    field( stringPtr("rt_IdString"))	         //  pointer to identification string
+    field( ptr("rt_Init"));		         //  pointer to init code
+};
+
+#define RTC_MATCHWORD	0x4AFC	//  The 68000 "ILLEGAL" instruction
+
+        #define RTF_AUTOINIT	(1<<7)	//  rt_Init points to data structure
+        #define RTF_AFTERDOS	(1<<2)
+        #define RTF_SINGLETASK	(1<<1)
+        #define RTF_COLDSTART	(1<<0)
+
+        //  Compatibility: (obsolete)
+        //  #define RTM_WHEN	   3
+        #define RTW_NEVER	0
+        #define RTW_COLDSTART	1
+     */
+
+    private static final BitMask RESIDENT_FLAGS = new BitMask()
+            .add("RTF_AUTOINIT",1<<7)
+            .add("RTF_AFTERDOS",1<<2)
+            .add("RTF_SINGLETASK",1<<1)
+            .add("RTF_COLDSTART",1<<0);
+
+    private static final StructDesc STRUCT_RESIDENT = new StructDesc(StructType.RESIDENT)
+            .field( uint16("rt_MatchWord") )	          //  word to match on (ILLEGAL)
+            .field( structPtr( "rt_MatchTag", StructType.RESIDENT)) //  pointer to the above
+            .field( ptr("rt_EndSkip"))		     //  address to continue scan
+            .field( uint8("rt_Flags",RESIDENT_FLAGS))		         //  various tag flags
+            .field( uint8("rt_Version"))		     //  release version number
+            .field( uint8("rt_Type"))		         //  type of module (NT_XXXXXX)
+            .field( int8("rt_Pri"))		         //  initialization priority
+            .field( stringPtr("rt_Name"))		         //  pointer to node name
+            .field( stringPtr("rt_IdString"))	         //  pointer to identification string
+            .field( ptr("rt_Init"));		         //  pointer to init code
+
     private final Emulator emulator;
 
     public StructTreeModelBuilder(Emulator emulator)
@@ -756,6 +802,7 @@ struct	MemEntry
             case MINNODE:   return STRUCT_MINNODE;
             case TASK:      return STRUCT_TASK;
             case LIBRARY:   return STRUCT_LIBRARY;
+            case RESIDENT:  return STRUCT_RESIDENT;
             default:
                 throw new RuntimeException("Unhandled struct type "+type);
         }

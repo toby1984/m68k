@@ -1792,6 +1792,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         }
 
         // push old program counter
+        int pc = pcAtStartOfLastInstruction;
         if ( irq == IRQ.ADDRESS_ERROR )
         {
             // FIXME: Currently decoding operand addresses and

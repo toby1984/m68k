@@ -27,6 +27,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class DisassemblyWindow extends AppWindow
         implements ITickListener, Emulator.IEmulatorStateCallback
@@ -174,53 +175,49 @@ public class DisassemblyWindow extends AppWindow
         }
     }
 
-    private final KeyAdapter keyAdapter = new KeyAdapter()
+    private final Consumer<KeyEvent> keyAdapter = e ->
     {
-        @Override
-        public void keyReleased(KeyEvent e)
-        {
-            if ( e.getKeyCode() == KeyEvent.VK_PAGE_UP ) {
-                synchronized (LOCK)
-                {
-                    addressToDisplay = lines.get(0).pc;
-                    followProgramCounter = false;
-                }
-                ui.doWithEmulator(DisassemblyWindow.this::tick);
-            }
-            else if ( e.getKeyCode() == KeyEvent.VK_PAGE_DOWN ) {
-                synchronized (LOCK)
-                {
-                    addressToDisplay = lines.get(lines.size()-1).pc;
-                    followProgramCounter = false;
-                }
-                ui.doWithEmulator(DisassemblyWindow.this::tick);
-            }
-            else if ( e.getKeyCode() == KeyEvent.VK_UP || e.getKeyCode() == KeyEvent.VK_DOWN )
+        if ( e.getKeyCode() == KeyEvent.VK_PAGE_UP ) {
+            synchronized (LOCK)
             {
-                synchronized(LOCK)
+                addressToDisplay = lines.get(0).pc;
+                followProgramCounter = false;
+            }
+            ui.doWithEmulator(DisassemblyWindow.this::tick);
+        }
+        else if ( e.getKeyCode() == KeyEvent.VK_PAGE_DOWN ) {
+            synchronized (LOCK)
+            {
+                addressToDisplay = lines.get(lines.size()-1).pc;
+                followProgramCounter = false;
+            }
+            ui.doWithEmulator(DisassemblyWindow.this::tick);
+        }
+        else if ( e.getKeyCode() == KeyEvent.VK_UP || e.getKeyCode() == KeyEvent.VK_DOWN )
+        {
+            synchronized(LOCK)
+            {
+                for (int i = 0; i < lines.size(); i++)
                 {
-                    for (int i = 0; i < lines.size(); i++)
+                    final Disassembler.Line l = lines.get(i);
+                    if ( l.pc == addressToDisplay )
                     {
-                        final Disassembler.Line l = lines.get(i);
-                        if ( l.pc == addressToDisplay )
-                        {
 
-                            if ( e.getKeyCode() == KeyEvent.VK_UP && i>0 )
-                            {
-                                followProgramCounter = false;
-                                addressToDisplay = lines.get(i-1).pc;
-                            }
-                            else if (  e.getKeyCode() == KeyEvent.VK_DOWN && (i+1) < lines.size() )
-                            {
-                                followProgramCounter = false;
-                                addressToDisplay = lines.get(i+1).pc;
-                            }
-                            break;
+                        if ( e.getKeyCode() == KeyEvent.VK_UP && i>0 )
+                        {
+                            followProgramCounter = false;
+                            addressToDisplay = lines.get(i-1).pc;
                         }
+                        else if (  e.getKeyCode() == KeyEvent.VK_DOWN && (i+1) < lines.size() )
+                        {
+                            followProgramCounter = false;
+                            addressToDisplay = lines.get(i+1).pc;
+                        }
+                        break;
                     }
                 }
-                ui.doWithEmulator(DisassemblyWindow.this::tick);
             }
+            ui.doWithEmulator(DisassemblyWindow.this::tick);
         }
     };
 
@@ -231,7 +228,7 @@ public class DisassemblyWindow extends AppWindow
 
         final JToolBar toolbar = new JToolBar(JToolBar.HORIZONTAL );
 
-        addKeyListener(keyAdapter );
+        registerKeyReleasedListener( keyAdapter );
         addressTextfield.addActionListener( ev -> {
 
             try
@@ -261,7 +258,7 @@ public class DisassemblyWindow extends AppWindow
         cnstrs = cnstrs(0,1);
         cnstrs.weighty = 1;
         panel.setFocusable(true);
-        panel.addKeyListener(keyAdapter );
+        panel.addKeyListener( getKeyAdapter() );
         getContentPane().add( panel, cnstrs);
     }
 

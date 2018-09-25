@@ -47,6 +47,22 @@ public enum Amiga
         {
             return isPAL() ? PAL_CPU_CLOCK_MHZ : NTSC_CPU_CLOCK_MHZ;
         }
+
+        @Override
+        public int getAgnusID()
+        {
+            /*
+
+    8361 (Regular) or 8370 (Fat) (Agnus-NTSC) = 10
+    8367 (Pal) or 8371 (Fat-Pal) (Agnus-PAL) = 00
+    8372 (Fat-hr) (agnushr),thru rev4 = 20 PAL, 30 NTSC
+    8372 (Fat-hr) (agnushr),rev 5 = 22 PAL, 31 NTSC
+    8374 (Alice) thru rev 2 = 22 PAL, 32 NTSC
+    8374 (Alice) rev 3 thru rev 4 = 23 PAL, 33 NTSC
+
+             */
+            return 0; // 8371 (Agnus-PAL)
+        }
     };
 
     public abstract int getChipRAMSize();
@@ -55,6 +71,7 @@ public enum Amiga
     public abstract int getKickRomSize();
     public abstract CPUType getCPUType();
     public abstract boolean isPAL();
+    public abstract int getAgnusID();
 
     /**
      * Returns the CPU clock in MHz.
