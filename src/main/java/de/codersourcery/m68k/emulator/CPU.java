@@ -3285,6 +3285,50 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
         storeValue(eaMode,eaRegister,1);
    }
 
+    private void subq(int instruction)
+    {
+        // SUBQ_ENCODING
+        final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
+        switch(operandSizeInBytes) {
+            case 1:
+            case 2:
+                cycles += 4;
+                break;
+            case 4:
+                cycles += 6;
+                break;
+            default:
+                throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
+        }
+        final int eaMode = (instruction & 0b111000) >> 3;
+        final int eaRegister = instruction & 0b111;
+        final boolean dstIsAddressRegister = eaMode == AddressingMode.ADDRESS_REGISTER_DIRECT.eaModeField;
+
+        int srcValue = (instruction& 0b111000000000) >> 9;
+        if ( srcValue == 0 ) {
+            srcValue = 8;
+        }
+        if ( dstIsAddressRegister )
+        {
+            decodeSourceOperand( instruction, 4 , false, false );
+        } else {
+            decodeSourceOperand( instruction, operandSizeInBytes, false, false );
+        }
+
+        final int dstValue = value;
+
+        value -= srcValue;
+
+        if ( dstIsAddressRegister ) {
+            storeValue( eaMode, eaRegister, 4 );
+        }
+        else
+        {
+            storeValue( eaMode, eaRegister, operandSizeInBytes );
+            updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
+        }
+    }
+
    private void addq(int instruction) {
        // ADDQ_ENCODING
        final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
@@ -3308,51 +3352,23 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
            srcValue = 8;
        }
 
-       decodeSourceOperand(instruction,operandSizeInBytes,false,false);
+       if ( dstIsAddressRegister )
+       {
+           decodeSourceOperand( instruction, 4 , false, false );
+       } else {
+           decodeSourceOperand( instruction, operandSizeInBytes, false, false );
+       }
        final int dstValue = value;
 
        value += srcValue;
 
-       storeValue(eaMode, eaRegister, operandSizeInBytes);
-
-       if ( ! dstIsAddressRegister )
+       if ( dstIsAddressRegister ) {
+           storeValue( eaMode, eaRegister, 4 );
+       }
+       else
        {
+           storeValue( eaMode, eaRegister, operandSizeInBytes );
            updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.ADDITION, CPU.ALL_USERMODE_FLAGS);
-       }
-   }
-
-   private void subq(int instruction) {
-       // SUBQ_ENCODING
-       final int operandSizeInBytes = 1 << ( (instruction & 0b11000000) >> 6 );
-       switch(operandSizeInBytes) {
-           case 1:
-           case 2:
-               cycles += 4;
-               break;
-           case 4:
-               cycles += 6;
-               break;
-           default:
-               throw new IllegalInstructionException( pcAtStartOfLastInstruction,instruction);
-       }
-       final int eaMode = (instruction & 0b111000) >> 3;
-       final int eaRegister = instruction & 0b111;
-       final boolean dstIsAddressRegister = eaMode == AddressingMode.ADDRESS_REGISTER_DIRECT.eaModeField;
-
-       int srcValue = (instruction& 0b111000000000) >> 9;
-       if ( srcValue == 0 ) {
-           srcValue = 8;
-       }
-       decodeSourceOperand(instruction,operandSizeInBytes,false,false);
-       final int dstValue = value;
-
-       value -= srcValue;
-
-       storeValue(eaMode, eaRegister, operandSizeInBytes);
-
-       if ( ! dstIsAddressRegister )
-       {
-           updateFlags(srcValue, dstValue, value, operandSizeInBytes, CCOperation.SUBTRACTION, CPU.ALL_USERMODE_FLAGS);
        }
    }
 
