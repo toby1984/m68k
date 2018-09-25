@@ -83,7 +83,7 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
     {
         super( "ROM listing" , ui );
 
-        this.textfield.setEditable( true );
+        this.textfield.setEditable( false );
         this.textfield.addKeyListener( new KeyAdapter() {
             @Override
             public void keyReleased(KeyEvent e)

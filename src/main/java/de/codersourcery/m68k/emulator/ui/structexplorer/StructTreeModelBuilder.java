@@ -605,7 +605,7 @@ struct Resident {
     {
         StructTreeNode result = new StructTreeNode(baseAddress, "");
         int ptr = baseAddress;
-        for ( int i = 0 ; i < 4 ; i++ )
+        for ( int i = 0 ; i < 1 ; i++ )
         {
             result.add( createTreeModel( "", ptr , type, 0, maxDepth ) );
             ptr += getStructDesc( type ).size;

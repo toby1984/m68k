@@ -90,6 +90,7 @@ C0 0000 - DF EFFF       Reserved.  Do not use.
             irqController.reset();
         }
 
+        // ticked every 140ns
         public void tick()
         {
             ciaa.tick();

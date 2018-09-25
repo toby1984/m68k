@@ -93,8 +93,6 @@ public class Video extends MemoryPage
     public static final int SPR7DATA = 0x17C; //  W   D       Sprite 7 image data register A
     public static final int SPR7DATB = 0x17E; //  W   D       Sprite 7 image data register B
 
-    private static final int CPU_CYCLES_UNTIL_NEXT_SCANLINE = (int) (227.5f*2);
-
     // BIT# 15,14,13,12,11,10,09,08,07,06,05,04,03,02,01,00
     //  RGB  X  X  X  X  R3 R2 R1 R0 G3 G2 G1 G0 B3 B2 B1 B0
 
@@ -191,9 +189,6 @@ These registers control the operation of the
     public IRQController irqController;
     public final Amiga amiga;
 
-    private int ticksUntilNextScanline;
-    private int ticksUntilVBlank;
-
     public int[] bpldat = new int[6];
 
     public int bplcon0;
@@ -212,7 +207,6 @@ These registers control the operation of the
 
     // interlace frame marker bit
     private int longFrame; // long frame bit, either 0x8000 (long frame) or 0
-
     /*
 "All lines are not the same length in NTSC.
 Every other line is long line (228 color clocks, 0-$E3), with the others being 227 color clocks long.
@@ -236,8 +230,6 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
         Arrays.fill(bpldat,0);
         bpl1mod = 0;
         bpl2mod = 0;
-        ticksUntilVBlank = calcTicksUntilVBlank();
-        ticksUntilNextScanline = CPU_CYCLES_UNTIL_NEXT_SCANLINE;
         vpos = 0;
         longFrame = 0;
         longLine = amiga.isPAL() ? 0b1000_0000 : 0; // LOL = Long line bit. When low, it indicates short raster line.
@@ -518,71 +510,52 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
         return isInterlaced() ? 400 : 200;
     }
 
+    /**
+     * Ticked every 140ns (=2 hi-res pixel,1 lo-res pixel)
+     */
     public void tick() {
 
-        if ( --ticksUntilVBlank < 0 ) {
-            ticksUntilVBlank = calcTicksUntilVBlank();
-        }
-        hpos++; // TODO: Broken, this is not how it works ... pixels per cycle depends on current resolution and needs to take into account blank areas
-        if ( hpos >= getDisplayWidth() ) {
+        hpos++;
+        if ( hpos == 0xd8 ) { // $d8 = 216 = 8 pixel hblank + 200 pixel + 8 pixel hblank
             hpos = 0;
-        }
 
-        if ( --ticksUntilNextScanline < 0 )
-        {
-            ticksUntilNextScanline = CPU_CYCLES_UNTIL_NEXT_SCANLINE;
-
-            if ( ! amiga.isPAL() ) // only applicable for NTSC amigas
+            if ( amiga.isNTSC() )
             {
+                // toggle long/short line flag, only applicable for NTSC amigas
                 longLine ^= 0b1000_0000;
             }
 
             vpos++;
-            final int height =  amiga.isPAL() ? 256 : 200;
-            if ( vpos >= height) {
-                vpos = 0;
-                if ( isInterlaced() )
+                /*
+    | Normal  | Interlaced
+PAL |  283    |     567
+NTSC|  241    |     483
+                 */
+
+            if ( isInterlaced() )
+            {
+                final int maxY = amiga.isPAL() ? 283 : 241;
+                if ( vpos >= maxY )
                 {
-                    longFrame ^= 0x8000;
+                    longFrame = 0x8000;
                 }
+            }
+
+            int maxY;
+            if ( amiga.isPAL() )
+            {
+                maxY = 29 + (isInterlaced() ? 567 : 283);
+            }
+            else
+            {
+                maxY = 21 + (isInterlaced() ? 483 : 241);
+            }
+            if ( vpos == maxY ) {
+                vpos = 0;
+                longFrame = 0;
             }
         }
     }
-
-    private int calcTicksUntilVBlank()
-    {
-        /* Agnus's timings are measured in "color clocks" of 280 ns.
-         * This is equivalent to two low resolution (140 ns) pixels or
-         * four high resolution (70 ns) pixels.
-         *
-         * NTSC: 3,57954525 Mhz = 2,79365095329e-07 s = 279,3 ns
-         * PAL: 3,546895 Mhz = 2,81936736216e-07 s = 281,9 ns
-         *
-         * 1x CPU cycle = 140ns = 8-bit transfer Memory Cycle
-         *
-         * 1 ns = 10^-9 s
-         *                    1
-         * 1 CPU cycle = ---------- = 1,4096*10-7s = 140,9 ns
-         *                7,09379
-         *
-         * The video beam produces about 262 video lines from top to bottom, of which
-         * 200 normally are visible on the screen with an NTSC system.  With a PAL
-         * system, the beam produces 312 lines, of which 256 are normally visible.
-         *
-         * During the display time for a six bitplane display (low resolution, 320
-         * pixels wide), 160 time slots will be taken by bitplane DMA for each
-         * horizontal line.
-         *
-         * 1 DMA cycle = 2 CPU cycles => 320 CPU cycles per
-         */
-        final double pixelTimeNanos = isHiRes() ? 70:140;
-        final int vlines = amiga.isPAL() ? 312 : 262;
-        final double screenTimeNanos = getDisplayWidth()*pixelTimeNanos*vlines;
-        // TODO: Just a rough estimate, there's probably an invisible 'border area'
-        //       left/right of the visible screen area that is currently not being accounted for
-        return (int) (screenTimeNanos/140);
-    }
-
 
     public boolean isHiRes() {
         return (bplcon0 & 1<<15) != 0;
@@ -622,4 +595,75 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
     public int readVHPOSR() {
         return (vpos<< 8 ) | ((hpos >> 1) & 0xff);
     }
+
+    /*
+The minimum time of vertical blanking is 20 horizontal scan lines for an
+NTSC system and 25 horizontal scan lines for a PAL system. The range
+starts at line 0 and ends at line 20 for NTSC or line 25 for PAL. After
+the minimum vertical blanking range, you can control where the display
+actually starts by using the  DIWSTRT  (display window start) register
+to extend the effective vertical blanking time. See Chapter 3, "Playfield
+Hardware," for more information on  DIWSTRT .
+
+If you find that you still require additional time during vertical
+blanking, you can use the Copper to create a  level 3 interrupt . This
+Copper interrupt would be timed to occur just after the last line of
+display on the screen (after the display window stop which you have
+defined by using the  DIWSTOP  register).
+
+0      $18                           $D8
++-------+-----------------------------+------+ 0
+|       |   VBLANK (mandatory)        |      |
+|       |                             |      | 21 (NTSC) or 29 (PAL) lines
++-------+-----------------------------+------+
+|       |                             |      |
+| HBLANK|     DISPLAY AREA            |HBLANK|
+|       |                             |      |
++-------+-----------------------------+------+
+
+Displayable lines of video:
+
+    | Normal  | Interlaced
+PAL |  283    |     567
+NTSC|  241    |     483
+
+Horizontally, the situation is similar. Strictly speaking, the hardware
+sets a rightmost limit to  DDFSTOP  of ($D8) and a leftmost limit to
+ DDFSTRT  of ($18). This gives a maximum of 25 words fetched in low
+resolution mode. In high resolution mode the maximum here is 49 words,
+because the rightmost limit remains ($D8) and only one word is fetched at
+this limit. However, horizontal blanking actually limits the displayable
+video to 368 low resolution pixels (23 words). These numbers are the same
+both for NTSC and for PAL. In addition, it should be noted that using a
+data-fetch start earlier than ($38) will disable some  sprites .
+
+
+        Table 3-14: Maximum Allowable Horizontal Screen Video
+
+                                   Lores            Hires
+                                   -----            -----
+         DDFSTRT  (standard)       $0038            $003C
+         DDFSTOP  (standard)       $00D0            $00D4
+
+         DDFSTRT  (hw limits)      $0018            $0018
+         DDFSTOP  (hw limits)      $00D8            $00D8
+
+         max words fetched         25               49
+         max display pixels        368 (low res)
+
+On the Amiga computer, the timing of a pixel was defined as 140 ns for Lores modes,
+70 ns for Hires, and 35 ns for Super Hires (AGA).
+Dividing the duration of the visible duration of a scanline (52 µs) by the duration of a single pixel
+thus results in 742 Hires pixels that may be visible on a standard-compliant
+NTSC or PAL TV.
+While some Amiga components can in theory process 768 (Hires) pixels per line,
+extensive practical tests (source: Toni Wilen) have led to the conclusion that
+no more than 752 pixels can be rendered horizontally in Hires modes.
+This also includes the maximum boundaries of sprites and copper effects.
+
+When describing Amiga clipping offsets, these units are always relative to a
+starting position which starts on the first line from the top after the
+vertical blanking offset (42 interlaced lines for NTSC, 52 for PAL), and
+considering a left offset of (768-752)/2=8 Hires (16 Superhires) "unused" pixels.
+     */
 }

@@ -43,6 +43,12 @@ public enum Amiga
         }
 
         @Override
+        public boolean isNTSC()
+        {
+            return false;
+        }
+
+        @Override
         public float getCPUClock()
         {
             return isPAL() ? PAL_CPU_CLOCK_MHZ : NTSC_CPU_CLOCK_MHZ;
@@ -71,6 +77,7 @@ public enum Amiga
     public abstract int getKickRomSize();
     public abstract CPUType getCPUType();
     public abstract boolean isPAL();
+    public abstract boolean isNTSC();
     public abstract int getAgnusID();
 
     /**
