@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.Emulator;
+import de.codersourcery.m68k.emulator.ui.structexplorer.DisassemblyTextWindow;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
@@ -76,7 +77,8 @@ public abstract class AppWindow extends JInternalFrame
         MEMORY_BREAKPOINTS( "membreakpoints" , "Memory Breakpoints", MemoryBreakpointsWindow.class ),
         ROM_LISTING("romlisting", "ROM Listing", ROMListingViewer.class ),
         STRUCT_EXPLORER( "struct-explorer" , "Struct Explorer", StructExplorer.class ),
-        SCREEN( "screen" , "Screen", ScreenWindow.class );
+        SCREEN( "screen" , "Screen", ScreenWindow.class ),
+        DISASSEMBLY_TEXT( "disassembly-text", "Disassembly" , DisassemblyTextWindow.class );
 
         public final String id;
         public final String uiLabel;
@@ -135,7 +137,7 @@ public abstract class AppWindow extends JInternalFrame
         keyReleasedListener.add(l);
     }
 
-    protected static final GridBagConstraints cnstrs(int x, int y)
+    public static final GridBagConstraints cnstrs(int x, int y)
     {
         final GridBagConstraints result = new GridBagConstraints();
         result.gridx = x; result.gridy = y;
@@ -146,7 +148,7 @@ public abstract class AppWindow extends JInternalFrame
         return result;
     }
 
-    protected static final GridBagConstraints cnstrsNoResize(int x,int y)
+    public static final GridBagConstraints cnstrsNoResize(int x,int y)
     {
         final GridBagConstraints result = cnstrs(x,y);
         result.weightx = 0; result.weighty = 0;

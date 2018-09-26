@@ -1,9 +1,11 @@
 package de.codersourcery.m68k.emulator.ui;
 
+import de.codersourcery.m68k.disassembler.LibraryCallResolver;
 import de.codersourcery.m68k.emulator.Amiga;
 import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.Emulator;
 import de.codersourcery.m68k.emulator.memory.MemoryBreakpoints;
+import de.codersourcery.m68k.emulator.ui.structexplorer.DisassemblyTextWindow;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
@@ -18,11 +20,16 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class UI extends JFrame
@@ -34,6 +41,8 @@ public class UI extends JFrame
     private final List<ITickListener> tickListeners = new ArrayList<>();
     private final List<Emulator.IEmulatorStateCallback> stateChangeListeners = new ArrayList<>();
     private final List<AppWindow> windows = new ArrayList<>();
+
+    private LibraryCallResolver libraryCallResolver;
 
     private UIConfig uiConfig;
 
@@ -73,15 +82,19 @@ public class UI extends JFrame
         {
             emulator.destroy();
             emulator = null;
+            libraryCallResolver = null;
         }
 
         System.out.println("Setting up new emulator instance for "+Amiga.AMIGA_500);
         System.out.println("Using kickstart ROM "+loadConfig().getKickRomLocation());
 
         emulator = new Emulator(Amiga.AMIGA_500,loadKickstartRom());
+
         emulator.getBreakpoints().populateFrom( loadConfig().getBreakpoints() );
         emulator.memory.breakpoints.populateFrom( loadConfig().getMemoryBreakpoints() );
         emulator.setCallbackInvocationTicks(1000000);
+
+        setupLibraryCallResolver(emulator);
 
         emulator.setStateCallback( new Emulator.IEmulatorStateCallback()
         {
@@ -110,7 +123,52 @@ public class UI extends JFrame
                 tickListeners.get( i ).tick( e );
             }
         });
+
         refresh();
+    }
+
+    private void setupLibraryCallResolver(Emulator emulator) throws IOException
+    {
+        libraryCallResolver = new LibraryCallResolver( emulator );
+
+        final UIConfig config = loadConfig();
+        final Set<File> descFiles = new HashSet<>();
+        if ( config.getLibraryFunctionDescBaseDir() != null )
+        {
+            final File baseDir = config.getLibraryFunctionDescBaseDir();
+            final File[] files = baseDir.listFiles();
+            if ( files != null )
+            {
+                for ( File f : files )
+                {
+                    if ( ! f.isDirectory() )
+                    {
+                        descFiles.add( f );
+                    }
+                }
+            }
+        }
+
+        for (UIConfig.LibraryMapping mapping : config.getLibraryMappings())
+        {
+            final Pattern fileNamePattern = Pattern.compile( mapping.descFileRegex , Pattern.CASE_INSENSITIVE );
+            final Pattern libraryNamePattern = Pattern.compile( mapping.libraryNameRegex , Pattern.CASE_INSENSITIVE );
+            final List<File> matches = descFiles.stream().filter( x -> fileNamePattern.matcher( x.getName() ).matches() ).collect( Collectors.toList() );
+            if ( matches.size() == 1 )
+            {
+                System.out.println("Registering "+matches.get(0).getAbsolutePath()+" => "+mapping);
+                final LibraryCallResolver.ILibraryMatcher matcher = (libraryName, libraryVersion) -> libraryNamePattern.matcher( libraryName ).matches();
+                libraryCallResolver.register( matches.get( 0 ), matcher );
+            }
+            else if ( matches.size() > 1 )
+            {
+                throw new RuntimeException("File name pattern '"+fileNamePattern+"' matches multiple files: "+matches.stream().map(x->x.getAbsolutePath()).collect( Collectors.joining(",")));
+            }
+            System.err.println( "No matching files for " + mapping.descFileRegex );
+        }
+
+        getWindow( AppWindow.WindowKey.DISASSEMBLY).ifPresent(  window -> ((DisassemblyWindow) window).setLibraryCallResolver( libraryCallResolver ) );
+        getWindow( AppWindow.WindowKey.DISASSEMBLY_TEXT).ifPresent(  window -> ((DisassemblyTextWindow) window).setLibraryCallResolver( libraryCallResolver ) );
     }
 
     private void refresh()
@@ -307,6 +365,8 @@ public class UI extends JFrame
                 setupEmulator();
             }
         }));
+
+        menu1.add( menuItem("Library function resolution...", () -> new LibraryFunctionResolutionDialog().showDialog( loadConfig() ) ));
 
         menu1.add( menuItem("Load kickstart ROM disassembly", () ->
         {

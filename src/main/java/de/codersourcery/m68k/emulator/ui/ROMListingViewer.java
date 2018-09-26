@@ -290,21 +290,7 @@ outer:
                     }
                     if ( textOffset != null )
                     {
-                        textfield.setCaretPosition( textOffset );
-                        Rectangle position = null;
-                        try
-                        {
-                            position = textfield.modelToView( textOffset );
-                        }
-                        catch (BadLocationException e)
-                        {
-                            error(e);
-                        }
-                        System.out.println("Caret at "+position);
-                        final JViewport pane = (JViewport) textfield.getParent();
-                        System.out.println("Viewport size: "+scrollpane.getViewport().getView().getSize());
-                        System.out.println("Viewport bounds: "+pane.getBounds());
-                        System.out.println("Visible rect: "+pane.getVisibleRect());
+//                        textfield.setCaretPosition( textOffset );
                         final int end = getEndOfLine( textOffset );
                         if ( currentHighlight != null )
                         {
@@ -313,6 +299,31 @@ outer:
                         }
                         currentHighlight = new Highlight( textOffset, end - textOffset );
                         currentHighlight.highlight();
+
+                        Rectangle position = null;
+                        try
+                        {
+                            position = textfield.modelToView( textOffset );
+                        }
+                        catch (BadLocationException e)
+                        {
+                            error(e);
+                            return;
+                        }
+
+                        // adjust viewport so that highlighted area is in the middle
+                        // of the scrollpane
+                        System.out.println("Caret at "+position);
+                        final JViewport pane = (JViewport) textfield.getParent();
+                        System.out.println("Viewport size: "+scrollpane.getViewport().getView().getSize());
+                        System.out.println("Viewport bounds: "+scrollpane.getBounds());
+                        System.out.println("Visible rect: "+pane.getVisibleRect());
+                        position.y += scrollpane.getBounds().height/4;
+                        if ( position.y >= 0 )
+                        {
+                            System.out.println("Scrolling to "+position);
+                            textfield.scrollRectToVisible( position );
+                        }
                     }
                     addressChanged = false;
                 }

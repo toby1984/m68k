@@ -14,6 +14,7 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorStateCallback,
         ITickListener
@@ -26,9 +27,13 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
         {
             int address;
             IAdrProvider newProvider = null;
+            final AtomicInteger tmpAddress = new AtomicInteger();
+            runOnEmulator( emu -> {
+                tmpAddress.set( adrProvider.getAddress( null ) );
+            });
             synchronized (LOCK)
             {
-                address = adrProvider.getAddress( null );
+                address = tmpAddress.get();
             }
             if ( e.getKeyCode() == KeyEvent.VK_PAGE_UP ) {
                 newProvider = new FixedAdrProvider(  address - bytesToDump/2 );

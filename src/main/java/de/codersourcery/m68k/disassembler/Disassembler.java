@@ -10,22 +10,34 @@ import de.codersourcery.m68k.utils.Misc;
 import de.codersourcery.m68k.utils.OpcodeFileReader;
 import org.apache.commons.lang3.StringUtils;
 
-import java.io.BufferedReader;
-import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 public class Disassembler
 {
     private static final boolean DEBUG = false;
+
+    public static final class FunctionDescription
+    {
+        public final String name;
+        public final int offset;
+        public final boolean isPublic;
+        public final String signature;
+
+        public FunctionDescription(String name, int offset, boolean isPublic, String signature)
+        {
+            this.name = name;
+            this.offset = offset;
+            this.isPublic = isPublic;
+            this.signature = signature;
+        }
+
+        @Override
+        public String toString()
+        {
+            return name+"("+offset+") , public = "+isPublic+", signature = "+signature;
+        }
+    }
 
     private final Memory memory;
 
@@ -44,7 +56,24 @@ public class Disassembler
 
     private boolean resolveRelativeOffsets;
 
+    private IIndirectCallResolver indirectCallResolver = null;
+
     private int pc;
+
+    /**
+     * Used when attempting to resolve 'JSR $XXXXX(An)' library calls.
+     */
+    public interface IIndirectCallResolver
+    {
+        /**
+         * Resolve library function.
+         *
+         * @param addressRegister
+         * @param offset
+         * @return Function name or <code>null</code> if resolving failed
+         */
+        FunctionDescription resolve(int addressRegister, int offset);
+    }
 
     public static final class Line
     {
@@ -546,7 +575,7 @@ public class Disassembler
             case LINK:
                 appendln("link ");
                 eaRegister = (insnWord & 0b000111);
-                final int displacement = readWord();
+                int displacement = readWord();
                 append("a").append(eaRegister).append(",#").appendHex16Bit(displacement);
                 return;
             case RTS:
@@ -556,6 +585,21 @@ public class Disassembler
                 appendln("jsr ");
                 eaMode     = (insnWord & 0b111000) >>> 3;
                 eaRegister = (insnWord & 0b000111);
+
+                // special case indirect jumps with displacement:
+                if ( eaMode == AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT.eaModeField )
+                {
+                    displacement = memory.readWordNoSideEffects( pc );
+                    FunctionDescription function  =
+                            indirectCallResolver == null ? null : indirectCallResolver.resolve( eaRegister, displacement );
+                    if ( function != null )
+                    {
+                        pc += 2; // skip displacement
+                        append( function.name ).append("(").appendAddressRegister( eaRegister ).append(")");
+                        commentsBuffer.append( function.signature );
+                        return;
+                    }
+                }
                 decodeOperand(4,eaMode,eaRegister);
                 return;
             case MOVEA:
@@ -1755,5 +1799,10 @@ public class Disassembler
     public void setResolveRelativeOffsets(boolean resolveRelativeOffsets)
     {
         this.resolveRelativeOffsets = resolveRelativeOffsets;
+    }
+
+    public void setIndirectCallResolver(IIndirectCallResolver indirectCallResolver)
+    {
+        this.indirectCallResolver = indirectCallResolver;
     }
 }

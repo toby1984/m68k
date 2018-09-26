@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.disassembler.Disassembler;
+import de.codersourcery.m68k.disassembler.LibraryCallResolver;
 import de.codersourcery.m68k.emulator.Breakpoint;
 import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.Emulator;
@@ -33,6 +34,8 @@ public class DisassemblyWindow extends AppWindow
         implements ITickListener, Emulator.IEmulatorStateCallback
 {
     private final Object LOCK = new Object();
+
+    private LibraryCallResolver libraryCallResolver;
 
     // @GuardedBy( LOCK )
     private int addressToDisplay;
@@ -268,6 +271,7 @@ public class DisassemblyWindow extends AppWindow
         final Disassembler disasm = new Disassembler(emulator.memory);
         disasm.setDumpHex(true);
         disasm.setResolveRelativeOffsets(true);
+        disasm.setIndirectCallResolver( (addressRegister, offset) -> libraryCallResolver == null ?null : libraryCallResolver.resolve( addressRegister, offset ) );
 
         int start;
         synchronized( LOCK )
@@ -354,5 +358,10 @@ public class DisassemblyWindow extends AppWindow
     public WindowKey getWindowKey()
     {
         return WindowKey.DISASSEMBLY;
+    }
+
+    public void setLibraryCallResolver(LibraryCallResolver libraryCallResolver)
+    {
+        this.libraryCallResolver = libraryCallResolver;
     }
 }
