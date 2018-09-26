@@ -70,7 +70,7 @@ public abstract class AppWindow extends JInternalFrame
         BACKTRACE( "backtrace" , "Backtrace", BacktraceWindow.class ),
         BREAKPOINTS( "breakpoints", "Breakpoints", BreakpointsWindow.class ),
         CPU_STATE( "cpustate" , "CPU State", CPUStateWindow.class),
-        DISASSEMBLY( "disassembly" , "Disassembly", DisassemblyWindow.class),
+        DISASSEMBLY( "disassembly" , "Disassembly (PC)", DisassemblyWindow.class),
         EMULATOR_STATE( "emulatorcontrol" , "Emulator", EmulatorStateWindow.class ),
         MAIN_WINDOW("mainWindow", "Main Window", null),
         MEMORY_VIEW( "memoryview" , "Memory", MemoryViewWindow.class ),
@@ -78,7 +78,7 @@ public abstract class AppWindow extends JInternalFrame
         ROM_LISTING("romlisting", "ROM Listing", ROMListingViewer.class ),
         STRUCT_EXPLORER( "struct-explorer" , "Struct Explorer", StructExplorer.class ),
         SCREEN( "screen" , "Screen", ScreenWindow.class ),
-        DISASSEMBLY_TEXT( "disassembly-text", "Disassembly" , DisassemblyTextWindow.class );
+        DISASSEMBLY_TEXT( "disassembly-text", "Disassembly (text)" , DisassemblyTextWindow.class );
 
         public final String id;
         public final String uiLabel;

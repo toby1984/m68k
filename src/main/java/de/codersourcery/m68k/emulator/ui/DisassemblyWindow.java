@@ -7,6 +7,7 @@ import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.Emulator;
 import de.codersourcery.m68k.emulator.IBreakpointCondition;
 import de.codersourcery.m68k.utils.Misc;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.JButton;
 import javax.swing.JPanel;
@@ -28,6 +29,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 public class DisassemblyWindow extends AppWindow
@@ -188,7 +190,8 @@ public class DisassemblyWindow extends AppWindow
             }
             ui.doWithEmulator(DisassemblyWindow.this::tick);
         }
-        else if ( e.getKeyCode() == KeyEvent.VK_PAGE_DOWN ) {
+        else if ( e.getKeyCode() == KeyEvent.VK_PAGE_DOWN )
+        {
             synchronized (LOCK)
             {
                 addressToDisplay = lines.get(lines.size()-1).pc;
@@ -232,17 +235,25 @@ public class DisassemblyWindow extends AppWindow
         final JToolBar toolbar = new JToolBar(JToolBar.HORIZONTAL );
 
         registerKeyReleasedListener( keyAdapter );
-        addressTextfield.addActionListener( ev -> {
-
+        addressTextfield.addActionListener( ev ->
+        {
             try
             {
-                final int toDisplay = parseNumber(addressTextfield.getText());
-                synchronized(LOCK)
+                final String text = addressTextfield.getText();
+                if ( StringUtils.isNotBlank(text))
                 {
-                    followProgramCounter = false;
-                    addressToDisplay = toDisplay;
+                    final IAdrProvider adrProvider = parseExpression( text );
+                    final AtomicInteger toDisplay = new AtomicInteger();
+
+                    runOnEmulator( emu -> toDisplay.set( adrProvider.getAddress( emu ) ) );
+
+                    synchronized (LOCK)
+                    {
+                        followProgramCounter = false;
+                        addressToDisplay = toDisplay.get();
+                    }
+                    ui.doWithEmulator( this::tick );
                 }
-                ui.doWithEmulator(this::tick);
             }
             catch(Exception e)
             {

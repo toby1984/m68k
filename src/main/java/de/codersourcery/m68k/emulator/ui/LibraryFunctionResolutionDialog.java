@@ -2,17 +2,37 @@ package de.codersourcery.m68k.emulator.ui;
 
 import org.apache.commons.lang3.StringUtils;
 
-import javax.swing.*;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.filechooser.FileFilter;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableModel;
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
-import java.util.stream.IntStream;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class LibraryFunctionResolutionDialog
 {
@@ -55,7 +75,7 @@ public class LibraryFunctionResolutionDialog
         @Override
         public int getColumnCount()
         {
-            return 2;
+            return 3;
         }
 
         @Override
@@ -66,6 +86,8 @@ public class LibraryFunctionResolutionDialog
                     return "Library Name RegEx";
                 case 1:
                     return "File Name RegEx";
+                case 2:
+                    return "Matched file";
                 default:
                     throw new IllegalArgumentException( "Invalid column "+columnIndex );
             }
@@ -80,18 +102,52 @@ public class LibraryFunctionResolutionDialog
         @Override
         public boolean isCellEditable(int rowIndex, int columnIndex)
         {
-            return true;
+            return columnIndex != 2;
+        }
+
+        public List<String> getMatches(UIConfig.LibraryMapping row) {
+            if ( baseDir != null && baseDir.exists() && StringUtils.isNotBlank(row.descFileRegex ) )
+            {
+                final Pattern pat = Pattern.compile(row.descFileRegex,Pattern.CASE_INSENSITIVE);
+                final AtomicInteger matchCount = new AtomicInteger(0);
+                try
+                {
+                    final Stream<Path> stream = Files.list( baseDir.toPath() );
+                    return stream.takeWhile( p -> matchCount.get() < 2 )
+                            .map( path -> path.getFileName().toString() )
+                            .filter(  path ->
+                            {
+                                final boolean matched = pat.matcher( path ).matches();
+                                if ( matched ) {
+                                    matchCount.incrementAndGet();
+                                }
+                                return matched;
+                            }).collect(Collectors.toList());
+                }
+                catch (IOException e)
+                {
+                    throw new RuntimeException(e);
+                }
+            }
+            return new ArrayList<>();
+        }
+
+        public UIConfig.LibraryMapping getRow(int row) {
+            return mappings.get(row);
         }
 
         @Override
         public Object getValueAt(int rowIndex, int columnIndex)
         {
-            final UIConfig.LibraryMapping row = mappings.get( rowIndex );
+            final UIConfig.LibraryMapping row = getRow( rowIndex );
             switch(columnIndex) {
                 case 0:
                     return row.libraryNameRegex;
                 case 1:
                     return row.descFileRegex;
+                case 2:
+                    final List<String> matches = getMatches( row );
+                    return matches.stream().collect( Collectors.joining(",") );
                 default:
                     throw new IllegalArgumentException( "Invalid column "+columnIndex );
             }
@@ -100,7 +156,7 @@ public class LibraryFunctionResolutionDialog
         @Override
         public void setValueAt(Object aValue, int rowIndex, int columnIndex)
         {
-            final UIConfig.LibraryMapping row = mappings.get( rowIndex );
+            final UIConfig.LibraryMapping row = getRow( rowIndex );
             switch(columnIndex)
             {
                 case 0:
@@ -132,6 +188,22 @@ public class LibraryFunctionResolutionDialog
 
     public void showDialog(UIConfig appConfig)
     {
+        table.setDefaultRenderer( String.class , new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column)
+            {
+                final Component result =
+                        super.getTableCellRendererComponent( table, value, isSelected, hasFocus, row, column );
+                final UIConfig.LibraryMapping mapping = tableModel.getRow(row);
+                final int matchCount = tableModel.getMatches( mapping ).size();
+                if ( matchCount == 0 || matchCount > 1 ) {
+                    setBackground( Color.RED );
+                } else {
+                    setBackground( table.getBackground() );
+                }
+                return result;
+            }
+        } );
         mappings.clear();
         mappings.addAll( appConfig.getLibraryMappings() );
 

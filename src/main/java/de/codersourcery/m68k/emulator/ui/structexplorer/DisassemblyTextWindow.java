@@ -10,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class DisassemblyTextWindow extends AppWindow implements ITickListener, Emulator.IEmulatorStateCallback
 {
@@ -37,13 +38,17 @@ public class DisassemblyTextWindow extends AppWindow implements ITickListener, E
             {
                 try
                 {
-                    int newAddress = parseNumber( address.getText() ) & ~1;
+                    final IAdrProvider adrProvider = parseExpression( address.getText() );
+                    final AtomicInteger newAddress = new AtomicInteger();
+
+                    runOnEmulator( emu -> newAddress.set( adrProvider.getAddress( emu ) & ~1 ) );
+
                     synchronized(LOCK)
                     {
-                        if ( newAddress != startAddress )
+                        if ( newAddress.get() != startAddress )
                         {
                             addressChanged = true;
-                            startAddress = newAddress;
+                            startAddress = newAddress.get();
                         }
                     }
                 }
