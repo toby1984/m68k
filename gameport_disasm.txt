@@ -1,0 +1,74 @@
+; Gameport driver
+; Init code
+
+; A0 = CIAA base address ($bfe001)
+; see http://amiga.nvg.org/amiga/reference/Hardware_Manual_guide/node012E.html
+
+00fe9296: move.b #$8,$f00(a0) ; runmode oneshot / crb - CIAA control register B
+00fe929c: move.b #$ff,$600(a0) ; load talo - CIAA timer B low byte (.715909 Mhz NTSC; .709379 Mhz PAL)
+00fe92a2: move.b #$ff,$700(a0) ; load tahi and start timer - CIAA timer B high byte
+
+00fe92a8: move.w #$4000,$dff09a ; master IRQ disable
+
+; inc IDNestCnt to disable interrupts
+00fe92b0: addq.b #1,$126(a6)
+
+00fe92b4: bsr $fe930e ; verify that todlo is changing
+
+00fe92b8: move.b #$19,$f00(a0) ; crb - %11001 ; start,one-shot mode, load timer
+00fe92be: bsr $fe930e ; verify that todlo is changing
+
+00fe92c2: move.b #$8,$f00(a0) ; one-shot
+00fe92c8: moveq #0,d0        ; clear d0 as we're going to load a byte value
+00fe92ca: move.b $700(a0),d0 ; tahi CIAA timer B high byte
+00fe92ce: lsl.l d0,d0        ; shift left by (d0 % 64) bits ???
+00fe92d0: move.b $600(a0),d0 ; load talo
+
+; enable interrupts again
+00fe92d4: subq.b #1,$126(a6)
+00fe92d8: bge $fe92e2
+00fe92da: move.w #$ffffc000,$dff09a
+
+00fe92e2: cmpi.w #$ccdd,d0 ; why $ccdd ?
+00fe92e6: bhi $fe92f0 ; we're running at 60 Hz
+
+; we're running at 50 Hz
+00fe92e8: moveq #50,d0
+00fe92ea: move.w #$4e20,d1
+00fe92ee: bra $fe92f6
+
+; we're running at 60 Hz
+00fe92f0: moveq #60,d0
+00fe92f2: move.w #$411b,d1
+
+; add device and exit
+00fe92f6: move.w d0,$22(a2) ; power supply frequency
+00fe92fa: move.w d1,$24(a2)
+00fe92fe: move.b d0,$213(a6) ; store PowerSupplyFrequency
+00fe9302: movea.l a2,a1
+00fe9304: jsr AddDevice(a6)              ;  device(a1)
+00fe9308: movem.l (a7)+,d2/a2-a3
+00fe930c: rts
+
+; --------
+; Verify that todlo is changing
+; at a reasonable speed
+; --------
+
+00fe930e: move.b $800(a0),d0 ; todlo - 50/60 Hz event counter bits 7-0 (VSync or line tick)
+00fe9312: cmp.b $800(a0),d0 ; todlo - 50/60 Hz event counter bits 7-0 (VSync or line tick)
+00fe9316: bne $fe9336 ; todolo changed, exit loop
+00fe9318: tst.b $700(a0) ; tbhi - CIAA timer B high byte
+00fe931c: bmi $fe9312 ; loop while MSB still set
+
+; todlo did not change at all after timer count
+; down from $ffff to 7fff
+; display Guru telling we're unable to determine
+; the power supply frequency
+
+00fe931e: movem.l d7/a5-a6,-(a7)
+00fe9322: move.l #$15000002,d7
+00fe9328: movea.l $4,a6
+00fe932c: jsr Alert(a6)                  ;  alertNum(d7)
+00fe9330: movem.l (a7)+,d7/a5-a6
+00fe9334: bra $fe92f0 ; pretend we're running at 60 Hz 
