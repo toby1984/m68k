@@ -219,7 +219,10 @@ public class Disassembler
         }
         catch(Exception e)
         {
-            e.printStackTrace();
+            if ( e instanceof EndOfMemoryAccess == false )
+            {
+                e.printStackTrace();
+            }
             textBuffer.append("dc.w ").append( Misc.hex(insnWord) );
             commentsBuffer.append( Misc.binary16Bit(insnWord) ).append(" , caught "+e.getMessage());
             pc = currentLine.pc+2;

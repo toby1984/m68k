@@ -114,7 +114,7 @@ public class DisassemblyTextWindow extends AppWindow implements ITickListener, E
         disasm.setDumpHex( false );
         disasm.setIndirectCallResolver( (addressRegister, offset) -> libraryCallResolver == null ? null : libraryCallResolver.resolve( addressRegister,offset ) );
 
-        final String newText = disasm.disassemble( startAddress, startAddress+1024 );
+        final String newText = disasm.disassemble( startAddress, 1024 );
         runOnEDT( () -> {
             textfield.setText( newText );
         } );
