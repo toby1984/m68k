@@ -56,7 +56,10 @@ public class Disassembler
 
     private boolean resolveRelativeOffsets;
 
+    private IChipRegisterResolver chipRegisterResolver = null;
     private IIndirectCallResolver indirectCallResolver = null;
+
+    private boolean verboseRegisterDescriptions;
 
     private int pc;
 
@@ -73,6 +76,30 @@ public class Disassembler
          * @return Function name or <code>null</code> if resolving failed
          */
         FunctionDescription resolve(int addressRegister, int offset);
+    }
+
+    /**
+     * Used to resolve absolute and address-register-indirect with displacement
+     * operands.
+     */
+    public interface IChipRegisterResolver
+    {
+        /**
+         * Try to resolve chip register name for an indirect memory address.
+         *
+         * @param addressRegister
+         * @param offset
+         * @return register name or <code>null</code> if the address did not belong to a valid chip register
+         */
+        RegisterDescription resolve(int addressRegister,int offset);
+
+        /**
+         * Try to resolve chip register name for a direct memory access.
+         *
+         * @param address
+         * @return register name or <code>null</code> if the address did not belong to a valid chip register
+         */
+        RegisterDescription resolve(int address);
     }
 
     public static final class Line
@@ -589,20 +616,6 @@ public class Disassembler
                 eaMode     = (insnWord & 0b111000) >>> 3;
                 eaRegister = (insnWord & 0b000111);
 
-                // special case indirect jumps with displacement:
-                if ( eaMode == AddressingMode.ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT.eaModeField )
-                {
-                    displacement = memory.readWordNoSideEffects( pc );
-                    FunctionDescription function  =
-                            indirectCallResolver == null ? null : indirectCallResolver.resolve( eaRegister, displacement );
-                    if ( function != null )
-                    {
-                        pc += 2; // skip displacement
-                        append( function.name ).append("(").appendAddressRegister( eaRegister ).append(")");
-                        commentsBuffer.append( function.signature );
-                        return;
-                    }
-                }
                 decodeOperand(4,eaMode,eaRegister);
                 return;
             case MOVEA:
@@ -1403,7 +1416,23 @@ public class Disassembler
                          */
                         adr = memLoadLong(pc);
                         pc += 4;
-                        append( Misc.hex(adr) );
+                        if ( chipRegisterResolver != null )
+                        {
+                            final RegisterDescription desc = chipRegisterResolver.resolve(adr);
+                            if ( desc != null ) {
+                                append( desc.name );
+                                commentsBuffer.append(Misc.hex(adr));
+                                if ( verboseRegisterDescriptions ) {
+                                    commentsBuffer.append(" ").append( desc.description );
+                                }
+                            } else {
+                                append(Misc.hex(adr));
+                            }
+                        }
+                        else
+                        {
+                            append(Misc.hex(adr));
+                        }
                         return;
                 }
                 // $$FALL-THROUGH$$
@@ -1441,6 +1470,29 @@ public class Disassembler
                 // ADDRESS_REGISTER_INDIRECT_WITH_DISPLACEMENT;
                 int offset = memLoadWord(pc);
                 pc += 2; // skip displacement
+
+                if ( chipRegisterResolver != null ) {
+                    final RegisterDescription resolved = chipRegisterResolver.resolve(eaRegister, offset);
+                    if ( resolved != null ) {
+                        append( resolved.name ).append("(a").append( eaRegister ).append(")");
+                        commentsBuffer.append( Misc.hex(offset) ).append("(a").append( eaRegister ).append(")");
+                        if ( verboseRegisterDescriptions ) {
+                            commentsBuffer.append(" ").append( resolved.description );
+                        }
+                        return;
+                    }
+                }
+
+                if ( indirectCallResolver != null )
+                {
+                    final FunctionDescription resolved = indirectCallResolver.resolve(eaRegister, offset);
+                    if ( resolved != null ) {
+                        append( resolved.name ).append("(a").append( eaRegister ).append(")");
+                        commentsBuffer.append( Misc.hex(offset) ).append("(a").append( eaRegister ).append(")");
+                        return;
+                    }
+                }
+
                 append( Misc.hex(offset) ).append("(a").append( eaRegister ).append(")");
                 return;
             case 0b110:
@@ -1807,5 +1859,15 @@ public class Disassembler
     public void setIndirectCallResolver(IIndirectCallResolver indirectCallResolver)
     {
         this.indirectCallResolver = indirectCallResolver;
+    }
+
+    public void setChipRegisterResolver(IChipRegisterResolver chipRegisterResolver)
+    {
+        this.chipRegisterResolver = chipRegisterResolver;
+    }
+
+    public void setVerboseRegisterDescriptions(boolean verboseRegisterDescriptions)
+    {
+        this.verboseRegisterDescriptions = verboseRegisterDescriptions;
     }
 }

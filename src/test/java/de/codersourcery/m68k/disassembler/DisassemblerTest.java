@@ -548,9 +548,19 @@ public class DisassemblerTest extends TestCase
         compile("ext.w d4");
         compile("ext.l d4");
     }
+
     public void testJSR() {
         compile("jsr sub\nillegal\nsub:","00000000: jsr $6\n" +
                 "00000004: illegal");
+    }
+
+    public void testJSRIndirect()
+    {
+        disasm.setIndirectCallResolver((addressRegister, offset) ->
+        {
+            return addressRegister != 3 || offset != 0x1200 ? null : new Disassembler.FunctionDescription("fake", 0, true, "");
+        });
+        compile("jsr $1200(a3)","00000000: jsr fake(a3)                   ;  $1200(a3)");
     }
 
     public void testRTS()

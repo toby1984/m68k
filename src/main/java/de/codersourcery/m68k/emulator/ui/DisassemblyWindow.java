@@ -2,14 +2,13 @@ package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.disassembler.Disassembler;
 import de.codersourcery.m68k.disassembler.LibraryCallResolver;
+import de.codersourcery.m68k.disassembler.RegisterDescription;
 import de.codersourcery.m68k.emulator.Breakpoint;
 import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.Emulator;
 import de.codersourcery.m68k.emulator.IBreakpointCondition;
-import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
 
-import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.JToolBar;
@@ -23,7 +22,6 @@ import java.awt.GridBagLayout;
 import java.awt.Rectangle;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -32,12 +30,10 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-public class DisassemblyWindow extends AppWindow
+public class DisassemblyWindow extends AbstractDisassemblyWindow
         implements ITickListener, Emulator.IEmulatorStateCallback
 {
     private final Object LOCK = new Object();
-
-    private LibraryCallResolver libraryCallResolver;
 
     // @GuardedBy( LOCK )
     private int addressToDisplay;
@@ -282,7 +278,8 @@ public class DisassemblyWindow extends AppWindow
         final Disassembler disasm = new Disassembler(emulator.memory);
         disasm.setDumpHex(true);
         disasm.setResolveRelativeOffsets(true);
-        disasm.setIndirectCallResolver( (addressRegister, offset) -> libraryCallResolver == null ?null : libraryCallResolver.resolve( addressRegister, offset ) );
+        disasm.setIndirectCallResolver(proxyCallResolver);
+        disasm.setChipRegisterResolver(proxyRegisterResolver);
 
         int start;
         synchronized( LOCK )
@@ -369,10 +366,5 @@ public class DisassemblyWindow extends AppWindow
     public WindowKey getWindowKey()
     {
         return WindowKey.DISASSEMBLY;
-    }
-
-    public void setLibraryCallResolver(LibraryCallResolver libraryCallResolver)
-    {
-        this.libraryCallResolver = libraryCallResolver;
     }
 }

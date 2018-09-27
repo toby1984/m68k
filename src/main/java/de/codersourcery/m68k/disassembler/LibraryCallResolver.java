@@ -1,6 +1,7 @@
 package de.codersourcery.m68k.disassembler;
 
 import de.codersourcery.m68k.emulator.Emulator;
+import de.codersourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.Validate;
 
 import java.io.File;
@@ -56,30 +57,38 @@ public class LibraryCallResolver implements Disassembler.IIndirectCallResolver
         // assume that address register points to a struct Library
         // get version number >> $14
         // get name >> $0a
-        if ( ( offset & 1 ) == 0 ) { // need an even address
-            final int libBase = emulator.cpu.addressRegisters[ addressRegister ];
-            final int version = emulator.memory.readWord( libBase + 0x14 );
-            int nameStart = emulator.memory.readLong( libBase + 0x0a );
 
-            final StringBuilder libName = new StringBuilder();
-            int idx = 0;
-            for ( ; idx < 64 ; idx++ )
+        if ( ( offset & 1 ) == 0 )
+        {
+            // need an even address
+            final int libBase = emulator.cpu.addressRegisters[ addressRegister ];
+            if ( ( libBase &1 ) == 0 )
             {
-                final int c = emulator.memory.readByte( nameStart+idx ) & 0xff;
-                if ( c < 32 || c >= 127 ) {
-                    break;
-                }
-                libName.append( (char) c );
-            }
-            if ( idx > 0 )
-            {
-                final String name = libName.toString();
-                for (int i = 0, matchersSize = matchers.size(); i < matchersSize; i++)
+                // need an even address
+                final int version = emulator.memory.readWord(libBase + 0x14);
+                int nameStart = emulator.memory.readLong(libBase + 0x0a);
+
+                final StringBuilder libName = new StringBuilder();
+                int idx = 0;
+                for (; idx < 64; idx++)
                 {
-                    final ILibraryMatcher m = matchers.get( i );
-                    if ( m.matches( name, version ) )
+                    final int c = emulator.memory.readByte(nameStart + idx) & 0xff;
+                    if (c < 32 || c >= 127)
                     {
-                        return functionDescriptions.get( i ).get( Integer.valueOf( offset ) );
+                        break;
+                    }
+                    libName.append((char) c);
+                }
+                if (idx > 0)
+                {
+                    final String name = libName.toString();
+                    for (int i = 0, matchersSize = matchers.size(); i < matchersSize; i++)
+                    {
+                        final ILibraryMatcher m = matchers.get(i);
+                        if (m.matches(name, version))
+                        {
+                            return functionDescriptions.get(i).get(Integer.valueOf(offset));
+                        }
                     }
                 }
             }

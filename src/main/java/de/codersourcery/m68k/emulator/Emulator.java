@@ -435,7 +435,15 @@ public class Emulator
                             }
                             break;
                         case CALLBACK:
-                            ((EmulatorCallback) cmd).callback.accept(this);
+                            try
+                            {
+                                ((EmulatorCallback) cmd).callback.accept(this);
+                            }
+                            catch(Exception e)
+                            {
+                                System.err.println("Emulator callback crashed");
+                                e.printStackTrace();
+                            }
                             break;
                         default:
                             throw new RuntimeException("Unhandled command: " + cmd);

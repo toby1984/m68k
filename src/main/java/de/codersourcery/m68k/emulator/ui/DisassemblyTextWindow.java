@@ -1,8 +1,9 @@
-package de.codersourcery.m68k.emulator.ui.structexplorer;
+package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.disassembler.Disassembler;
 import de.codersourcery.m68k.disassembler.LibraryCallResolver;
 import de.codersourcery.m68k.emulator.Emulator;
+import de.codersourcery.m68k.emulator.ui.AbstractDisassemblyWindow;
 import de.codersourcery.m68k.emulator.ui.AppWindow;
 import de.codersourcery.m68k.emulator.ui.ITickListener;
 import de.codersourcery.m68k.emulator.ui.UI;
@@ -12,7 +13,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class DisassemblyTextWindow extends AppWindow implements ITickListener, Emulator.IEmulatorStateCallback
+public class DisassemblyTextWindow extends AbstractDisassemblyWindow implements ITickListener, Emulator.IEmulatorStateCallback
 {
     private JTextField address = new JTextField("$0");
     private JTextArea textfield = new JTextArea();
@@ -24,8 +25,6 @@ public class DisassemblyTextWindow extends AppWindow implements ITickListener, E
 
     // @GuardedBy( LOCK )
     private boolean addressChanged = true;
-
-    private LibraryCallResolver libraryCallResolver;
 
     public DisassemblyTextWindow(UI ui)
     {
@@ -109,19 +108,19 @@ public class DisassemblyTextWindow extends AppWindow implements ITickListener, E
             }
             adr = startAddress;
         }
-        Disassembler disasm = new Disassembler( emulator.memory );
+
+        final Disassembler disasm = new Disassembler( emulator.memory );
         disasm.setResolveRelativeOffsets( true );
         disasm.setDumpHex( false );
-        disasm.setIndirectCallResolver( (addressRegister, offset) -> libraryCallResolver == null ? null : libraryCallResolver.resolve( addressRegister,offset ) );
+        disasm.setIndirectCallResolver( proxyCallResolver );
+        disasm.setChipRegisterResolver( proxyRegisterResolver );
+        disasm.setVerboseRegisterDescriptions(true);
 
-        final String newText = disasm.disassemble( startAddress, 1024 );
-        runOnEDT( () -> {
-            textfield.setText( newText );
-        } );
-    }
-
-    public void setLibraryCallResolver(LibraryCallResolver libraryCallResolver)
-    {
-        this.libraryCallResolver = libraryCallResolver;
+        final String newText = disasm.disassemble( adr, 1024 );
+        runOnEDT( () ->
+        {
+            textfield.setText(newText);
+            textfield.setCaretPosition(0);
+        });
     }
 }

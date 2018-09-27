@@ -1,11 +1,11 @@
 package de.codersourcery.m68k.emulator.ui;
 
+import de.codersourcery.m68k.disassembler.ChipRegisterResolver;
 import de.codersourcery.m68k.disassembler.LibraryCallResolver;
 import de.codersourcery.m68k.emulator.Amiga;
 import de.codersourcery.m68k.emulator.Breakpoints;
 import de.codersourcery.m68k.emulator.Emulator;
 import de.codersourcery.m68k.emulator.memory.MemoryBreakpoints;
-import de.codersourcery.m68k.emulator.ui.structexplorer.DisassemblyTextWindow;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +41,7 @@ public class UI extends JFrame
     private final List<Emulator.IEmulatorStateCallback> stateChangeListeners = new ArrayList<>();
     private final List<AppWindow> windows = new ArrayList<>();
 
+    private ChipRegisterResolver registerResolver;
     private LibraryCallResolver libraryCallResolver;
 
     private UIConfig uiConfig;
@@ -82,6 +82,7 @@ public class UI extends JFrame
         {
             emulator.destroy();
             emulator = null;
+            registerResolver = null;
             libraryCallResolver = null;
         }
 
@@ -95,6 +96,8 @@ public class UI extends JFrame
         emulator.setCallbackInvocationTicks(1000000);
 
         setupLibraryCallResolver(emulator);
+
+        windows.forEach( this::initializeWindow );
 
         emulator.setStateCallback( new Emulator.IEmulatorStateCallback()
         {
@@ -129,6 +132,7 @@ public class UI extends JFrame
 
     private void setupLibraryCallResolver(Emulator emulator) throws IOException
     {
+        registerResolver = new ChipRegisterResolver(emulator );
         libraryCallResolver = new LibraryCallResolver( emulator );
 
         final UIConfig config = loadConfig();
@@ -166,9 +170,6 @@ public class UI extends JFrame
             }
             System.err.println( "No matching files for " + mapping.descFileRegex );
         }
-
-        getWindow( AppWindow.WindowKey.DISASSEMBLY).ifPresent(  window -> ((DisassemblyWindow) window).setLibraryCallResolver( libraryCallResolver ) );
-        getWindow( AppWindow.WindowKey.DISASSEMBLY_TEXT).ifPresent(  window -> ((DisassemblyTextWindow) window).setLibraryCallResolver( libraryCallResolver ) );
     }
 
     private void refresh()
@@ -242,6 +243,12 @@ public class UI extends JFrame
             stateChangeListeners.add( (Emulator.IEmulatorStateCallback) window);
         }
 
+        initializeWindow(window);
+        return window;
+    }
+
+    private void initializeWindow(AppWindow window)
+    {
         if ( window instanceof ROMListingViewer)
         {
             final ROMListingViewer romListing = (ROMListingViewer) window;
@@ -256,7 +263,11 @@ public class UI extends JFrame
                 }
             }
         }
-        return window;
+        if ( window instanceof AbstractDisassemblyWindow)
+        {
+            ((AbstractDisassemblyWindow) window).setChipRegisterResolver(registerResolver );
+            ((AbstractDisassemblyWindow) window).setLibraryCallResolver(libraryCallResolver);
+        }
     }
 
     public void run()

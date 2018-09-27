@@ -17,6 +17,29 @@ public class CustomChipPage extends MemoryPage
     private final int startAddress;
 
     /*
+See http://amigadev.elowar.com/read/ADCD_2.1/Hardware_Manual_guide/node0060.html
+
+The following codes and abbreviations are used in this appendix:
+
+  &        Register used by DMA channel only.
+
+  %        Register used by DMA channel usually, processors sometimes.
+
+  +        Address register pair.  Must be an even address pointing to chip
+           memory.
+
+  *        Address not writable by the Copper.
+
+  ~        Address not writable by the Copper unless the "copper danger bit",  COPCON  is set true.
+
+  W,R      W=write-only; R=read-only,
+
+  ER       Early read. This is a DMA data transfer to RAM, from either the
+           disk or the blitter.  RAM timing requires data to be on the bus
+           earlier than microprocessor read cycles. These transfers are
+           therefore initiated by Agnus timing, rather than a read address
+           on the destination address bus.
+
 ----------------------------------------------------------------------
 NAME        ADD  R/W  CHIP    FUNCTION
 ----------------------------------------------------------------------

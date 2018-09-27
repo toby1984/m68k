@@ -1,7 +1,6 @@
 package de.codersourcery.m68k.emulator.ui;
 
 import de.codersourcery.m68k.emulator.Emulator;
-import de.codersourcery.m68k.emulator.ui.structexplorer.DisassemblyTextWindow;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 

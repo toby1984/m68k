@@ -29,7 +29,7 @@ public class MemoryViewWindow extends AppWindow implements Emulator.IEmulatorSta
             IAdrProvider newProvider = null;
             final AtomicInteger tmpAddress = new AtomicInteger();
             runOnEmulator( emu -> {
-                tmpAddress.set( adrProvider.getAddress( null ) );
+                tmpAddress.set( adrProvider.getAddress( emu ) );
             });
             synchronized (LOCK)
             {
