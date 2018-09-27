@@ -22,6 +22,7 @@ import java.awt.GridBagLayout;
 import java.awt.Rectangle;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -135,7 +136,7 @@ public class DisassemblyWindow extends AbstractDisassemblyWindow
                     final Disassembler.Line line = lines.get(i);
                     final Breakpoint bp = breakpoints.getBreakpoint(line.pc);
                     final String prefix;
-                    final boolean markLine = followProgramCounter && addressToDisplay == line.pc;
+                    final boolean markLine = addressToDisplay == line.pc;
                     if ( bp != null ) {
                         if ( breakpoints.isEnabled(bp ) ) {
                             prefix = markLine ? ">>>[B]" : "   [B]";
@@ -223,7 +224,6 @@ public class DisassemblyWindow extends AbstractDisassemblyWindow
         }
     };
 
-
     public DisassemblyWindow(UI ui)
     {
         super("Disassembly",ui);
@@ -231,6 +231,7 @@ public class DisassemblyWindow extends AbstractDisassemblyWindow
         final JToolBar toolbar = new JToolBar(JToolBar.HORIZONTAL );
 
         registerKeyReleasedListener( keyAdapter );
+
         addressTextfield.addActionListener( ev ->
         {
             try
@@ -239,16 +240,10 @@ public class DisassemblyWindow extends AbstractDisassemblyWindow
                 if ( StringUtils.isNotBlank(text))
                 {
                     final IAdrProvider adrProvider = parseExpression( text );
-                    final AtomicInteger toDisplay = new AtomicInteger();
-
-                    runOnEmulator( emu -> toDisplay.set( adrProvider.getAddress( emu ) ) );
-
-                    synchronized (LOCK)
+                    if ( adrProvider != null )
                     {
-                        followProgramCounter = false;
-                        addressToDisplay = toDisplay.get();
+                        setAddressProvider(adrProvider);
                     }
-                    ui.doWithEmulator( this::tick );
                 }
             }
             catch(Exception e)
@@ -268,8 +263,34 @@ public class DisassemblyWindow extends AbstractDisassemblyWindow
         cnstrs = cnstrs(0,1);
         cnstrs.weighty = 1;
         panel.setFocusable(true);
-        panel.addKeyListener( getKeyAdapter() );
+        panel.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e)
+            {
+                keyAdapter.accept(e);
+            }
+        });
+        attachKeyListeners(panel );
         getContentPane().add( panel, cnstrs);
+    }
+
+    public void setAddressProvider(IAdrProvider adrProvider)
+    {
+        final AtomicInteger toDisplay = new AtomicInteger();
+        runOnEmulator( emu -> toDisplay.set( adrProvider.getAddress( emu ) ) );
+
+        synchronized (LOCK)
+        {
+            followProgramCounter = false;
+            addressToDisplay = toDisplay.get();
+        }
+        ui.doWithEmulator( this::tick );
+    }
+
+    @Override
+    protected void windowClosed()
+    {
+        unregisterKeyReleasedListener(keyAdapter);
     }
 
     @Override

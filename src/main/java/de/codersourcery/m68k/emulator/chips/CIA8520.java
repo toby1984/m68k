@@ -87,6 +87,8 @@ import java.util.function.Function;
  */
 public class CIA8520
 {
+    private static final boolean DEBUG = true;
+
     public enum Name
     {
         CIAA,CIAB
@@ -343,6 +345,9 @@ Register  Name          Function
 14 E      CRA           Control register A
 15 F      CRB           Control register B
         */
+        if ( DEBUG) {
+            System.out.println( "WRITE: "+this+" - register "+Integer.toHexString(regNum)+ " <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")");
+        }
         switch( regNum )
         {
             case REG_PORTA:
@@ -506,6 +511,17 @@ Register  Name          Function
     }
 
     public int readRegister(int regNum)
+    {
+        if ( DEBUG )
+        {
+            final int result = internalReadRegister(regNum);
+            System.out.println( "READ: "+this+" - register "+Integer.toHexString(regNum)+ " ==> "+Integer.toHexString(result)+" (%"+Integer.toBinaryString(result)+")");
+            return result;
+        }
+        return internalReadRegister(regNum);
+    }
+
+    private int internalReadRegister(int regNum)
     {
         switch( regNum )
         {

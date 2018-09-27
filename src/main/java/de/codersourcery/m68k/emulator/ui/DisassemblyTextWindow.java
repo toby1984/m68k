@@ -38,16 +38,19 @@ public class DisassemblyTextWindow extends AbstractDisassemblyWindow implements 
                 try
                 {
                     final IAdrProvider adrProvider = parseExpression( address.getText() );
-                    final AtomicInteger newAddress = new AtomicInteger();
-
-                    runOnEmulator( emu -> newAddress.set( adrProvider.getAddress( emu ) & ~1 ) );
-
-                    synchronized(LOCK)
+                    if ( adrProvider != null )
                     {
-                        if ( newAddress.get() != startAddress )
+                        final AtomicInteger newAddress = new AtomicInteger();
+
+                        runOnEmulator(emu -> newAddress.set(adrProvider.getAddress(emu) & ~1));
+
+                        synchronized (LOCK)
                         {
-                            addressChanged = true;
-                            startAddress = newAddress.get();
+                            if (newAddress.get() != startAddress)
+                            {
+                                addressChanged = true;
+                                startAddress = newAddress.get();
+                            }
                         }
                     }
                 }

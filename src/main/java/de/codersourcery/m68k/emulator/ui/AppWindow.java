@@ -5,13 +5,19 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import javax.swing.*;
+import javax.swing.event.InternalFrameAdapter;
+import javax.swing.event.InternalFrameEvent;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.Insets;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ContainerAdapter;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -32,8 +38,6 @@ import java.util.stream.Stream;
  */
 public abstract class AppWindow extends JInternalFrame
 {
-    private static final Pattern HEX_DIGITS= Pattern.compile("[a-f]+",Pattern.CASE_INSENSITIVE);
-
     private static final Pattern ARITH_PATTERN =
             Pattern.compile(".*?(\\+|-)\\s*(\\$?[0-9a-fA-F]+)",Pattern.CASE_INSENSITIVE);
 
@@ -123,17 +127,37 @@ public abstract class AppWindow extends JInternalFrame
         setMaximizable(true);
         setFocusable(true);
         addKeyListener( KEY_ADAPTER );
+        addInternalFrameListener(new InternalFrameAdapter()
+        {
+            @Override
+            public void internalFrameClosed(InternalFrameEvent e)
+            {
+                windowClosed();
+            }
+        });
     }
 
-    protected static KeyAdapter getKeyAdapter()
-    {
-        return KEY_ADAPTER;
+    protected void windowClosed() {
+    }
+
+    protected static <T extends Component> T attachKeyListeners(T component,T... additional) {
+        component.addKeyListener( KEY_ADAPTER );
+        if (additional != null ) {
+            Arrays.stream(additional).forEach(c -> c.addKeyListener(KEY_ADAPTER) );
+        }
+        return component;
     }
 
     protected static void registerKeyReleasedListener(Consumer<KeyEvent> l)
     {
         Validate.notNull( l, "l must not be null" );
         keyReleasedListener.add(l);
+    }
+
+    protected static void unregisterKeyReleasedListener(Consumer<KeyEvent> l)
+    {
+        Validate.notNull( l, "l must not be null" );
+        keyReleasedListener.remove(l);
     }
 
     public static final GridBagConstraints cnstrs(int x, int y)

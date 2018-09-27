@@ -8,6 +8,7 @@ import de.codersourcery.m68k.utils.Misc;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
+import java.util.function.Consumer;
 
 public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulatorStateCallback
 {
@@ -16,6 +17,18 @@ public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulator
     private final JButton stepButton;
     private final JButton resetButton;
     private final JButton stepOverButton;
+
+    private final Consumer<KeyEvent> keyAdapter = event ->
+    {
+        if (event.getKeyCode() == KeyEvent.VK_F7)
+        {
+            runOnEmulator(Emulator::singleStep);
+        }
+        else if (event.getKeyCode() == KeyEvent.VK_F9)
+        {
+            runOnEmulator(Emulator::start);
+        }
+    };
 
     public EmulatorStateWindow(UI ui)
     {
@@ -48,17 +61,13 @@ public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulator
             ui.doWithEmulator( emu -> emu.reset() );
         });
         stopButton.setEnabled(false);
+        registerKeyReleasedListener(keyAdapter);
+    }
 
-        registerKeyReleasedListener( event ->
-        {
-            if ( event.getKeyCode() == KeyEvent.VK_F7 ) {
-                ui.doWithEmulator( emu -> emu.singleStep() );
-            }
-            else if ( event.getKeyCode() == KeyEvent.VK_F9 )
-            {
-                ui.doWithEmulator( emu -> emu.start() );
-            }
-        });
+    @Override
+    protected void windowClosed()
+    {
+        unregisterKeyReleasedListener(keyAdapter );
     }
 
     @Override

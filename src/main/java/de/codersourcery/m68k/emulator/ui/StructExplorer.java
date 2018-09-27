@@ -63,6 +63,7 @@ public class StructExplorer extends AppWindow implements
             runOnEmulator( this::tick );
         });
 
+        attachKeyListeners(tree);
         tree.setExpandsSelectedPaths( true );
         tree.setRootVisible( false );
 
@@ -84,6 +85,7 @@ public class StructExplorer extends AppWindow implements
         cnstrs.gridwidth = 2;
         cnstrs.fill=GridBagConstraints.BOTH;
         final JScrollPane scrollPane = new JScrollPane( tree );
+        attachKeyListeners(scrollPane);
         getContentPane().add( scrollPane,cnstrs );
     }
 

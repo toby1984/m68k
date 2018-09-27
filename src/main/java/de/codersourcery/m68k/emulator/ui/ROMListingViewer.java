@@ -138,6 +138,7 @@ public class ROMListingViewer extends AppWindow implements ITickListener, Emulat
         cnstrs = cnstrs(0,1);
         cnstrs.weighty=0.9;cnstrs.weightx=1;
         scrollpane = new JScrollPane(textfield);
+        attachKeyListeners(textfield,scrollpane);
         getContentPane().add( scrollpane , cnstrs );
 
         highlightStyle = document().addStyle( "highlightstyle", null );

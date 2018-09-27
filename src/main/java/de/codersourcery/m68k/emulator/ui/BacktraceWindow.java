@@ -62,11 +62,13 @@ public class BacktraceWindow extends AppWindow implements ITickListener, Emulato
         {
             listeners.remove(l);
         }
-    };
+    }
+
     public BacktraceWindow(UI ui)
     {
         super("Backtrace",ui);
 
+        attachKeyListeners(list);
         list.setCellRenderer(new DefaultListCellRenderer(){
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus)
@@ -89,6 +91,10 @@ public class BacktraceWindow extends AppWindow implements ITickListener, Emulato
                     ui.getWindow(WindowKey.ROM_LISTING).ifPresent( window ->
                     {
                         ((ROMListingViewer) window).showAddress(address);
+                    });
+                    ui.getWindow(WindowKey.DISASSEMBLY).ifPresent( window ->
+                    {
+                        ((DisassemblyWindow) window).setAddressProvider( new FixedAdrProvider(address) );
                     });
                 }
             }
