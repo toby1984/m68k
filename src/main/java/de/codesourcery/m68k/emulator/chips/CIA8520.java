@@ -350,25 +350,34 @@ Register  Name          Function
 14 E      CRA           Control register A
 15 F      CRB           Control register B
         */
-        if ( DEBUG) {
-            LOG.info(  "WRITE: "+this+" - register "+Integer.toHexString(regNum)+ " <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
-        }
         switch( regNum )
         {
             case REG_PORTA:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - PORT_A <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 writePortA(value);
                 break;
             case REG_PORTB:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - PORT_B <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 writePortB(value);
                 break;
             case REG_DDRA:
                 // DDR = 0 => INPUT pin
                 // DDR = 1 => OUTPUT pin
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - DDRA <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 portADDR = value;
                 int v = portA & portADDR;
                 portALine = (portALine & ~portADDR) | v;
                 break;
             case REG_DDRB:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - DDRB <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 // DDR = 0 => INPUT pin
                 // DDR = 1 => OUTPUT pin
                 portBDDR = value;
@@ -376,18 +385,33 @@ Register  Name          Function
                 portBLine = (portBLine & ~portBDDR) | v;
                 break;
             case REG_TIMERA_LO:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - TIMER_A_LO <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 setTimerALo(value);
                 break;
             case REG_TIMERA_HI:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - TIMER_A_HI <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 setTimerAHi(value);
                 break;
             case REG_TIMERB_LO:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - TIMER_B_LO <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 setTimerBLo(value);
                 break;
             case REG_TIMERB_HI:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - TIMER_B_HI <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 setTimerBHi(value);
                 break;
             case REG_EVENT_LO:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - EVENT_LO <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 if ( (ctrlB & CTRL_ALARM) != 0 ) {
                     eventCounterAlarmLatch = (eventCounterAlarmLatch & 0xffff00) | (value & 0xff);
                     eventCounterAlarm = eventCounterAlarmLatch;
@@ -396,9 +420,15 @@ Register  Name          Function
                 {
                     eventCounter = (eventCounter & 0xffff00) | (value & 0xff);
                 }
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - Event counter started with "+Misc.hex(eventCounter));
+                }
                 eventCounterRunning = true;
                 break;
             case REG_EVENT_MED:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - EVENT_MED <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 if ( (ctrlB & CTRL_ALARM) != 0 ) {
                     eventCounterAlarmLatch = (eventCounterAlarmLatch & 0xff00ff) | ((value & 0xff) << 8);
                 }
@@ -406,9 +436,15 @@ Register  Name          Function
                 {
                     eventCounter = (eventCounter & 0xff00ff) | ((value & 0xff) << 8);
                 }
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - Event counter stopped");
+                }
                 eventCounterRunning = false;
                 break;
             case REG_EVENT_HI:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - EVENT_HI <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 if ( (ctrlB & CTRL_ALARM) != 0 )
                 {
                     eventCounterAlarmLatch = (eventCounterAlarmLatch & 0x00ffff) | ((value & 0xff) << 16);
@@ -417,13 +453,22 @@ Register  Name          Function
                 {
                     eventCounter = (eventCounter & 0x00ffff) | ((value & 0xff) << 16);
                 }
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - Event counter stopped");
+                }
                 eventCounterRunning = false;
                 break;
             case REG_SERIAL_DATA:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - SERIAL_DATAA <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 serialDataReg = value & 0xff;
                 serialDataAvailable = true;
                 break;
             case REG_IRQ_CTRL:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - IRQ_CTRL <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 if ( (value & ICR_SETCLR) != 0 ) { // bit = 1
                     // set bits
                     irqMaskRegister |= (value & ~ICR_SETCLR);
@@ -435,12 +480,22 @@ Register  Name          Function
                 LOG.info( "IRQs active    : "+ Misc.binary8Bit(triggeredInterrupts) );
                 break;
             case REG_CTRLA:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - CTRL_A <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 final boolean serialModeChanged = (ctrlA & CTRL_SPMODE) != (value & CTRL_SPMODE);
                 ctrlA = value & ~CTRL_LOAD;
                 if ( (value & CTRL_LOAD) != 0 ) {
+                    if ( DEBUG) {
+                        LOG.info(  "WRITE: "+this+" - Loading timer A");
+                    }
                     loadTimerA();
                 }
                 if ( serialModeChanged ) {
+
+                    if ( DEBUG) {
+                        LOG.info(  "WRITE: "+this+" - Serial mode changed ");
+                    }
                     shiftRegisterBits = 0;
                     serialDataAvailable = false;
                     serialShiftReg = 0;
@@ -452,13 +507,19 @@ Register  Name          Function
                 }
                 break;
             case REG_CTRLB:
+                if ( DEBUG) {
+                    LOG.info(  "WRITE: "+this+" - CTRL_B <== "+Integer.toHexString(value)+" (%"+Integer.toBinaryString(value)+")" );
+                }
                 ctrlB = value & ~CTRL_LOAD;
                 if ( (value & CTRL_LOAD) != 0 ) {
+                    if ( DEBUG) {
+                        LOG.info(  "WRITE: "+this+" - Loading timer b");
+                    }
                     loadTimerB();
                 }
                 break;
             default:
-                LOG.info( "Unhandled register "+regNum+" on "+this );
+                LOG.warn( "WRITE: "+this+" Unhandled register "+Misc.hex(regNum));
         }
     }
 
@@ -703,6 +764,9 @@ Register  Name          Function
         {
             if ( elapsedTodCycles-- == 0 )
             {
+                if ( DEBUG) {
+                    LOG.info(  this+" - TOD elapsed");
+                }
                 elapsedTodCycles = cyclesPerTodTick;
                 eventCounter++;
                 if ( (ctrlB & CTRL_ALARM) != 0 && eventCounter == eventCounterAlarm )
@@ -872,11 +936,17 @@ Register  Name          Function
 
     private void triggerInterrupt(int maskBit)
     {
-        LOG.info( "IRQ triggered: "+ Misc.binary8Bit(maskBit) );
-        LOG.info( "IRQ mask: "+ Misc.binary8Bit(irqMaskRegister) );
+        if ( DEBUG )
+        {
+            LOG.info( this + " - IRQ triggered: " + Misc.binary8Bit( maskBit ) );
+            LOG.info( this + " - IRQ mask: " + Misc.binary8Bit( irqMaskRegister ) );
+        }
         if ( (irqMaskRegister & maskBit) != 0)
         {
-            LOG.info( "Triggered external IRQ" );
+            if ( DEBUG )
+            {
+                LOG.info( this + " - Triggered external IRQ" );
+            }
             triggeredInterrupts |= (maskBit|ICR_SETCLR);
             irqController.externalInterrupt(this);
         } else {
