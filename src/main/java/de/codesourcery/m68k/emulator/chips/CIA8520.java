@@ -239,7 +239,7 @@ Register  Name          Function
     public final Name name;
 
     private int timerAUnderflowCount;
-    private int cycle;
+    private int cyclesUntilTick;
 
     private int portADDR; // bit set to 0 => INPUT pin
 
@@ -287,7 +287,8 @@ Register  Name          Function
         this.name = name;
         this.irqController = irqController;
         this.amiga = amiga;
-        this.cyclesPerTodTick = name == Name.CIAA ? amiga.getPowerSupplyCycles() : amiga.getHSyncCycles();
+        this.cyclesPerTodTick = name == Name.CIAA ? getPowerSupplyCycles(amiga) :
+                getHSyncCycles(amiga);
         reset();
     }
 
@@ -487,6 +488,7 @@ Register  Name          Function
                 ctrlA = value & ~CTRL_LOAD;
                 if ( (value & CTRL_LOAD) != 0 ) {
                     if ( DEBUG) {
+
                         LOG.info(  "WRITE: "+this+" - Loading timer A");
                     }
                     loadTimerA();
@@ -505,6 +507,11 @@ Register  Name          Function
                         serialPin = true;
                     }
                 }
+                if ( DEBUG )
+                {
+                    LOG.info( "WRITE: " + this + " - Time A running: "+isTimerARunning() );
+                    LOG.info( "WRITE: " + this + " - Time A mode: "+(isTimerAOneShot() ? "one-shot" : "continous"));
+                }
                 break;
             case REG_CTRLB:
                 if ( DEBUG) {
@@ -516,6 +523,11 @@ Register  Name          Function
                         LOG.info(  "WRITE: "+this+" - Loading timer b");
                     }
                     loadTimerB();
+                }
+                if ( DEBUG )
+                {
+                    LOG.info( "WRITE: " + this + " - Time B running: "+isTimerBRunning() );
+                    LOG.info( "WRITE: " + this + " - Time B mode: "+(isTimerBOneShot()?"one-shot":"continous"));
                 }
                 break;
             default:
@@ -606,7 +618,7 @@ Register  Name          Function
             case REG_TIMERB_LO:
                 return timerB & 0xff;
             case REG_TIMERB_HI:
-                return (timerA & 0xff00) >> 8;
+                return (timerB & 0xff00) >> 8;
             case REG_EVENT_LO:
                 if ( (ctrlB & CTRL_ALARM) != 0 )
                 {
@@ -669,6 +681,19 @@ Register  Name          Function
         if ( ! isTimerARunning() ) {
             loadTimerA();
         }
+        /*
+In one-shot mode, a write to timer-high (register 5 for timer A, register
+7 for Timer B) will transfer the timer latch to the counter and initiate
+counting regardless of the start bit.
+         */
+        if ( isTimerAOneShot() )
+        {
+            if ( DEBUG ) {
+                LOG.debug("setTimerAHi("+this+") Starting timer A in one-shot mode at "+Misc.hex(timerALatch));
+            }
+            timerA = timerALatch;
+            ctrlA |= CTRL_START;
+        }
     }
 
     private void setTimerBLo(int value)
@@ -681,6 +706,19 @@ Register  Name          Function
         timerBLatch = (timerBLatch & 0x00ff) | ((value & 0xff) << 8);
         if ( ! isTimerBRunning() ) {
             loadTimerB();
+        }
+                /*
+In one-shot mode, a write to timer-high (register 5 for timer A, register
+7 for Timer B) will transfer the timer latch to the counter and initiate
+counting regardless of the start bit.
+         */
+        if ( isTimerBOneShot() )
+        {
+            if ( DEBUG ) {
+                LOG.debug("setTimerBHi("+this+") Starting timer B in one-shot mode at "+Misc.hex(timerBLatch));
+            }
+            timerB = timerBLatch;
+            ctrlB |= CTRL_START;
         }
     }
 
@@ -758,7 +796,15 @@ Register  Name          Function
 
     public void tick() {
 
-        cycle++;
+        /*
+         * All Amiga models have same CIA timer clock rates,
+         * ~709KHz if PAL model and ~715KHz if NTSC model.
+         */
+        if ( cyclesUntilTick-- > 0 )
+        {
+            return;
+        }
+        cyclesUntilTick = 10;
 
         if ( eventCounterRunning )
         {
@@ -971,7 +1017,9 @@ Register  Name          Function
         triggeredInterrupts = 0;
         irqMaskRegister = 0;
         elapsedTodCycles = cyclesPerTodTick;
+        LOG.debug("reset(): "+this+" event counter increments every "+cyclesPerTodTick+" ticks");
         eventCounter = 0;
+        cyclesUntilTick = 10;
         eventCounterAlarmLatch = 0;
         eventCounterAlarm = 0;
         eventCounterRunning = false;
@@ -1037,5 +1085,44 @@ Register  Name          Function
 
     public void setCntIn(boolean value) {
         this.cntIn = value;
+    }
+
+    // 50 Hz = 0,02s
+    // NTSC: 143184 cycles
+
+    // 60 Hz = 0,0166s
+    // PAL:  118237
+
+    /**
+     * Returns the number of CIA ticks per power-supply cycle.
+     *
+     * PAL runs at 60 Hz while NTSC runs at 50 Hz.
+     * @return
+     */
+    private int getPowerSupplyCycles(Amiga amiga)
+    {
+        final double value;
+        final double cpuFreq = 1.0 / (amiga.getCPUClock()*1000000.0);
+        if ( amiga.isPAL() ) {
+            value = (1/60.0) / cpuFreq;
+        } else
+        {
+            value = (1/50.0) / cpuFreq;
+        }
+        // divided by 10 because CIA runs at 1/10 of CPU frequency
+        return (int) Math.round(value/10.0);
+    }
+
+    /**
+     * Returns the number of CIA ticks per HSYNC.
+     *
+     * @return
+     */
+    private static int getHSyncCycles(Amiga amiga)
+    {
+        final double hsyncFreq = 1/15000.0; // 15kHz
+        final double cpuFreq = 1.0 / amiga.getCPUClock() * 1000000.0;
+        // divided by 10 because CIA runs at 1/10 of CPU frequency
+        return (int) Math.round( hsyncFreq / cpuFreq / 10.0 );
     }
 }

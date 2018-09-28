@@ -89,38 +89,4 @@ public enum Amiga
 
     public static final float NTSC_CPU_CLOCK_MHZ = 7.15909f; // 7159090 => 139,68 ns
     public static final float PAL_CPU_CLOCK_MHZ  = 7.09379f; // 7093790 => 140,96 ns
-
-    // 50 Hz = 0,02s
-    // NTSC: 143184 cycles
-
-    // 60 Hz = 0,0166s
-    // PAL:  118237
-
-    /**
-     * Returns the number of CPU cycles per power-supply cycle.
-     *
-     * PAL runs at 60 Hz while NTSC runs at 50 Hz.
-     * @return
-     */
-    public int getPowerSupplyCycles()
-    {
-        final double value;
-        if ( isPAL() ) {
-            value = (1/60.0) / (1.0 / getCPUClock()*1000000.0);
-        } else
-        {
-            value = (1/50.0) / (1.0 / getCPUClock() * 1000000.0);
-        }
-        return (int) Math.round(value);
-    }
-
-    /**
-     * Returns the number of CPU cycles per HSYNC.
-     *
-     * @return
-     */
-    public int getHSyncCycles()
-    {
-       return (int) Math.round( (1/15000.0) / ( 1.0 / getCPUClock()*1000000.0) );
-    }
 }

@@ -9,7 +9,8 @@
     </File>
   </Appenders>
   <Loggers>
-    <Logger name="de.codesourcery" level="info"/>
+    <Logger name="de.codesourcery" level="warn"/>
+    <Logger name="de.codesourcery.m68k.emulator.chips.CIA8520" level="debug"/>
     <Root level="error">
       <AppenderRef ref="STDOUT"/>
       <!--  <AppenderRef ref="file"/> -->      
