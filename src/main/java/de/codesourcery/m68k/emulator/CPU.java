@@ -35,7 +35,8 @@ public class CPU
     private static final boolean DEBUG = false;
     private static final boolean DEBUG_RECORD_BACKTRACE = true;
 
-    public static final int MAX_BACKTRACE_SIZE = 16;
+    public static final int MAX_BACKTRACE_SIZE = 64; // adjust BACKTRACE_MASK when changing this!!
+    private static final int BACKTRACE_MASK = 0b111111;
 
     private final CPUType cpuType;
 
@@ -802,9 +803,9 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         if ( DEBUG_RECORD_BACKTRACE )
         {
             backtrace[backtraceWritePtr] = pc;
-            backtraceWritePtr = (backtraceWritePtr+1) & 0b1111;
+            backtraceWritePtr = (backtraceWritePtr+1) & BACKTRACE_MASK;
             if ( backtraceBufferFull ) {
-                backtraceReadPtr = (backtraceReadPtr+1) & 0b1111;
+                backtraceReadPtr = (backtraceReadPtr+1) & BACKTRACE_MASK;
             }
             else
             {
@@ -916,7 +917,7 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
         int count = 0;
         if ( backtraceBufferFull )
         {
-            for ( int i = 0,start = backtraceReadPtr ; i < 16 ; i++,count++ ) {
+            for ( int i = 0,start = backtraceReadPtr ; i < MAX_BACKTRACE_SIZE ; i++,count++ ) {
                 result[i] = backtrace[start];
                 start = (start+1) & 0b1111;
             }
