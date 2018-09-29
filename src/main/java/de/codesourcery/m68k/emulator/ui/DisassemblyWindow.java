@@ -5,7 +5,10 @@ import de.codesourcery.m68k.emulator.Breakpoint;
 import de.codesourcery.m68k.emulator.Breakpoints;
 import de.codesourcery.m68k.emulator.Emulator;
 import de.codesourcery.m68k.emulator.IBreakpointCondition;
+import de.codesourcery.m68k.utils.Misc;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.swing.JPanel;
 import javax.swing.JTextField;
@@ -32,6 +35,8 @@ import java.util.function.Consumer;
 public class DisassemblyWindow extends AbstractDisassemblyWindow
         implements ITickListener, Emulator.IEmulatorStateCallback
 {
+    private static final Logger LOG = LogManager.getLogger( DisassemblyWindow.class.getName() );
+
     private final Object LOCK = new Object();
 
     // @GuardedBy( LOCK )
@@ -275,12 +280,17 @@ public class DisassemblyWindow extends AbstractDisassemblyWindow
     public void setAddressProvider(IAdrProvider adrProvider)
     {
         final AtomicInteger toDisplay = new AtomicInteger();
-        runOnEmulator( emu -> toDisplay.set( adrProvider.getAddress( emu ) ) );
+        runOnEmulator( emu ->
+        {
+            LOG.info("===> Setting address "+adrProvider);
+            toDisplay.set( adrProvider.getAddress( emu ) );
+        } );
 
         synchronized (LOCK)
         {
             followProgramCounter = false;
             addressToDisplay = toDisplay.get();
+            LOG.info("===> Setting address to display "+ Misc.hex(addressToDisplay));
         }
         ui.doWithEmulator( this::tick );
     }
@@ -294,6 +304,7 @@ public class DisassemblyWindow extends AbstractDisassemblyWindow
     @Override
     public void tick(Emulator emulator)
     {
+        LOG.info("tick(): Called");
         final Disassembler disasm = new Disassembler(emulator.memory);
         disasm.setDumpHex(true);
         disasm.setResolveRelativeOffsets(true);

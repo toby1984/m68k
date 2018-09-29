@@ -3,11 +3,14 @@ package de.codesourcery.m68k.emulator.ui;
 import de.codesourcery.m68k.emulator.CPU;
 import de.codesourcery.m68k.emulator.Emulator;
 import de.codesourcery.m68k.utils.Misc;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JList;
 import javax.swing.JScrollPane;
 import javax.swing.ListModel;
+import javax.swing.ListSelectionModel;
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
 import javax.swing.event.ListSelectionEvent;
@@ -19,6 +22,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class BacktraceWindow extends AppWindow implements ITickListener, Emulator.IEmulatorStateCallback
 {
+    private static final Logger LOG = LogManager.getLogger( BacktraceWindow.class.getName() );
+
     private final JList<Integer> list = new JList<>();
 
     private final int[] backtrace = new int[CPU.MAX_BACKTRACE_SIZE];
@@ -85,9 +90,15 @@ public class BacktraceWindow extends AppWindow implements ITickListener, Emulato
             @Override
             public void valueChanged(ListSelectionEvent e)
             {
-                if ( ! e.getValueIsAdjusting() ) {
-                    final int idx = e.getFirstIndex();
+                if ( ! e.getValueIsAdjusting() )
+                {
+                    final ListSelectionModel lsm = list.getSelectionModel();
+                    if ( lsm.isSelectionEmpty() ) {
+                        return;
+                    }
+                    final int idx = lsm.getMinSelectionIndex();
                     final Integer address = listModel.getElementAt(idx);
+                    LOG.debug("listSelectionChanged(): Selected address "+Misc.hex(address));
                     ui.getWindow(WindowKey.ROM_LISTING).ifPresent( window ->
                     {
                         ((ROMListingViewer) window).showAddress(address);
