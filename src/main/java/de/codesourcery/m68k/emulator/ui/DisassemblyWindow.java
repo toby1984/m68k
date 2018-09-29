@@ -104,7 +104,7 @@ public class DisassemblyWindow extends AbstractDisassemblyWindow
                                 Breakpoint existing = emBp.getBreakpoint(finalAdr);
                                 if ( existing == null )
                                 {
-                                    emBp.add(new Breakpoint(finalAdr, IBreakpointCondition.TRUE));
+                                    emBp.add(new Breakpoint(finalAdr, "", IBreakpointCondition.TRUE));
                                 } else {
                                     emBp.remove(existing);
                                 }

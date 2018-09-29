@@ -143,6 +143,32 @@ public class Breakpoints
         throw new RuntimeException("Unknown breakpoint "+bp);
     }
 
+    public void setComment(Breakpoint bp,String comment)
+    {
+        for (int i = 0,len = enabledBreakpoints.length ; i < len; i++)
+        {
+            Breakpoint existing = enabledBreakpoints[i];
+            if (bp == existing)
+            {
+                enabledBreakpoints[i] = enabledBreakpoints[i].withComment( comment );
+                updateHashCode();
+                return;
+            }
+        }
+
+        for (int i = 0,len = disabledBreakpoints.length ; i < len ; i++)
+        {
+            Breakpoint existing = disabledBreakpoints[i];
+            if (bp == existing)
+            {
+                disabledBreakpoints[i] = disabledBreakpoints[i].withComment( comment );
+                updateHashCode();
+                return;
+            }
+        }
+        throw new RuntimeException("Unknown breakpoint "+bp);
+    }
+
     public void setEnabled(Breakpoint bp)
     {
         for (int i = 0,len = enabledBreakpoints.length ; i < len; i++)
@@ -326,7 +352,9 @@ public class Breakpoints
                 {
                     final String prefix = "breakpoint."+adr+".";
                     final boolean enabled = Boolean.parseBoolean(data.get(prefix+"enabled") );
-                    final Breakpoint bp = new Breakpoint(adr, ConditionalBreakpointExpressionParser.parse(data.get(prefix + "condition")));
+                    final String comment = data.get(prefix+"comment");
+                    final Breakpoint bp = new Breakpoint(adr,comment,
+                            ConditionalBreakpointExpressionParser.parse(data.get(prefix + "condition")));
                     result.add(bp);
                     if ( ! enabled )
                     {
@@ -347,6 +375,10 @@ public class Breakpoints
                 final boolean enabled = isEnabled( bp );
                 final String prefix = "breakpoint." + bp.address + ".";
                 data.put( prefix + "enabled", Boolean.toString( enabled ) );
+                if ( bp.comment != null )
+                {
+                    data.put( prefix + "comment", bp.comment );
+                }
                 data.put( prefix + "condition", bp.condition.getExpression() );
             }
             return true;

@@ -27,8 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-public class BreakpointsWindow extends AppWindow implements ITickListener,
-        Emulator.IEmulatorStateCallback
+public class BreakpointsWindow extends AppWindow implements ITickListener, Emulator.IEmulatorStateCallback
 {
     private static final Logger LOG = LogManager.getLogger( BreakpointsWindow.class.getName() );
 
@@ -73,16 +72,22 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
             }
         }
 
+        private static final int COL_ADDRESS = 0;
+        private static final int COL_COMMENT = 1;
+        private static final int COL_ENABLED = 2;
+        private static final int COL_CONDITION = 3;
+        private static final int COL_COUNT = 4;
+
         @Override
         public Class<?> getColumnClass(int columnIndex)
         {
             switch (columnIndex)
             {
-                case 0:
-                    return String.class;
-                case 1:
+                case COL_ENABLED:
                     return Boolean.class;
-                case 2:
+                case COL_ADDRESS:
+                case COL_COMMENT:
+                case COL_CONDITION:
                     return String.class;
                 default:
                     throw new IllegalArgumentException("Invalid column " + columnIndex);
@@ -92,19 +97,42 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
         @Override
         public boolean isCellEditable(int rowIndex, int columnIndex)
         {
-            return columnIndex == 1 || columnIndex == 2;
+            switch(columnIndex)
+            {
+                case COL_ENABLED:
+                case COL_COMMENT:
+                case COL_CONDITION:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         @Override
         public int getColumnCount()
         {
-            return 3;
+            return COL_COUNT;
         }
 
         @Override
         public void setValueAt(Object aValue, int rowIndex, int columnIndex)
         {
-            if (columnIndex == 1)
+            if ( columnIndex == COL_COMMENT ) {
+                // comment
+                final Breakpoint bp = getBreakpoint(rowIndex);
+                runOnEmulator(emu ->
+                {
+                    final Breakpoints bps = emu.getBreakpoints();
+                    final Breakpoint existing = bps.getBreakpoint(bp.address);
+                    if (existing != null)
+                    {
+                        bps.setComment(existing,(String) aValue);
+                        emu.invokeTickCallback();
+                    }
+                });
+                return;
+            }
+            if (columnIndex == COL_ENABLED )
             {
                 // enable/disable
                 final Breakpoint bp = getBreakpoint(rowIndex);
@@ -120,13 +148,12 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
                     if (existing != null)
                     {
                         bps.setEnabled(existing,newState);
-                        LOG.info( existing+" is now "+bps.isEnabled(existing)  );
                         emu.invokeTickCallback();
                     }
                 });
                 return;
             }
-            else if (columnIndex == 2)
+            else if (columnIndex == COL_CONDITION )
             {
                 // expression
                 final String newExpr = (String) aValue;
@@ -168,12 +195,14 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
         public String getColumnName(int column)
         {
             switch(column) {
-                case 0:
+                case COL_ADDRESS:
                     return "Address";
-                case 1:
+                case COL_ENABLED:
                     return "Enabled?";
-                case 2:
+                case COL_CONDITION:
                     return "Expression";
+                case COL_COMMENT:
+                    return "Comment";
                 default:
                     throw new IllegalArgumentException("Invalid column "+column);
             }
@@ -185,15 +214,17 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
             final Breakpoint bp = getBreakpoint(rowIndex);
             switch (columnIndex)
             {
-                case 0:
+                case COL_ADDRESS:
                     return Misc.hex(bp.address);
-                case 1:
+                case COL_ENABLED:
                     synchronized (LOCK)
                     {
                         return breakpoints.isEnabled(bp);
                     }
-                case 2:
+                case COL_CONDITION:
                     return bp.condition.getExpression();
+                case COL_COMMENT:
+                    return bp.comment;
                 default:
                     throw new IllegalArgumentException("Invalid column " + columnIndex);
             }
@@ -318,7 +349,8 @@ public class BreakpointsWindow extends AppWindow implements ITickListener,
             {
                 runOnEmulator( emu ->
                 {
-                    final Breakpoint breakpoint = new Breakpoint( address, IBreakpointCondition.TRUE );
+                    final Breakpoint breakpoint =
+                            new Breakpoint( address, "",IBreakpointCondition.TRUE );
                     emu.getBreakpoints().add( breakpoint );
                     emu.invokeTickCallback();
                 });

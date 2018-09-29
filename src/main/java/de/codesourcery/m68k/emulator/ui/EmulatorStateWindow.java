@@ -56,7 +56,7 @@ public class EmulatorStateWindow extends AppWindow implements Emulator.IEmulator
                 final int size = emu.cpu.getBranchInstructionSizeInBytes();
                 final int bpAdr = emu.cpu.pc + size;
                 LOG.info( "*** Installing temporary breakpoint at "+ Misc.hex(bpAdr) );
-                emu.getBreakpoints().add( new Breakpoint( bpAdr, true, IBreakpointCondition.TRUE ) );
+                emu.getBreakpoints().add( new Breakpoint( bpAdr, true, "(temporary)", IBreakpointCondition.TRUE ) );
                 emu.start();
             });
         });

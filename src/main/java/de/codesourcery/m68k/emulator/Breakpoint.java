@@ -14,22 +14,29 @@ public final class Breakpoint
     public final int address;
     public final IBreakpointCondition condition;
     public final boolean isTemporary;
+    public final String comment;
 
-    public Breakpoint(int address,IBreakpointCondition condition) {
-        this(address,false,condition);
+    public Breakpoint(int address,String comment,IBreakpointCondition condition) {
+        this(address,false,comment,condition);
     }
 
-    public Breakpoint(int address,boolean isTemporary,IBreakpointCondition condition)
+    public Breakpoint(int address,boolean isTemporary,String comment,IBreakpointCondition condition)
     {
         Validate.notNull( condition, "condition must not be null" );
         this.condition = condition;
         this.address = address;
         this.isTemporary = isTemporary;
+        this.comment = comment;
     }
 
     public Breakpoint with(IBreakpointCondition newCondition)
     {
-        return new Breakpoint(this.address,this.isTemporary,newCondition);
+        return new Breakpoint(this.address,this.isTemporary,this.comment,newCondition);
+    }
+
+    public Breakpoint withComment(String newComment)
+    {
+        return new Breakpoint(this.address,this.isTemporary,newComment,this.condition);
     }
 
     public boolean matches(Emulator emulator)
@@ -40,7 +47,7 @@ public final class Breakpoint
     @Override
     public int hashCode()
     {
-        return Objects.hash(address, condition);
+        return Objects.hash(address, condition,comment);
     }
 
     @Override
@@ -59,7 +66,7 @@ public final class Breakpoint
 
     public Breakpoint createCopy()
     {
-        return new Breakpoint(this.address,this.isTemporary,this.condition);
+        return new Breakpoint(this.address,this.isTemporary,this.comment,this.condition);
     }
 
     @Override
