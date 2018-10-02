@@ -7,6 +7,7 @@ import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.JTextComponent;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
@@ -295,7 +296,6 @@ outer:
                     }
                     if ( textOffset != null )
                     {
-//                        textfield.setCaretPosition( textOffset );
                         final int end = getEndOfLine( textOffset );
                         if ( currentHighlight != null )
                         {
@@ -305,34 +305,38 @@ outer:
                         currentHighlight = new Highlight( textOffset, end - textOffset );
                         currentHighlight.highlight();
 
-                        Rectangle position = null;
-                        try
-                        {
-                            position = textfield.modelToView( textOffset );
-                        }
-                        catch (BadLocationException e)
-                        {
-                            error(e);
-                            return;
-                        }
-
-                        // adjust viewport so that highlighted area is in the middle
-                        // of the scrollpane
-                        LOG.info( "Caret at "+position );
-                        final JViewport pane = (JViewport) textfield.getParent();
-                        LOG.info( "Viewport size: "+scrollpane.getViewport().getView().getSize() );
-                        LOG.info( "Viewport bounds: "+scrollpane.getBounds() );
-                        LOG.info( "Visible rect: "+pane.getVisibleRect() );
-                        position.y += scrollpane.getBounds().height/4;
-                        if ( position.y >= 0 )
-                        {
-                            LOG.info( "Scrolling to "+position );
-                            textfield.scrollRectToVisible( position );
-                        }
+                        textfield.setCaretPosition( textOffset );
+                        centerLineInScrollPane(textfield);
                     }
                     addressChanged = false;
                 }
             } );
         }
+    }
+
+    /* The following method was taken from
+     * http://www.camick.com/java/source/RXTextUtilities.java
+     *
+     * (C) 2008 by Rob Camick
+     */
+    public static void centerLineInScrollPane(JTextComponent component)
+    {
+        Container container = SwingUtilities.getAncestorOfClass(JViewport.class, component);
+
+        if (container == null) return;
+
+        try
+        {
+            Rectangle r = component.modelToView(component.getCaretPosition());
+            JViewport viewport = (JViewport)container;
+            int extentHeight = viewport.getExtentSize().height;
+            int viewHeight = viewport.getViewSize().height;
+
+            int y = Math.max(0, r.y - ((extentHeight - r.height) / 2));
+            y = Math.min(y, viewHeight - extentHeight);
+
+            viewport.setViewPosition(new Point(0, y));
+        }
+        catch(BadLocationException ble) {}
     }
 }

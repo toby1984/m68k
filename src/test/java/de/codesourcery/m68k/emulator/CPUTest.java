@@ -3262,7 +3262,7 @@ BLE Less or Equal    1111 = Z | (N & !V) | (!N & V) (ok)
             }
         }
 
-        cpu.reset();
+        cpu.externalReset();
 
         for ( ; insToExecute > 0 ; insToExecute--)
         {

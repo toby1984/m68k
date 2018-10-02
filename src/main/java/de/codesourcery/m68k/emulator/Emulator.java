@@ -3,6 +3,7 @@ package de.codesourcery.m68k.emulator;
 import de.codesourcery.m68k.disassembler.Disassembler;
 import de.codesourcery.m68k.emulator.chips.CIA8520;
 import de.codesourcery.m68k.emulator.chips.IRQController;
+import de.codesourcery.m68k.emulator.exceptions.CPUResetException;
 import de.codesourcery.m68k.emulator.memory.Blitter;
 import de.codesourcery.m68k.emulator.memory.DMAController;
 import de.codesourcery.m68k.emulator.memory.MMU;
@@ -273,7 +274,7 @@ public class Emulator
             // copy first 1 KB from ROM to IRQ vectors starting at 0x00
             memory.bulkWrite(0x000000, kickstartRom, 0, 1024);
 
-            cpu.reset();
+            cpu.externalReset();
 
             // clear current memory breakpoint,just in
             // case one was triggered already
@@ -310,10 +311,10 @@ public class Emulator
                         {
                             LOG.info(  "Restarting emulator thread in 10 seconds"  );
                             Thread.sleep( 10 * 1000 );
-                        } catch (Exception e)
+                        }
+                        catch (Exception e)
                         {
                             e.printStackTrace();
-                            ;
                         }
                         synchronized (EMULATOR_LOCK)
                         {
@@ -427,6 +428,12 @@ public class Emulator
                                 mmu.tick();
                                 cpu.executeOneInstruction();
                             }
+                            catch(CPUResetException ex)
+                            {
+                                LOG.warn("*** CPU executed RESET instruction at "+Misc.hex( cpu.pcAtStartOfLastInstruction) +" , resetting emulator");
+                                mode = EmulatorMode.STOPPED;
+                                reset();
+                            }
                             catch (Exception e)
                             {
                                 printBacktrace();
@@ -465,6 +472,19 @@ public class Emulator
                         {
                             callback.tick(Emulator.this);
                         }
+                    }
+                    catch(CPUResetException ex)
+                    {
+                        LOG.warn("*** CPU executed RESET instruction at "+Misc.hex( cpu.pcAtStartOfLastInstruction) +" , resetting emulator");
+                        mode = EmulatorMode.STOPPED;
+                        try
+                        {
+                            stateCallback.stopped( Emulator.this );
+                        }
+                        finally {
+                            reset();
+                        }
+                        continue;
                     }
                     catch (Exception e)
                     {

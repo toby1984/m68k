@@ -6,6 +6,7 @@ import de.codesourcery.m68k.assembler.arch.CPUType;
 import de.codesourcery.m68k.assembler.arch.Condition;
 import de.codesourcery.m68k.assembler.arch.Instruction;
 import de.codesourcery.m68k.assembler.arch.InstructionEncoding;
+import de.codesourcery.m68k.emulator.exceptions.CPUResetException;
 import de.codesourcery.m68k.emulator.exceptions.IllegalInstructionException;
 import de.codesourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codesourcery.m68k.emulator.memory.Memory;
@@ -1664,7 +1665,12 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         this.irqStackPtr++;
     }
 
-    public void reset() {
+    public void internalReset(int instruction) throws CPUResetException
+    {
+        throw new CPUResetException();
+    }
+
+    public void externalReset() {
         triggerIRQ(IRQ.RESET,0);
     }
 
@@ -1739,6 +1745,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
             pc = memLoadLong(4 );
             // enter supervisor mode, disable tracing, set interrupt level 7
             statusRegister = FLAG_I2|FLAG_I1|FLAG_I0|FLAG_SUPERVISOR_MODE;
+
             return;
         }
 
@@ -2754,11 +2761,6 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
             cycles = 4;
             stopped = true;
         }
-    }
-
-    private void reset(int instruction)
-    {
-        cycles = 132;
     }
 
     private void movepWordFromMemoryToRegister(int instruction) {
@@ -4270,7 +4272,7 @@ C — Set if a borrow occurs; cleared otherwise.
 
     private final InstructionImpl PEA_ENCODING = this::pea;
 
-    private final InstructionImpl RESET_ENCODING = this::reset;
+    private final InstructionImpl RESET_ENCODING = this::internalReset;
 
     private final InstructionImpl ROL_IMMEDIATE_ENCODING = this::roImmediate;
 
