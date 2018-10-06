@@ -400,8 +400,6 @@ public class BreakpointsWindow extends AppWindow implements ITickListener, Emula
         {
             repaint();
             tableModel.fireTableDataChanged();
-        } else {
-            LOG.info( "tick(): BPWindow model is still up-to-date" );
         }
     }
 }

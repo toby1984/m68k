@@ -141,7 +141,6 @@ public class StructExplorer extends AppWindow implements
                 newModel = null;
             }
         }
-        LOG.info( "Tree model changed: "+(newModel!=null) );
         if ( newModel != null)
         {
             final StructTreeNode finalModel = newModel;

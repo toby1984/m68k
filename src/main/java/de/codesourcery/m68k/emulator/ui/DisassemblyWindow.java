@@ -304,7 +304,6 @@ public class DisassemblyWindow extends AbstractDisassemblyWindow
     @Override
     public void tick(Emulator emulator)
     {
-        LOG.info("tick(): Called");
         final Disassembler disasm = new Disassembler(emulator.memory);
         disasm.setDumpHex(true);
         disasm.setResolveRelativeOffsets(true);
