@@ -271,7 +271,7 @@ public class DisassemblerTest extends TestCase
     public void testMuls()
     {
         //         assertArrayEquals(compile("muls.w #64,d0"),0xc1,0xfc,0x00,0x40)
-        compile("muls.w #64,d0");
+        compile("muls.w #$40,d0");
         compile("muls.w $1200,d3");
         compile("muls.w d4,d3");
     }
