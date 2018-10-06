@@ -538,6 +538,7 @@ public class AssemblerTest extends TestCase
 
     public void testMuls()
     {
+        assertArrayEquals(compile("muls.w #64,d0"),0xc1,0xfc,0x00,0x40);
         assertArrayEquals(compile("muls.w $1200,d3"),0xc7,0xf8,0x12,0x00);
         assertArrayEquals(compile("muls.w d4,d3"),0xc7,0xc4);
     }

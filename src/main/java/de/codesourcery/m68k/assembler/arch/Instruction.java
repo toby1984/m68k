@@ -378,8 +378,10 @@ public enum Instruction
                 @Override
                 public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
                 {
-                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA)
-                        .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                    return Instruction.sourceAddressingModes( cpuType , mode -> {
+                        return mode == AddressingMode.IMMEDIATE_VALUE ||
+                                ( mode.hasKinds( AddressingModeKind.DATA,AddressingModeKind.ALTERABLE ) );
+                    }).with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
                 }
 
                 @Override
@@ -395,8 +397,10 @@ public enum Instruction
                 @Override
                 public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
                 {
-                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA)
-                        .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                    return Instruction.sourceAddressingModes( cpuType , mode -> {
+                        return mode == AddressingMode.IMMEDIATE_VALUE ||
+                                ( mode.hasKinds( AddressingModeKind.DATA,AddressingModeKind.ALTERABLE ) );
+                    }).with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
                 }
 
                 @Override
@@ -412,8 +416,10 @@ public enum Instruction
                 @Override
                 public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
                 {
-                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.ALTERABLE,AddressingModeKind.DATA)
-                        .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                    return Instruction.sourceAddressingModes( cpuType , mode -> {
+                        return mode == AddressingMode.IMMEDIATE_VALUE ||
+                                ( mode.hasKinds( AddressingModeKind.DATA,AddressingModeKind.ALTERABLE ) );
+                    }).with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
                 }
 
                 @Override
@@ -429,8 +435,10 @@ public enum Instruction
                 @Override
                 public EncodingTableGenerator.IValueIterator getValueIterator(InstructionEncoding encoding, CPUType cpuType)
                 {
-                    return Instruction.sourceAddressingModes(cpuType,AddressingModeKind.DATA,AddressingModeKind.DATA)
-                        .with( Instruction.registerRange(Field.DST_BASE_REGISTER));
+                    return Instruction.sourceAddressingModes( cpuType , mode -> {
+                        return mode == AddressingMode.IMMEDIATE_VALUE ||
+                                ( mode.hasKinds( AddressingModeKind.DATA,AddressingModeKind.ALTERABLE ) );
+                    }).with( Instruction.registerRange(Field.DST_BASE_REGISTER) );
                 }
 
                 @Override
