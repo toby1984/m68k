@@ -70,6 +70,7 @@ public abstract class AppWindow extends JInternalFrame
     {
         BACKTRACE( "backtrace" , "Backtrace", BacktraceWindow.class ),
         BREAKPOINTS( "breakpoints", "Breakpoints", BreakpointsWindow.class ),
+        CIA_STATE( "ciastate", "CIAs", CIAStateWindow.class ),
         CPU_STATE( "cpustate" , "CPU State", CPUStateWindow.class),
         DISASSEMBLY( "disassembly" , "Disassembly (PC)", DisassemblyWindow.class),
         EMULATOR_STATE( "emulatorcontrol" , "Emulator", EmulatorStateWindow.class ),

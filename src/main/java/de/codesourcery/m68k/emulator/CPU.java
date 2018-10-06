@@ -161,7 +161,6 @@ public class CPU
         AUTOVECTOR_LVL1(24,IRQGroup.GROUP1,82),
         ILLEGAL_INSTRUCTION(3,IRQGroup.GROUP1,81),
         PRIVILEGE_VIOLATION(7,IRQGroup.GROUP1,80),
-
         // group 2
         INTEGER_DIVIDE_BY_ZERO(4,IRQGroup.GROUP2),
         CHK_CHK2(5,IRQGroup.GROUP2),
@@ -260,7 +259,7 @@ public class CPU
     public static final int FLAG_T1        = 1<<15; // TRACE
     public static final int FLAG_T0        = 1<<14;
     public static final int FLAG_SUPERVISOR_MODE        = 1<<13;
-    public static final int FLAG_MASTER_INTERRUPT       = 1<<12;
+    // public static final int FLAG_MASTER_INTERRUPT       = 1<<12; // 68020+ only
 
     public static final int FLAG_I2        = 1<<10; // IRQ priority mask bit 2
     public static final int FLAG_I1        = 1<<9; // IRQ priority mask bit 1
@@ -286,6 +285,7 @@ public class CPU
     private final long[] irqData = new long[10];
     private final IRQ[] irqStack = new IRQ[10];
 
+    private int pendingExternalInterrupts = 0;
     private int irqStackPtr;
     public IRQ activeIrq; // currently active IRQ (if any)
 
@@ -1644,12 +1644,52 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
     private void checkPendingIRQ() {
 
+        if ( pendingExternalInterrupts != 0 )
+        {
+            // process hardware interrupts
+            final int minPrio = (statusRegister & FLAG_I2|FLAG_I1|FLAG_I0) >>> 8;
+
+            for ( int i = 7 ; i > minPrio ; i-- )
+            {
+                final int mask = 1 << i;
+                if ( ( pendingExternalInterrupts & mask) != 0 )
+                {
+                    IRQ irq;
+                    switch(i) {
+                        case 7: irq = IRQ.AUTOVECTOR_LVL7; break;
+                        case 6: irq = IRQ.AUTOVECTOR_LVL6; break;
+                        case 5: irq = IRQ.AUTOVECTOR_LVL5; break;
+                        case 4: irq = IRQ.AUTOVECTOR_LVL4; break;
+                        case 3: irq = IRQ.AUTOVECTOR_LVL3; break;
+                        case 2: irq = IRQ.AUTOVECTOR_LVL2; break;
+                        case 1: irq = IRQ.AUTOVECTOR_LVL1; break;
+                        default:
+                            throw new RuntimeException("Internal error, invalid priority level "+i);
+                    }
+
+                    if ( activeIrq == null || activeIrq.priority < irq.priority )
+                    {
+                        LOG.info("Now handling pending external interrupt "+irq);
+                        pendingExternalInterrupts &= ~mask;
+                        triggerIRQ(irq, 0);
+                        return;
+                    }
+                    // abort loop, since we already started with
+                    // the highest priority IRQ and this one did
+                    // not have a priority higher than the currently active one
+                    // we'll have no success with the other (even lower) priorities...
+                    break;
+                }
+            }
+        }
+
         if ( irqStackPtr > 0 )
         {
             if ( activeIrq == null || irqStack[irqStackPtr-1].priority > activeIrq.priority )
             {
                 irqStackPtr--;
                 final IRQ irq = irqStack[irqStackPtr];
+                LOG.info("Now handling internal interrupt "+irq);
                 final long irqData = this.irqData[irqStackPtr];
                 irqStack[irqStackPtr] = null;
                 this.irqData[irqStackPtr] = 0;
@@ -1685,39 +1725,35 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
     public void externalInterrupt(int priority)
     {
-
         // TODO: Implement support for emulating hardware interrupts, needs
         // TODO: to honor FLAG_I2|FLAG_I1|FLAG_I0 priorities (IRQs with less than/equal priority get ignored)
 
-        final int minPrio = (statusRegister & FLAG_I2|FLAG_I1|FLAG_I0) >> 8;
-        if ( priority > minPrio )
+        final int minPrio = (statusRegister & FLAG_I2 | FLAG_I1 | FLAG_I0) >>> 8;
+        if (priority > minPrio)
         {
+            IRQ irq;
             switch (priority)
             {
-                case 1:
-                    triggerIRQ(IRQ.AUTOVECTOR_LVL1, 0);
-                    return;
-                case 2:
-                    triggerIRQ(IRQ.AUTOVECTOR_LVL2, 0);
-                    return;
-                case 3:
-                    triggerIRQ(IRQ.AUTOVECTOR_LVL3, 0);
-                    return;
-                case 4:
-                    triggerIRQ(IRQ.AUTOVECTOR_LVL4, 0);
-                    return;
-                case 5:
-                    triggerIRQ(IRQ.AUTOVECTOR_LVL5, 0);
-                    return;
-                case 6:
-                    triggerIRQ(IRQ.AUTOVECTOR_LVL6, 0);
-                    return;
-                case 7:
-                    triggerIRQ(IRQ.AUTOVECTOR_LVL7, 0);
-                    return;
+                case 1: irq = IRQ.AUTOVECTOR_LVL1; break;
+                case 2: irq = IRQ.AUTOVECTOR_LVL2; break;
+                case 3: irq = IRQ.AUTOVECTOR_LVL3; break;
+                case 4: irq = IRQ.AUTOVECTOR_LVL4; break;
+                case 5: irq = IRQ.AUTOVECTOR_LVL5; break;
+                case 6: irq = IRQ.AUTOVECTOR_LVL6; break;
+                case 7: irq = IRQ.AUTOVECTOR_LVL7; break;
                 default:
                     throw new IllegalArgumentException("Priority must be >= 1 && <= 8 but was " + priority);
             }
+            LOG.info("External interrupt: "+irq);
+            triggerIRQ(irq,0);
+            return;
+        }
+        // just remember that this IRQ happened
+        final int mask = 1<<priority;
+        if ( ( pendingExternalInterrupts & mask ) == 0 )
+        {
+            LOG.info("PENDING external interrupt: "+priority);
+            pendingExternalInterrupts |= (1 << priority); // bits (1<<1) ... (1<<7)
         }
     }
 
@@ -1739,6 +1775,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
             // clear interrupt stack
             irqStackPtr = 0;
             activeIrq = null;
+            pendingExternalInterrupts = 0;
 
             supervisorModeStackPtr = memLoadLong(0 );
             addressRegisters[7] = supervisorModeStackPtr;
@@ -2124,7 +2161,6 @@ M->R    long	   18+8n      16+8n      20+8n	    16+8n      18+8n      12+8n	   1
                 ( ( statusRegister & FLAG_T1 ) != 0 ? "XX" : "--" )+"|"+
                 ( ( statusRegister & FLAG_T0 ) != 0 ? "XX" : "--" )+"|"+
                 ( ( statusRegister & FLAG_SUPERVISOR_MODE ) != 0 ? "X" : "-" )+"|"+
-                ( ( statusRegister & FLAG_MASTER_INTERRUPT ) != 0 ? "X" : "-" )+"|"+
                 ( ( statusRegister & FLAG_I2 ) != 0 ? "XX" : "--" )+"|"+
                 ( ( statusRegister & FLAG_I1 ) != 0 ? "XX" : "--" )+"|"+
                 ( ( statusRegister & FLAG_I0 ) != 0 ? "XX" : "--" )+"|"+

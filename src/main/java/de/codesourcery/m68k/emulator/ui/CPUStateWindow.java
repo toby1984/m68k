@@ -189,12 +189,11 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
             CPU.FLAG_I0,
             CPU.FLAG_I1,
             CPU.FLAG_I2,
-            CPU.FLAG_MASTER_INTERRUPT,
             CPU.FLAG_SUPERVISOR_MODE,
             CPU.FLAG_T0,
             CPU.FLAG_T1
         };
-        final String[] checkboxLabels = {"C","V","Z","N","X","I0","I1","I2","Master-IRQ","S","T0","T1"};
+        final String[] checkboxLabels = {"C","V","Z","N","X","I0","I1","I2","S","T0","T1"};
         for ( int i = 0 ; i < checkboxLabels.length ; i++ )
         {
             final int maskBits = flagMasks[i];
@@ -333,10 +332,9 @@ public class CPUStateWindow extends AppWindow implements ITickListener, Emulator
                 cpuFlagCheckboxes.get( 5 ).setSelected( (flags & CPU.FLAG_I0) != 0 );
                 cpuFlagCheckboxes.get( 6 ).setSelected( (flags & CPU.FLAG_I1) != 0 );
                 cpuFlagCheckboxes.get( 7 ).setSelected( (flags & CPU.FLAG_I2) != 0 );
-                cpuFlagCheckboxes.get( 8 ).setSelected( (flags & CPU.FLAG_MASTER_INTERRUPT) != 0 );
-                cpuFlagCheckboxes.get( 9 ).setSelected( (flags & CPU.FLAG_SUPERVISOR_MODE) != 0 );
-                cpuFlagCheckboxes.get( 10 ).setSelected( (flags & CPU.FLAG_T0) != 0 );
-                cpuFlagCheckboxes.get( 11 ).setSelected( (flags & CPU.FLAG_T1) != 0 );
+                cpuFlagCheckboxes.get( 8 ).setSelected( (flags & CPU.FLAG_SUPERVISOR_MODE) != 0 );
+                cpuFlagCheckboxes.get( 9 ).setSelected( (flags & CPU.FLAG_T0) != 0 );
+                cpuFlagCheckboxes.get( 10 ).setSelected( (flags & CPU.FLAG_T1) != 0 );
                 for (int i = 0; i < 8; i++)
                 {
                     dataRegistersTextfields.get( i ).setText( hex( dataRegisters[i] ) );

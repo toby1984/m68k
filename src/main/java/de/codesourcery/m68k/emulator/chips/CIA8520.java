@@ -330,6 +330,58 @@ Register  Name          Function
         return value | regValue;
     }
 
+    public String getStateAsString() {
+
+        // Timer A
+        final String timerARunning = isTimerARunning()  ? "running" : "stopped";
+        final String timerAOneshot = isTimerAOneShot() ? "one-shot" : "continous";
+
+        // Timer B
+        final String timerBRunning = isTimerBRunning()  ? "running" : "stopped";
+        final String timerBOneshot = isTimerBOneShot() ? "one-shot" : "continous";
+
+        final String[] names = {"TA","TB","ALARM","SP","FLAG","IR"};
+        final int[] mask = {1<<0,1<<1,1<<2,1<<3,1<<4,1<<7};
+
+        final StringBuilder buffer = new StringBuilder();
+        for ( int i = 0 ; i < names.length ; i++)
+        {
+            final int maskBits = mask[i];
+            final boolean triggered = (triggeredInterrupts & maskBits) != 0;
+            final boolean enabled = (irqMaskRegister & maskBits) != 0;
+            if ( enabled || triggered )
+            {
+                if ( buffer.length() > 0 ) {
+                    buffer.append(" , ");
+                }
+                buffer.append( names[i] ).append(" ");
+                if (triggered)
+                {
+                    buffer.append("(active");
+                }
+                else
+                {
+                    buffer.append("(inactive");
+                }
+                buffer.append(" / ");
+
+                if (enabled)
+                {
+                    buffer.append("enabled)");
+                }
+                else
+                {
+                    buffer.append("disabled)");
+                }
+            }
+        }
+        return
+            "Timer A: "+timerARunning+" , "+timerAOneshot+" , latch: "+timerALatch+"\n"+
+            "Timer B: "+timerBRunning+" , "+timerBOneshot+" , latch: "+timerBLatch+"\n"+
+            "ToD: "+(eventCounterRunning?"running":"stopped")+" / alarm @ "+(eventCounterAlarm)+"\n"+
+            "IRQs: "+buffer;
+    }
+
     public void writeRegister(int regNum,int value)
     {
     /*
@@ -556,22 +608,10 @@ Register  Name          Function
                 case REG_TIMERB_HI:
                     return (timerA & 0xff00) >> 8;
                 case REG_EVENT_LO:
-                    if ((ctrlB & CTRL_ALARM) != 0 && eventCounterLatched)
-                    {
-                        return eventCounterAlarmLatch & 0xff;
-                    }
                     return eventCounter & 0xff;
                 case REG_EVENT_MED:
-                    if ( (ctrlB & CTRL_ALARM) != 0 )
-                    {
-                        return (eventCounterAlarmLatch & 0xff00)>>8;
-                    }
                     return (eventCounter & 0xff00) >> 8;
                 case REG_EVENT_HI:
-                    if ( (ctrlB & CTRL_ALARM) != 0 )
-                    {
-                        return (eventCounterAlarmLatch & 0xff0000)>>16;
-                    }
                     return (eventCounter & 0xff0000) >> 16;
                 case REG_SERIAL_DATA:
                     return serialDataReg;
@@ -620,40 +660,22 @@ Register  Name          Function
             case REG_TIMERB_HI:
                 return (timerB & 0xff00) >> 8;
             case REG_EVENT_LO:
-                if ( (ctrlB & CTRL_ALARM) != 0 )
+                if ( eventCounterLatched )
                 {
-                    if ( eventCounterLatched )
-                    {
-                        eventCounterLatched = false;
-                        return eventCounterAlarmLatch & 0xff;
-                    }
+                    eventCounterLatched = false;
+                    return eventCounterAlarmLatch & 0xff;
                 }
                 return eventCounter & 0xff;
             case REG_EVENT_MED:
-                if ( (ctrlB & CTRL_ALARM) != 0 )
+                if ( eventCounterLatched )
                 {
-                    if ( ! eventCounterLatched )
-                    {
-                        eventCounterAlarmLatch = eventCounter;
-                        eventCounterLatched = true;
-                    }
-                    return (eventCounterAlarmLatch & 0xff00)>>8;
+                    return (eventCounterAlarmLatch & 0xff00) >> 8;
                 }
-                return (eventCounter & 0xff00) >> 8;
+                return (eventCounter & 0xff00)>>8;
             case REG_EVENT_HI:
-                if ( (ctrlB & CTRL_ALARM) != 0 )
-                {
-                    if ( ! eventCounterLatched )
-                    {
-                        eventCounterAlarmLatch = eventCounter;
-                        eventCounterLatched = true;
-                    }
-                    return (eventCounterAlarmLatch & 0xff0000)>>16;
-                }
-                if ( eventCounterRunning ) {
-                    eventCounterRunning = false;
-                }
-                return (eventCounter & 0xff0000) >> 16;
+                eventCounterAlarmLatch = eventCounter;
+                eventCounterLatched = true;
+                return (eventCounterAlarmLatch & 0xff0000)>>16;
             case REG_SERIAL_DATA:
                 return serialDataReg;
             case REG_IRQ_CTRL:
@@ -815,7 +837,7 @@ counting regardless of the start bit.
                 }
                 elapsedTodCycles = cyclesPerTodTick;
                 eventCounter++;
-                if ( (ctrlB & CTRL_ALARM) != 0 && eventCounter == eventCounterAlarm )
+                if ( eventCounter == eventCounterAlarm )
                 {
                     triggerInterrupt(ICR_ALRM);
                     eventCounter = 0;
