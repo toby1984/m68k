@@ -1754,6 +1754,8 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         {
             LOG.info("PENDING external interrupt: "+priority);
             pendingExternalInterrupts |= (1 << priority); // bits (1<<1) ... (1<<7)
+        } else {
+            LOG.info("Already pending external interrupt: "+priority);
         }
     }
 

@@ -194,6 +194,9 @@ These registers control the operation of the
 
     public int[] bpldat = new int[6];
 
+    private int ticksUntilVSync;
+    private int ticksUntilVSyncLatch;
+
     public int bplcon0;
     public int bplcon1;
     public int bplcon2;
@@ -224,6 +227,12 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
     }
     public void reset()
     {
+        if ( amiga.isPAL() ) {
+            ticksUntilVSyncLatch= (int) ((amiga.getCPUClock()*1000000)/60.0);
+        } else {
+            ticksUntilVSyncLatch = (int) ((amiga.getCPUClock()*1000000)/50.0);
+        }
+        ticksUntilVSync = ticksUntilVSyncLatch;
         bplcon0=0;
         bplcon1=0;
         bplcon2=0;
@@ -516,7 +525,13 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
     /**
      * Ticked every 140ns (=2 hi-res pixel,1 lo-res pixel)
      */
-    public void tick() {
+    public void tick()
+    {
+        if ( --ticksUntilVSync == 0 )
+        {
+            ticksUntilVSync = ticksUntilVSyncLatch;
+            irqController.triggerIRQ( IRQController.IRQSource.VBLANK );
+        }
 
         hpos++;
         if ( hpos == 0xd8 ) { // $d8 = 216 = 8 pixel hblank + 200 pixel + 8 pixel hblank

@@ -130,6 +130,7 @@ public class Emulator
         this.irqController = new IRQController(this.cpu);
         faultHandler.setIRQController( irqController );
         this.blitter.setIRQController( irqController );
+        this.video.setIRQController( irqController );
         this.ciaa = new CIA8520(CIA8520.Name.CIAA, amiga, irqController);
         this.ciab = new CIA8520(CIA8520.Name.CIAB, amiga, irqController);
         faultHandler.setCIAA(this.ciaa);

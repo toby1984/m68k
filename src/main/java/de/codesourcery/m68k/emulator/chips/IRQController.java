@@ -221,7 +221,10 @@ Priority     Priority     Description                  Name
         }
         if ( (irqEnabled & enabledMask) == enabledMask )
         {
+            System.out.println("IRQ controller: Triggering "+source);
             cpu.externalInterrupt( priority );
+        } else {
+            System.out.println("IRQ controller: Not enabled: "+source);
         }
     }
 
