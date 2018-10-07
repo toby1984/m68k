@@ -1,5 +1,6 @@
 package de.codesourcery.m68k.emulator.memory;
 
+import de.codesourcery.m68k.assembler.arch.Register;
 import de.codesourcery.m68k.emulator.Amiga;
 import de.codesourcery.m68k.emulator.chips.IRQController;
 import de.codesourcery.m68k.emulator.exceptions.MemoryAccessException;
@@ -147,6 +148,8 @@ public class Video extends MemoryPage
     public static final int HCENTER  = 0x1E2; //  W   A( E )  Horizontal position for Vsync on interlace
     public static final int DIWHIGH  = 0x1E4; //  W   AD( E ) Display window -  upper bits for start, stop
 
+    private final Blitter blitter; // needed to copper can wait on blitter finished bit
+
     /*
 These registers control the operation of the
                  bitplanes and various aspects of the display.
@@ -221,10 +224,12 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
      */
     private int longLine; // LOL = Long line bit. When low, it indicates short raster line.
 
-    public Video(Amiga amiga) {
+    public Video(Amiga amiga,Blitter blitter) {
         this.amiga = amiga;
+        this.blitter = blitter;
         reset();
     }
+
     public void reset()
     {
         if ( amiga.isPAL() ) {
@@ -245,6 +250,8 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
         vpos = 0;
         longFrame = 0;
         longLine = amiga.isPAL() ? 0b1000_0000 : 0; // LOL = Long line bit. When low, it indicates short raster line.
+
+        copper.reset();
     }
 
     @Override
@@ -354,7 +361,44 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
     @Override
     public void writeWord(int offset, int value) throws MemoryAccessException
     {
-        switch( offset ) {
+        /*
+         * COPPER:
+         *
+         * COPCON      *02E  W   A( E )  Coprocessor control register (CDANG)
+         * COP1LCH   +  080  W   A( E )  Coprocessor first location register (high 3 bits, high 5 bits if ECS)
+         * COP1LCL   +  082  W   A       Coprocessor first location register (low 15 bits)
+         * COP2LCH   +  084  W   A( E )  Coprocessor second location register (high 3 bits, high 5 bits if ECS)
+         * COP2LCL   +  086  W   A       Coprocessor second location register (low 15 bits)
+         * COPJMP1      088  S   A       Coprocessor restart at first location
+         * COPJMP2      08A  S   A       Coprocessor restart at second location
+         * COPINS       08C  W   A       Coprocessor instruction fetch identify
+         */
+        switch( offset )
+        {
+            case 0x2e: // COPCON
+                copper.copperDanger = (value & 0b10) != 0; // bit 1 = Copper Danger bit
+                return;
+            case 0x80: // COP1LCH
+                copper.list1Addr = (copper.list1Addr & 0x0000ffff) | ((value & 0xffff) << 16);
+                return;
+            case 0x82: // COP1LCL
+                copper.list1Addr = (copper.list1Addr & 0xffff0000) | (value & 0xffff);
+                return;
+            case 0x84: // COP2LCH
+                copper.list2Addr = (copper.list2Addr & 0x0000ffff) | ((value & 0xffff) << 16);
+                return;
+            case 0x86: // COP2LCL
+                copper.list2Addr = (copper.list2Addr & 0xffff0000) | (value & 0xffff);
+                return;
+            case 0x88: // COPJMP1
+                copper.pc = copper.list1Addr;
+                return;
+            case 0x8a: // COPJMP2
+                copper.pc = copper.list2Addr;
+                return;
+            case 0x8c: // COPINS
+                // TODO: Does writing here have any effect ?
+                return;
             case 0x100: bplcon0 = value; return;
             case 0x102: bplcon1 = value; return;
             case 0x104: bplcon2 = value; return;
@@ -530,8 +574,10 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
         if ( --ticksUntilVSync == 0 )
         {
             ticksUntilVSync = ticksUntilVSyncLatch;
+            copper.restart();
             irqController.triggerIRQ( IRQController.IRQSource.VBLANK );
         }
+        copper.tick();
 
         hpos++;
         if ( hpos == 0xd8 ) { // $d8 = 216 = 8 pixel hblank + 200 pixel + 8 pixel hblank
@@ -684,4 +730,222 @@ starting position which starts on the first line from the top after the
 vertical blanking offset (42 interlaced lines for NTSC, 52 for PAL), and
 considering a left offset of (768-752)/2=8 Hires (16 Superhires) "unused" pixels.
      */
+
+    private final Copper copper = new Copper();
+
+    private static enum CopperInstruction
+    {
+        MOVE
+        {
+            @Override
+            public boolean perform(Video video)
+            {
+                /*
+                 * MOVE instruction.
+                 *
+                 * FIRST MOVE INSTRUCTION WORD (IR1)
+                 * ---------------------------------
+                 * Bit 0           Always set to 0.
+                 * Bits 8 - 1      Register destination address (DA8-1).
+                 * Bits 15 - 9     Not used, but should be set to 0.
+                 *
+                 * SECOND MOVE INSTRUCTION WORD (IR2)
+                 * ----------------------------------
+                 * Bits 15 - 0     16 bits of data to be transferred (moved) to the register destination.
+                 */
+
+                /*
+                 * The registers that the Copper can always affect are numbered
+                 * $80 through $FF inclusive. Those it cannot affect at all are numbered
+                 * $00 to $3E inclusive.
+                 * The Copper control register is within this group ($00 to $3E).
+                 * The rest of the registers, from $40 to $7E, are protected by the COPDANG bit.
+                 */
+                final int offset = (video.copper.word1 & 0b111111110);
+                final int adr = 0xDFF000 + offset;
+                if ( offset > 0x3e && (offset >= 0x80 || video.copper.copperDanger) )
+                {
+                    video.memory.writeWord( adr, video.copper.word2 );
+                } else {
+                    LOG.warn("Invalid copper write to register "+Misc.hex(adr));
+                }
+                return true;
+            }
+        },
+        WAIT {
+            @Override
+            public boolean perform(Video video)
+            {
+                /*
+                 * WAIT instruction.
+                 *
+                 * FIRST WAIT INSTRUCTION WORD (IR1)
+                 * ---------------------------------
+                 * Bit 0           Always set to 1.
+                 * Bits 15 - 8      Vertical beam position  (called VP).
+                 * Bits 7 - 1       Horizontal beam position  (called HP).
+                 *
+                 * SECOND WAIT INSTRUCTION WORD (IR2)
+                 * ----------------------------------
+                 * Bit 0           Always set to 0.
+                 * Bit 15          The  blitter-finished-disable bit .  Normally, this bit is a 1. (See the "Advanced Topics" section below.)
+                 * Bits 14 - 8     Vertical position compare enable bits (called VE).
+                 * Bits 7 - 1      Horizontal position compare enable bits (called HE).
+                 */
+                int expectedHpos = (video.copper.word1 & 0b11111110)>>>1;
+                int expectedVpos = (video.copper.word1 & 0b11111111_00000000)>>>8;
+                expectedVpos &= ( (video.copper.word2 & 0b1111111_00000000) >>>8);
+                expectedHpos &= ( (video.copper.word2 & 0b1111110) >>>1);
+                if ( ( video.copper.word2 & 1<<15) == 0 && ! video.blitter.blitterDone )
+                {
+                    // wait for blitter done
+                    return false;
+                }
+                return video.vpos >= expectedVpos && video.hpos >= expectedHpos;
+            }
+        },
+        SKIP {
+            @Override
+            public boolean perform(Video video)
+            {
+                /*
+                 * SKIP instruction.
+                 *
+                 * FIRST SKIP INSTRUCTION WORD (IR1)
+                 * ---------------------------------
+                 * Bit 0        The registers that the Copper can always affect are numbered
+$80 through $FF inclusive.  (See  Appendix B  for a list of registers in
+address order.) Those it cannot affect at all are numbered $00 to $3E
+inclusive.  The Copper control register is within this group ($00 to $3E).
+The rest of the registers, from $40 to $7E, are protected by a bit in the
+Copper control register.   Always set to 1.
+                 * Bits 15 - 8     Vertical position  (called VP).
+                 * Bits 7 - 1      Horizontal position  (called HP).
+                 *
+                 *                 Skip if the beam counter is equal to or
+                 *                 greater than these combined bits
+                 *                 (bits 15 through 1).
+                 *
+                 *
+                 * SECOND SKIP INSTRUCTION WORD (IR2)
+                 * ----------------------------------
+                 * Bit 0           Always set to 1.
+                 * Bit 15          The  blitter-finished-disable bit . (See "Using the Copper with the Blitter" below.)
+                 * Bits 14 - 8     Vertical position compare enable bits (called VE).
+                 * Bits 7 - 1      Horizontal position compare enable bits (called HE).
+                 */
+                int expectedHpos = (video.copper.word1 & 0b11111110)>>>1;
+                int expectedVpos = (video.copper.word1 & 0b11111111_00000000)>>>8;
+                expectedVpos &= ( (video.copper.word2 & 0b1111111_00000000) >>>8);
+                expectedHpos &= ( (video.copper.word2 & 0b1111110) >>>1);
+                if ( ( video.copper.word2 & 1<<15) == 0 && ! video.blitter.blitterDone)
+                {
+                    // wait for blitter done
+                    return false;
+                }
+                if ( video.vpos >= expectedVpos && video.hpos >= expectedHpos ) {
+                    video.copper.pc += 4;
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        /**
+         * Execute copper instruction.
+         *
+         * @param video
+         * @return true if instruction has completed
+         */
+        public abstract boolean perform(Video video);
+    }
+
+    private final class Copper
+    {
+        public int pc;
+        public int cycles;
+        public boolean list1Active;
+
+        public int list1Addr;
+        public int list2Addr;
+
+        public int word1;
+        public int word2;
+
+        public boolean copperDanger;
+
+        private CopperInstruction currentInstruction;
+
+        private boolean isActive = false;
+
+        public void reset()
+        {
+            pc = 0;
+            cycles = 0;
+            list1Active = true;
+            list1Addr = list2Addr;
+            isActive = false;
+            word1 = word2 = 0;
+            copperDanger = false;
+        }
+
+        public void restart()
+        {
+            pc = list1Active ? list1Addr : list2Addr;
+        }
+
+        public void tick()
+        {
+            if ( isActive )
+            {
+                if ( cycles-- == 0 )
+                {
+                    if ( currentInstruction != null )
+                    {
+                        if ( ! currentInstruction.perform(Video.this) ) {
+                            // copper only gets every 2nd cycle
+                            cycles = 2;
+                            return;
+                        }
+                    }
+
+                    // fetch next instruction
+                    final int words = memory.readLong( pc );
+                    pc += 4;
+                    word1 = words >>> 16;
+                    word2 = words & 0xffff;
+
+                    if ( (word1 & 1 ) == 0 )
+                    {
+                        // MOVE instruction.
+                        // Bit 0 in IR1 => Always set to 0.
+                        currentInstruction = CopperInstruction.MOVE;
+                        cycles = 6;
+                        return;
+                    }
+                    // bit 0 of IR1 is 1, test bit 0 of IR2
+                    if ( (word2 & 1) == 0 )
+                    {
+                        /*
+                         * WAIT instruction.
+                         * Bit 0 in IR1 => Always set to 1.
+                         * Bit 0 in IR2 => Always set to 0.
+                         */
+                        currentInstruction = CopperInstruction.WAIT;
+                        cycles = 6;
+                    }
+                    else
+                    {
+                        /*
+                         * SKIP instruction.
+                         * Bit 0           Always set to 1.
+                         * Bit 0           Always set to 1.
+                         */
+                        currentInstruction = CopperInstruction.SKIP;
+                        cycles = 6;
+                    }
+                }
+            }
+        }
+    }
 }

@@ -33,7 +33,6 @@ The following codes and abbreviations are used in this appendix:
 
     public ChipRegisterResolver(Emulator emulator)
     {
-        Validate.notNull(emulator, "emulator must not be null");
         this.emulator = emulator;
     }
 

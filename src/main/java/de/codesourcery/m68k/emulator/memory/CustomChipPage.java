@@ -1,5 +1,7 @@
 package de.codesourcery.m68k.emulator.memory;
 
+import de.codesourcery.m68k.disassembler.ChipRegisterResolver;
+import de.codesourcery.m68k.disassembler.RegisterDescription;
 import de.codesourcery.m68k.emulator.chips.IRQController;
 import de.codesourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codesourcery.m68k.utils.Misc;
@@ -16,6 +18,9 @@ public class CustomChipPage extends MemoryPage
     private static final Logger LOG = LogManager.getLogger( CustomChipPage.class.getName() );
 
     private static final int CHIPRAM_START = 0xDF0000;
+
+    private static final ChipRegisterResolver regResolver =
+            new ChipRegisterResolver( null ); // TODO: Debug only
 
     private final Blitter blitter;
     private final int startAddress;
@@ -325,7 +330,11 @@ NAME        ADD  R/W  CHIP    FUNCTION
     public final Video video;
     private IRQController irqController;
 
-    public CustomChipPage(int startAddress,Blitter blitter,Video video,IRQController irqController) {
+    public CustomChipPage(int startAddress,
+                          Blitter blitter,
+                          Video video,
+                          IRQController irqController)
+    {
         this.startAddress = startAddress;
         this.blitter = blitter;
         this.video = video;
@@ -433,7 +442,7 @@ NAME        ADD  R/W  CHIP    FUNCTION
         } else if ( adr == 0x09c) { // INTREQR
             irqController.writeIRQReq( value );
         } else {
-            LOG.info( "CHIPSET: Unhandled word write @ "+Misc.hex(offset) );
+            LOG.info( "CHIPSET: Unhandled word write @ "+registerName(startAddress+offset) );
         }
     }
 
@@ -505,4 +514,8 @@ DMACONR    002      R     A   P   DMA control (and blitter status) read
                  01    AUD1EN      Audio channel 1 DMA enable
                  00    AUD0EN      Audio channel 0 DMA enable
      */
+    private static String registerName(int address) {
+        final RegisterDescription register = regResolver.resolve( address );
+        return register == null ? Misc.hex(address) : register.name+" ("+Misc.hex(address)+")";
+    }
 }

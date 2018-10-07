@@ -10,6 +10,8 @@ public class IRQController
     private static final Logger LOG2 = LogManager.getLogger( IRQController.class.getName() );
     private static final DeduplicatingLogger LOG = new DeduplicatingLogger( LOG2 );
 
+    private static final boolean DEBUG = false;
+
     private final CPU cpu;
 
     /*
@@ -223,10 +225,16 @@ Priority     Priority     Description                  Name
         }
         if ( (irqEnabled & enabledMask) == enabledMask )
         {
-            LOG.info("IRQ controller: Triggering "+source);
+            if ( DEBUG )
+            {
+                LOG.info( "IRQ controller: Triggering " + source );
+            }
             cpu.externalInterrupt( priority );
         } else {
-            LOG.info("IRQ controller: Not enabled: "+source);
+            if ( DEBUG )
+            {
+                LOG.info( "IRQ controller: Not enabled: " + source );
+            }
         }
     }
 
@@ -276,7 +284,10 @@ Priority     Priority     Description                  Name
             // set bits
             irqEnabled |= (value & ~(1 << 15));
         }
-        LOG.info(  "IRQs: " + this  );
+        if ( DEBUG )
+        {
+            LOG.info( "IRQs: " + this );
+        }
     }
 
     public String toString()
