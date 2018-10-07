@@ -10,6 +10,7 @@ import de.codesourcery.m68k.emulator.exceptions.CPUResetException;
 import de.codesourcery.m68k.emulator.exceptions.IllegalInstructionException;
 import de.codesourcery.m68k.emulator.exceptions.MemoryAccessException;
 import de.codesourcery.m68k.emulator.memory.Memory;
+import de.codesourcery.m68k.utils.DeduplicatingLogger;
 import de.codesourcery.m68k.utils.Misc;
 import de.codesourcery.m68k.utils.OpcodeFileReader;
 import org.apache.commons.lang3.StringUtils;
@@ -32,6 +33,8 @@ import java.util.Map;
 public class CPU
 {
     private static final Logger LOG = LogManager.getLogger( CPU.class.getName() );
+
+    private static final boolean DEBUG_IRQS = false;
 
     private static final boolean DEBUG = false;
     private static final boolean DEBUG_RECORD_BACKTRACE = true;
@@ -774,11 +777,12 @@ TODO: Not all of them apply to m68k (for example FPU/MMU ones)
 
     public void executeOneCycle()
     {
-        if ( --cycles > 0 ) {
+        if ( stopped ) { // TODO: Move above "--cycles" line so that cycles does not go below zero when CPU is stopped...
+            checkPendingIRQ();
             return;
         }
 
-        if ( stopped ) { // TODO: Move above "--cycles" line so that cycles does not go below zero when CPU is stopped...
+        if ( --cycles > 0 ) {
             return;
         }
 
@@ -1647,7 +1651,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         if ( pendingExternalInterrupts != 0 )
         {
             // process hardware interrupts
-            final int minPrio = (statusRegister & FLAG_I2|FLAG_I1|FLAG_I0) >>> 8;
+            final int minPrio = (statusRegister & (FLAG_I2|FLAG_I1|FLAG_I0)) >>> 8;
 
             for ( int i = 7 ; i > minPrio ; i-- )
             {
@@ -1669,7 +1673,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
 
                     if ( activeIrq == null || activeIrq.priority < irq.priority )
                     {
-                        LOG.info("Now handling pending external interrupt "+irq);
+                        if ( DEBUG_IRQS )
+                        {
+                            LOG.info( "Now handling pending external interrupt " + irq );
+                        }
                         pendingExternalInterrupts &= ~mask;
                         triggerIRQ(irq, 0);
                         return;
@@ -1689,7 +1696,10 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
             {
                 irqStackPtr--;
                 final IRQ irq = irqStack[irqStackPtr];
-                LOG.info("Now handling internal interrupt "+irq);
+                if ( DEBUG_IRQS )
+                {
+                    LOG.info( "Now handling internal interrupt " + irq );
+                }
                 final long irqData = this.irqData[irqStackPtr];
                 irqStack[irqStackPtr] = null;
                 this.irqData[irqStackPtr] = 0;
@@ -1728,7 +1738,7 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
         // TODO: Implement support for emulating hardware interrupts, needs
         // TODO: to honor FLAG_I2|FLAG_I1|FLAG_I0 priorities (IRQs with less than/equal priority get ignored)
 
-        final int minPrio = (statusRegister & FLAG_I2 | FLAG_I1 | FLAG_I0) >>> 8;
+        final int minPrio = (statusRegister & (FLAG_I2 | FLAG_I1 | FLAG_I0)) >>> 8;
         if (priority > minPrio)
         {
             IRQ irq;
@@ -1744,20 +1754,33 @@ C — Set according to the last bit shifted out of the operand; cleared for a sh
                 default:
                     throw new IllegalArgumentException("Priority must be >= 1 && <= 8 but was " + priority);
             }
-            LOG.info("External interrupt: "+irq);
+            if ( DEBUG_IRQS )
+            {
+                LOG.info( "External interrupt: " + irq );
+            }
             triggerIRQ(irq,0);
             return;
         }
         // just remember that this IRQ happened
         final int mask = 1<<priority;
-        if ( ( pendingExternalInterrupts & mask ) == 0 )
+        if ( DEBUG_IRQS )
         {
-            LOG.info("PENDING external interrupt: "+priority);
-            pendingExternalInterrupts |= (1 << priority); // bits (1<<1) ... (1<<7)
-        } else {
-            LOG.info("Already pending external interrupt: "+priority);
+            if ( ( pendingExternalInterrupts & mask ) == 0 )
+            {
+                LOG2.info("PENDING external interrupt: "+priority);
+                pendingExternalInterrupts |= mask; // bits (1<<1) ... (1<<7)
+            } else {
+                LOG2.info("Already pending external interrupt: "+priority);
+            }
+        }
+        else
+        {
+            pendingExternalInterrupts |= mask; // bits (1<<1) ... (1<<7)
         }
     }
+
+    private static final DeduplicatingLogger LOG2 =
+            new DeduplicatingLogger( LOG );
 
     private void triggerIRQ(IRQ irq, long irqData)
     {

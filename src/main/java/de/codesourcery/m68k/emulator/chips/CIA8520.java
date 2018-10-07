@@ -1,6 +1,7 @@
 package de.codesourcery.m68k.emulator.chips;
 
 import de.codesourcery.m68k.emulator.Amiga;
+import de.codesourcery.m68k.utils.DeduplicatingLogger;
 import de.codesourcery.m68k.utils.IBus;
 import de.codesourcery.m68k.utils.Misc;
 import org.apache.logging.log4j.LogManager;
@@ -87,9 +88,10 @@ import org.apache.logging.log4j.Logger;
  */
 public class CIA8520
 {
-    private static final Logger LOG = LogManager.getLogger( CIA8520.class.getName() );
+    private static final Logger REAL_LOG = LogManager.getLogger( CIA8520.class.getName() );
+    private static final DeduplicatingLogger LOG = new DeduplicatingLogger( REAL_LOG );
 
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     public enum Name
     {

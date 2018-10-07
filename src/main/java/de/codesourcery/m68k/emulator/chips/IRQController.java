@@ -1,12 +1,14 @@
 package de.codesourcery.m68k.emulator.chips;
 
 import de.codesourcery.m68k.emulator.CPU;
+import de.codesourcery.m68k.utils.DeduplicatingLogger;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class IRQController
 {
-    private static final Logger LOG = LogManager.getLogger( IRQController.class.getName() );
+    private static final Logger LOG2 = LogManager.getLogger( IRQController.class.getName() );
+    private static final DeduplicatingLogger LOG = new DeduplicatingLogger( LOG2 );
 
     private final CPU cpu;
 
@@ -221,10 +223,10 @@ Priority     Priority     Description                  Name
         }
         if ( (irqEnabled & enabledMask) == enabledMask )
         {
-            System.out.println("IRQ controller: Triggering "+source);
+            LOG.info("IRQ controller: Triggering "+source);
             cpu.externalInterrupt( priority );
         } else {
-            System.out.println("IRQ controller: Not enabled: "+source);
+            LOG.info("IRQ controller: Not enabled: "+source);
         }
     }
 
