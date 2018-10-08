@@ -431,7 +431,9 @@ NAME        ADD  R/W  CHIP    FUNCTION
         if ( adr >= 0x40 && adr <= 0x74 )
         {
             final int regOffset = adr - 0x040;
-            blitter.writeWord( regOffset, value);
+            blitter.writeWord( regOffset, value );
+        } else if ( adr == 0x2e || adr >= 0x80 && adr <= 0x8c ) { // COPCON
+            video.writeWord( adr, value );
         } else if ( adr == 0x96 ) {
             writeDMACON( value );
         } else if ( adr >= 0x0e0 && adr <= 0x1E5) {
@@ -455,7 +457,7 @@ NAME        ADD  R/W  CHIP    FUNCTION
             current |= (value & ~(1<<15) );
         } else {
             // clear bits
-            current &= (value & ~(1<<15) );
+            current &= ~value;
         }
         blitter.dmaController.flags=current;
         LOG.info( blitter.dmaController );

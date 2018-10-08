@@ -17,8 +17,9 @@ public class MMUTest extends TestCase
     {
         super.setUp();
         final Amiga amiga = Amiga.AMIGA_500;
-        final Blitter blitter = new Blitter(new DMAController());
-        final Video video = new Video(amiga);
+        final DMAController dmaCtrl = new DMAController();
+        final Blitter blitter = new Blitter( dmaCtrl );
+        final Video video = new Video(amiga,blitter,dmaCtrl);
         this.mmu = new MMU(new MMU.PageFaultHandler(amiga, blitter, video ));
         final Memory memory = new Memory(this.mmu);
         blitter.setMemory( memory );

@@ -26,8 +26,9 @@ public class MemoryTest extends TestCase
     {
         super.setUp();
         final Amiga amiga = Amiga.AMIGA_500;
-        final Blitter blitter = new Blitter(new DMAController());
-        final Video video = new Video(amiga);
+        final DMAController dmaCtrl = new DMAController();
+        final Blitter blitter = new Blitter( dmaCtrl );
+        final Video video = new Video(amiga,blitter,dmaCtrl);
         mmu = new MMU( new MMU.PageFaultHandler(amiga, blitter, video ) );
         memory = new Memory(mmu);
         blitter.setMemory( memory );

@@ -30,10 +30,11 @@ public class DisassemblerTest extends TestCase
         super.setUp();
         asm = new Assembler();
 
-        final Blitter blitter = new Blitter(new DMAController());
+        final DMAController dmaCtrl = new DMAController();
+        final Blitter blitter = new Blitter( dmaCtrl );
 
         final Amiga amiga = Amiga.AMIGA_500;
-        final Video video = new Video(amiga);
+        final Video video = new Video(amiga,blitter,dmaCtrl);
         mmu = new MMU( new MMU.PageFaultHandler(amiga, blitter, video ) );
         memory = new Memory(mmu);
         blitter.setMemory( memory );

@@ -24,9 +24,10 @@ public class CIA8520Test extends TestCase
     @Override
     protected void setUp()
     {
-        final Blitter blitter = new Blitter(new DMAController());
+        final DMAController dmaCtrl = new DMAController();
+        final Blitter blitter = new Blitter( dmaCtrl );
         final Amiga amiga = Amiga.AMIGA_500;
-        final Video video = new Video(amiga);
+        final Video video = new Video(amiga,blitter,dmaCtrl);
         final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler( amiga, blitter, video );
         final MMU mmu = new MMU( faultHandler );
         final Memory memory = new Memory(mmu);

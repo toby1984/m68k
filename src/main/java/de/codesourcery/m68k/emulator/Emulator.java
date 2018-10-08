@@ -120,7 +120,7 @@ public class Emulator
         }
         this.dmaController = new DMAController();
         this.blitter = new Blitter(this.dmaController);
-        this.video = new Video(amiga);
+        this.video = new Video(amiga,this.blitter,this.dmaController);
         final MMU.PageFaultHandler faultHandler = new MMU.PageFaultHandler(amiga,blitter,video);
         this.mmu = new MMU(faultHandler);
         this.memory = new Memory(this.mmu);
