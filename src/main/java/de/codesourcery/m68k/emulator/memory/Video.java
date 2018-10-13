@@ -3,6 +3,7 @@ package de.codesourcery.m68k.emulator.memory;
 import de.codesourcery.m68k.emulator.Amiga;
 import de.codesourcery.m68k.emulator.chips.IRQController;
 import de.codesourcery.m68k.emulator.exceptions.MemoryAccessException;
+import de.codesourcery.m68k.utils.DeduplicatingLogger;
 import de.codesourcery.m68k.utils.Misc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -12,6 +13,7 @@ import java.util.Arrays;
 public class Video extends MemoryPage
 {
     private static final Logger LOG = LogManager.getLogger( Video.class.getName() );
+    public static final DeduplicatingLogger LOG2 = new DeduplicatingLogger(LOG);
 
     /* Agnus's timings are measured in "color clocks" of 280 ns.
      * This is equivalent to two low resolution (140 ns) pixels or
@@ -771,7 +773,7 @@ considering a left offset of (768-752)/2=8 Hires (16 Superhires) "unused" pixels
                         {
                             video.memory.writeWord( adr, video.copper.word2 );
                         } else {
-                            LOG.warn("Invalid copper write to register "+Misc.hex(adr));
+                            // LOG2.warn("Invalid copper write to register "+Misc.hex(adr));
                         }
                         return true;
                     }

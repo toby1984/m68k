@@ -2,12 +2,15 @@ package de.codesourcery.m68k.emulator.memory;
 
 import de.codesourcery.m68k.emulator.chips.IRQController;
 import de.codesourcery.m68k.emulator.exceptions.MemoryAccessException;
+import de.codesourcery.m68k.utils.Misc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class Blitter extends MemoryPage
 {
     private static final Logger LOG = LogManager.getLogger( Blitter.class.getName() );
+
+    public static final boolean DEBUG = true;
 
     /*
 Register	Name	description
@@ -225,9 +228,35 @@ width 1008 pixels.
                 }
             }
 
+            if ( DEBUG )
+            {
+                final int widthInPixels = wordsToProcess * 16 - zeroBitsInWord(bltafwm) - zeroBitsInWord(bltalwm);
+                System.out.println("Blitter is now active, " + wordsToProcess + " words (" + widthInPixels + ") x " + rowsToProcess);
+                System.out.println("Ascending: " + ascendingMode);
+                System.out.println("-------------------------");
+                System.out.println("Mask A first word: " + Misc.binary16Bit(bltafwm));
+                System.out.println("Mask A last  word: " + Misc.binary16Bit(bltalwm));
+                System.out.println("-------------------------");
+                System.out.println("bltaptr = " + Misc.hex(bltaptr));
+                System.out.println("bltbptr = " + Misc.hex(bltbptr));
+                System.out.println("bltcptr = " + Misc.hex(bltcptr));
+                System.out.println("bltdptr = " + Misc.hex(bltdptr));
+                System.out.println("-------------------------");
+                System.out.println("Shift A: " + shiftA);
+                System.out.println("Shift B: " + shiftB);
+                System.out.println("-------------------------");
+                System.out.println("Mask A first word: " + bltafwm);
+                System.out.println("Mask A last word: " + bltalwm);
+            }
+
             blitterDone = false;
             blitterActive = true;
         }
+    }
+
+    private static int zeroBitsInWord(int word)
+    {
+        return 16 - Integer.bitCount(word & 0xffff );
     }
 
     @Override
@@ -373,7 +402,7 @@ width 1008 pixels.
 
     public void tick()
     {
-        if ( blitterActive & dmaController.isBlitterDMAEnabled() )
+        if ( isBlitterActive() )
         {
             if ( isAreaMode() )
             {
@@ -384,6 +413,10 @@ width 1008 pixels.
                 tickLineMode();
             }
         }
+    }
+
+    public boolean isBlitterActive() {
+        return blitterActive & dmaController.isBlitterDMAEnabled();
     }
 
     private void tickAreaMode()
@@ -400,6 +433,10 @@ width 1008 pixels.
         {
             blitterDone = true;
             blitterActive = false;
+            if ( DEBUG )
+            {
+                System.out.println("Blitter DONE.");
+            }
             irqController.triggerIRQ( IRQController.IRQSource.BLITTER_FINISHED );
         }
 
