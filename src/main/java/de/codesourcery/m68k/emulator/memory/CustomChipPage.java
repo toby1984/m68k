@@ -428,6 +428,10 @@ NAME        ADD  R/W  CHIP    FUNCTION
     public void writeWord(int offset, int value) throws MemoryAccessException
     {
         final int adr = (startAddress+offset) & 0x1ff;
+        switch( adr ) {
+            case 0x34: // TODO: POTGO, currently silently dropped
+                return;
+        }
         if ( adr >= 0x40 && adr <= 0x74 )
         {
             final int regOffset = adr - 0x040;
@@ -444,7 +448,7 @@ NAME        ADD  R/W  CHIP    FUNCTION
         } else if ( adr == 0x09c) { // INTREQR
             irqController.writeIRQReq( value );
         } else {
-            LOG.info( "CHIPSET: Unhandled word write @ "+registerName(startAddress+offset) );
+            LOG.info( "CHIPSET: Unhandled word write "+Misc.hex(value)+" ("+Misc.binary16Bit( value )+" @ "+registerName(startAddress+offset) );
         }
     }
 

@@ -1,5 +1,7 @@
 package de.codesourcery.m68k.emulator.memory;
 
+import de.codesourcery.m68k.disassembler.ChipRegisterResolver;
+import de.codesourcery.m68k.disassembler.RegisterDescription;
 import de.codesourcery.m68k.emulator.Amiga;
 import de.codesourcery.m68k.emulator.chips.IRQController;
 import de.codesourcery.m68k.emulator.exceptions.MemoryAccessException;
@@ -13,6 +15,10 @@ import java.util.Arrays;
 public class Video extends MemoryPage
 {
     private static final Logger LOG = LogManager.getLogger( Video.class.getName() );
+
+    private static final ChipRegisterResolver REGISTER_RESOLVER =
+            new ChipRegisterResolver( null );
+
     public static final DeduplicatingLogger LOG2 = new DeduplicatingLogger(LOG);
 
     /* Agnus's timings are measured in "color clocks" of 280 ns.
@@ -358,7 +364,7 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
             }
             return;
         }
-        LOG.info( "VIDEO: Unhandled write to offset "+offset );
+        LOG.info( "VIDEO: Unhandled write " + Misc.hex( value ) + " (" + Misc.binary16Bit( value ) + ") to offset " + offset );
     }
 
     @Override
@@ -432,7 +438,12 @@ See http://amigadev.elowar.com/read/ADCD.../node004C.html
             bpldat[idx] = value;
             return;
         }
-        LOG.info( "VIDEO: Word write access to unhandled register "+ Misc.hex(offset) );
+        if ( LOG.isInfoEnabled() )
+        {
+            final RegisterDescription desc = REGISTER_RESOLVER.resolve( 0xdff000 + offset );
+            final String regName = (desc == null ? "" : desc.name) + " ("+Misc.hex( 0xdff000 + offset )+")";
+            LOG.info( "VIDEO: Unhandled word write " + Misc.hex( value ) + " (" + Misc.binary16Bit( value ) + ") to "+regName );
+        }
     }
 
     private static byte hi(int value) {
@@ -623,6 +634,7 @@ NTSC|  241    |     483
             if ( vpos == maxY ) {
                 vpos = 0;
                 longFrame = 0;
+                copper.restart();
             }
         }
     }
@@ -894,7 +906,7 @@ considering a left offset of (768-752)/2=8 Hires (16 Superhires) "unused" pixels
 
         public void tick()
         {
-            if ( --cycles == 0 )
+            if ( --cycles <= 0 )
             {
                 if ( currentInstruction != null )
                 {

@@ -61,7 +61,11 @@ public class CopperStateWindow extends AppWindow implements
 
         buffer.append("Copper DMA enabled: ").append( emulator.dmaController.isCopperDMAEnabled() ).append("\n\n");
 
+        buffer.append("Active list: ").append( copper.list1Active ? "#1" : "#2" ).append("\n");
+        buffer.append("PC @ ").append( Misc.hex( copper.pc ) ).append("\n\n");
         buffer.append("COPLST1 = ").append( Misc.hex( copper.list1Addr ) ).append("\n\n");
+        buffer.append("COPLST2 = ").append( Misc.hex( copper.list2Addr ) ).append("\n\n");
+
         disassemble( copper.list1Addr, 20 , emulator,copper.pc);
         buffer.append("\n\n===================\n\n");
 
