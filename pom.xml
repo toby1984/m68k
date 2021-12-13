@@ -9,7 +9,7 @@
     <version>1.0.0-SNAPSHOT</version>
 
     <properties>
-        <log4.version>2.11.1</log4.version>
+        <log4.version>2.15.0</log4.version>
     </properties>
 
     <dependencyManagement>
